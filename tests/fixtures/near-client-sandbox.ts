@@ -11,6 +11,9 @@ import type { NearSignerConfig } from "../../packages/near/src/protocol.js";
 import { isObject, type BlobRef, type BlobStore } from "../../packages/protocol/src/memory.js";
 import { ProviderError } from "../../packages/protocol/src/providers.js";
 
+let fixtureStage = "bootstrap";
+let observedStatus: string | undefined;
+
 class SyntheticFixtureBlobs implements BlobStore {
   constructor(private readonly directory: string) {}
   async put(bytes: Uint8Array): Promise<BlobRef> {
@@ -34,7 +37,7 @@ async function main(): Promise<void> {
   assert.equal(url.protocol, "http:"); assert.equal(url.hostname, "127.0.0.1");
   // This bootstrap discovers the disposable sandbox's random chain ID only.
   // Public deployment config must set chainId=testnet explicitly.
-  const status: unknown = await (await fetch(input.rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "fixture", method: "status", params: {} }) })).json();
+  const status: unknown = await (await fetch(input.rpcUrl, { method: "POST", signal: AbortSignal.timeout(10_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "fixture", method: "status", params: {} }) })).json();
   assert.ok(isObject(status) && isObject(status.result) && typeof status.result.chain_id === "string");
   const config: NearSignerConfig = { kind: "sandbox", chainId: status.result.chain_id, rpcUrl: input.rpcUrl,
     contractId: String(input.contractId), signerId: String(input.signerId), publicKey: String(input.publicKey), agentId: String(input.agentId),
@@ -44,6 +47,7 @@ async function main(): Promise<void> {
   const blobs = new SyntheticFixtureBlobs(join(input.directory, "ciphertext"));
   const inputMemory = { operationId: "memory:fixture", text: "Research reports must cite dated primary sources.", source: { kind: "owner" as const, reference: "sandbox:owner-preference" } };
   if (input.phase === "write") {
+    fixtureStage = "write-checkpoint";
     assert.equal(typeof input.runtimeSecretKey, "string");
     await writeFile(config.runtimeKeyFile, String(input.runtimeSecretKey), { flag: "wx", mode: 0o600 });
     let transactionHash: string | undefined;
@@ -52,6 +56,7 @@ async function main(): Promise<void> {
       submit: async (...args: Parameters<IsolatedNearSigner["submit"]>) => {
         operationId = args[0];
         const outcome = await signer.submit(...args);
+        observedStatus = outcome.status;
         assert.equal(outcome.status, "confirmed");
         transactionHash = outcome.transactionHash;
         throw new ProviderError("OUTCOME_UNKNOWN", "Injected lost checkpoint response", false, outcome.transactionHash);
@@ -61,15 +66,18 @@ async function main(): Promise<void> {
     const memory = new MemoryService(config.agentId, Buffer.alloc(32, 42), 1, blobs, new NearMemoryHeadStore(reader, config, loseResponse));
     await assert.rejects(memory.remember(inputMemory), { code: "OUTCOME_UNKNOWN" });
     assert.ok(transactionHash);
+    fixtureStage = "read-written-checkpoint";
     const a = await reader.agent(config.agentId);
     assert.equal(a.head?.version, 1);
     console.log(JSON.stringify({ phase: "write", evidence: "local-sandbox-synthetic-storage", transactionHash, operationId, version: 1 }));
   } else if (input.phase === "reconcile") {
+    fixtureStage = "reconcile-without-key";
     await assert.rejects(readFile(config.runtimeKeyFile));
     const outcome = await signer.reconcile(String(input.checkpointOperationId));
     assert.equal(outcome.status, "confirmed");
     console.log(JSON.stringify({ phase: "reconcile", status: outcome.status, transactionHash: outcome.transactionHash }));
   } else if (input.phase === "reserve" || input.phase === "accept") {
+    fixtureStage = input.phase;
     const treasury = new NearTreasuryClient(reader, config, signer);
     const state = await reader.agent(config.agentId);
     let job;
@@ -88,6 +96,7 @@ async function main(): Promise<void> {
     }
     console.log(JSON.stringify({ phase: input.phase, evidence: "local-sandbox-synthetic-storage", status: job.status, amount: job.amount }));
   } else {
+    fixtureStage = "recover-without-key-or-journal";
     assert.equal(input.phase, "recover");
     await assert.rejects(readFile(config.runtimeKeyFile));
     await assert.rejects(readFile(config.journalFile));
@@ -102,6 +111,9 @@ async function main(): Promise<void> {
   }
 }
 main().catch((error: unknown) => {
-  console.error(JSON.stringify({ status: "failed", code: error instanceof ProviderError ? error.code : "FIXTURE_ASSERTION_FAILED" }));
+  // Test diagnostics keep source locations/statuses, never assertions' actual
+  // payloads, input, SDK exception messages, keys, or decrypted content.
+  const locations = error instanceof Error ? error.stack?.split("\n").filter((line) => /^\s+at /.test(line)).slice(0, 4) : [];
+  console.error(JSON.stringify({ status: "failed", code: error instanceof ProviderError ? error.code : "FIXTURE_ASSERTION_FAILED", stage: fixtureStage, observedStatus, locations }));
   process.exitCode = 1;
 });

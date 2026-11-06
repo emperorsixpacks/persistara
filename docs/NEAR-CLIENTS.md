@@ -30,6 +30,8 @@ accept_job
 
 Record a matching delegate grant on the agent. Use a finite gas allowance. The signer rejects full-access keys, unrestricted method lists, extra methods, wrong receivers, zero/unbounded allowances, mismatched key files, the registration owner key, paused agents and absent/expired/insufficient grants. It checks the chain's finalized timestamp for expiry. Contract checks remain authoritative if state changes after this preflight.
 
+Wait for finality on owner setup transactions before starting a runtime session: registration, funding, policy and delegate grants must be finalized. The sandbox scenario explicitly waits for this boundary because its Rust setup API returns optimistic outcomes while the application reads finalized state.
+
 Use **one dedicated runtime key per agent and one journal per key**. Do not use that key through another SDK, process with an independent journal, account/contract configuration, or manual CLI. The default journal path is derived from account/public-key scope, and its stored binding also includes network, contract and agent, so accidental default-path reuse is rejected. Overriding the path does not make sharing a key safe.
 
 Key and journal files require private permissions. Journal directories require mode 0700, files 0600. The worker refuses a symlink key/file through `O_NOFOLLOW`. The journal contains signed transactions, which are capabilities while valid; keep it private and include it in trusted operational backups. It does not contain private keys or decrypted memory. OS/process isolation and the trusted owner machine remain part of the threat model; a child process is not a filesystem/network sandbox.

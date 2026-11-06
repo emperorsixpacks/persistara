@@ -87,6 +87,28 @@ async fn settle_gas_refunds(worker: &Worker<Sandbox>) -> Result<()> {
     Ok(())
 }
 
+async fn wait_for_finalized_setup(contract: &Contract, id: &str) -> Result<()> {
+    // near-workspaces transactions/read defaults are optimistic. Application
+    // clients intentionally read final state, so onboarding must be final first.
+    let expected = agent(contract, id).await?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    while contract
+        .view("get_agent")
+        .args_json(json!({"agent_id":id}))
+        .finality(near_workspaces::types::Finality::Final)
+        .await?
+        .json::<Value>()?
+        != expected
+    {
+        anyhow::ensure!(
+            std::time::Instant::now() < deadline,
+            "sandbox setup did not finalize"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    Ok(())
+}
+
 fn request(
     id: &str,
     op: &str,
@@ -434,6 +456,7 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
         .into_result()?;
     let now = worker.view_block().await?.timestamp();
     owner.call(contract.id(), "set_delegate").args_json(json!({"agent_id":id,"delegate":{"publicKey":key.public_key().to_string(),"expiresAtNs":(now+24*HOUR).to_string(),"canCheckpoint":true,"canSpend":true}})).max_gas().transact().await?.into_result()?;
+    wait_for_finalized_setup(&contract, &id).await?;
     let directory = std::env::temp_dir().join(format!(
         "persistara-application-{}-{now}",
         std::process::id()
