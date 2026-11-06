@@ -7,7 +7,7 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 | Plan | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | 001 | New repo, provenance, memory protocol and adversarial foundation tests | — | DONE — 20 tests pass; private GitHub repo created |
-| 002 | Live 0G storage adapter and verified private inference spike | 001 | TODO |
+| 002 | Live 0G storage adapter and verified private inference spike | 001 | IN PROGRESS — adapters and 38 offline tests pass; live gates await credentials/funds |
 | 003 | NEAR registry, revocation, budgeted treasury and escrow | 001 | TODO |
 | 004 | Recoverable indexed memory and owner recovery workflow | 002, 003 | TODO |
 | 005 | Durable missions, signed worker protocol, authenticated API | 003, 004 | TODO |
@@ -16,6 +16,8 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 Plans 002 and 003 are independent after 001. This is a dependency observation, not permission to spawn other agents. Keep work single-agent unless the operator authorizes delegation.
 
 Foundation evidence: `pnpm check` completed with 20 passing tests in three suites; eight reviewed source hashes matched; tracked-file and whitespace checks passed. Initial implementation commit: `950b82c`. Remote: https://github.com/JemIIahh/persistara (private). Live-provider and contract acceptance gates remain unexecuted.
+
+Provider milestone evidence (2026-11-06): isolated Node 24.22.2; pinned 0G SDK 1.2.13 and NEAR AI SDK 0.2.1 import successfully; 38 tests in seven suites pass. Read-only Galileo RPC reports the expected chain ID, and the public NEAR AI catalog is reachable. No paid upload/inference, real storage proof roundtrip, or live TEE verification has been completed. See `docs/INTEGRATIONS.md` for setup and acceptance commands.
 
 ## Release priorities
 

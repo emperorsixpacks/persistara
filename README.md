@@ -10,13 +10,13 @@ Repository: https://github.com/JemIIahh/persistara. Development visibility: priv
 
 ## Current implementation
 
-This is the foundation milestone, not the finished application. Implemented: typed storage and registry boundaries, authenticated memory encryption, encrypted manifests, idempotent memory writes, checkpoint conflict handling, recovery from a committed head, and a local disk-backed blob adapter. Tests exercise corruption, incorrect keys, cross-agent substitution, replay/conflict cases, and recovery without the original memory-service instance.
+Implemented: typed storage and registry boundaries, authenticated memory encryption, encrypted manifests, idempotent memory writes, checkpoint conflict handling, recovery from a committed head, and a local disk-backed blob adapter. Provider adapters now connect the pinned 0G and NEAR AI SDKs through isolated processes, with strict evidence validation and reproducible diagnostic/spike commands.
 
-**Not implemented yet:** live NEAR contracts, live 0G adapter, NEAR AI inference, durable mission worker, authenticated API, or product console. Local/in-memory adapters in tests are explicitly test fixtures, not blockchain deployments. No live network transaction has been performed.
+**Not implemented yet:** NEAR contracts, durable mission worker, authenticated API, or product console. **Live-provider acceptance is pending** funded testnet uploader and NEAR AI credentials; no upload transaction or paid inference has been performed. Galileo RPC identity and the public NEAR AI model catalog have been checked. Local/in-memory test adapters are fixtures, not blockchain deployments.
 
 ## Development
 
-- Node.js 22.22 or newer for this foundation. The planned verified NEAR AI SDK adapter has a higher runtime requirement; see `docs/ARCHITECTURE.md` before integrating it.
+- Node.js >=24.22.1. pnpm downloads the pinned project-local Node 24.22.2 runtime; the global installation is unchanged.
 - pnpm 10.26.0.
 
 ```sh
@@ -26,7 +26,9 @@ pnpm check
 
 `pnpm check` typechecks, builds, and runs the foundation tests. No credentials, faucet, or network is needed to execute those tests after installation.
 
-Foundation verification: **20 tests passing**, covering authenticated encryption, memory recovery, concurrency, corruption, and operation deduplication. These are local protocol tests; they are not evidence of a deployed NEAR or 0G integration.
+Verification: **38 tests passing**, covering authenticated encryption, memory recovery, concurrency, corruption, provider contracts, evidence rejection and worker cancellation. These are offline tests; they are not evidence of a deployed NEAR or 0G integration.
+
+For provider setup, run `pnpm provider:doctor` and follow [live integration instructions](docs/INTEGRATIONS.md). Missing prerequisites exit nonzero; the commands never silently substitute test fixtures.
 
 ## Build specification
 
@@ -36,6 +38,7 @@ Foundation verification: **20 tests passing**, covering authenticated encryption
 - [Source selection and attribution](docs/MIGRATION.md)
 - [Execution order and release gates](plans/README.md)
 - [Verified integration references](docs/REFERENCES.md)
+- [Provider setup and live acceptance](docs/INTEGRATIONS.md)
 
 ## License and provenance
 

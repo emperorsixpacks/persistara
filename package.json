@@ -6,15 +6,34 @@
   "description": "Owner-controlled agents with recoverable memory, durable missions, and bounded commerce on NEAR.",
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.26.0",
-  "engines": { "node": ">=22.22.0" },
+  "engines": {
+    "node": ">=24.22.1"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "pnpm build && node --test dist/tests/*.test.js",
-    "check": "pnpm typecheck && pnpm test"
+    "check": "pnpm typecheck && pnpm test",
+    "provider:doctor": "pnpm build && node dist/scripts/provider-doctor.js",
+    "storage:wallet": "pnpm build && node dist/scripts/storage-wallet.js",
+    "inference:models": "pnpm build && node dist/scripts/inference-models.js",
+    "spike:storage": "pnpm build && node dist/scripts/storage-roundtrip.js",
+    "spike:inference": "pnpm build && node dist/scripts/inference-verify.js"
   },
   "devDependencies": {
     "@types/node": "22.19.0",
     "typescript": "5.9.3"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.22.2",
+      "onFail": "download"
+    }
+  },
+  "dependencies": {
+    "@0gfoundation/0g-storage-ts-sdk": "1.2.13",
+    "@nearai/inference-sdk": "0.2.1",
+    "ethers": "6.13.1"
   }
 }
