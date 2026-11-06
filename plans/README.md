@@ -6,7 +6,7 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 
 | Plan | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| 001 | New repo, provenance, memory protocol and adversarial foundation tests | — | IN PROGRESS |
+| 001 | New repo, provenance, memory protocol and adversarial foundation tests | — | DONE — 20 tests pass; private GitHub repo created |
 | 002 | Live 0G storage adapter and verified private inference spike | 001 | TODO |
 | 003 | NEAR registry, revocation, budgeted treasury and escrow | 001 | TODO |
 | 004 | Recoverable indexed memory and owner recovery workflow | 002, 003 | TODO |
@@ -14,6 +14,8 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 | 006 | Operational console, live demo, release evidence | 005 | TODO |
 
 Plans 002 and 003 are independent after 001. This is a dependency observation, not permission to spawn other agents. Keep work single-agent unless the operator authorizes delegation.
+
+Foundation evidence: `pnpm check` completed with 20 passing tests in three suites; eight reviewed source hashes matched; tracked-file and whitespace checks passed. Initial implementation commit: `950b82c`. Remote: https://github.com/JemIIahh/persistara (private). Live-provider and contract acceptance gates remain unexecuted.
 
 ## Release priorities
 

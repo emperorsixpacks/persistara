@@ -6,6 +6,8 @@ Persistara is a new successor to Sofer: a workspace for owner-controlled agents 
 
 The selected stack is **NEAR ownership and settlement + 0G encrypted storage + NEAR AI inference**. This repository starts fresh. It selectively adapts reviewed Sofer primitives; it is not a renamed copy or a claim that old work was built during the hackathon.
 
+Repository: https://github.com/JemIIahh/persistara. Development visibility: private; the hackathon release must be public by its submission deadline.
+
 ## Current implementation
 
 This is the foundation milestone, not the finished application. Implemented: typed storage and registry boundaries, authenticated memory encryption, encrypted manifests, idempotent memory writes, checkpoint conflict handling, recovery from a committed head, and a local disk-backed blob adapter. Tests exercise corruption, incorrect keys, cross-agent substitution, replay/conflict cases, and recovery without the original memory-service instance.
@@ -23,6 +25,8 @@ pnpm check
 ```
 
 `pnpm check` typechecks, builds, and runs the foundation tests. No credentials, faucet, or network is needed to execute those tests after installation.
+
+Foundation verification: **20 tests passing**, covering authenticated encryption, memory recovery, concurrency, corruption, and operation deduplication. These are local protocol tests; they are not evidence of a deployed NEAR or 0G integration.
 
 ## Build specification
 
