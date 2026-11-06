@@ -7,17 +7,19 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 | Plan | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | 001 | New repo, provenance, memory protocol and adversarial foundation tests | — | DONE — 20 tests pass; private GitHub repo created |
-| 002 | Live 0G storage adapter and verified private inference spike | 001 | IN PROGRESS — adapters and 38 offline tests pass; live gates await credentials/funds |
-| 003 | NEAR registry, revocation, budgeted treasury and escrow | 001 | TODO |
+| 002 | Live 0G storage adapter and verified private inference spike | 001 | DEFERRED at user request — AI credits can be arranged later; uploader has 0.5 testnet 0G |
+| 003 | NEAR registry, revocation, budgeted treasury and escrow | 001 | IN PROGRESS — contract implemented; application client and public testnet gates remain |
 | 004 | Recoverable indexed memory and owner recovery workflow | 002, 003 | TODO |
 | 005 | Durable missions, signed worker protocol, authenticated API | 003, 004 | TODO |
 | 006 | Operational console, live demo, release evidence | 005 | TODO |
 
 Plans 002 and 003 are independent after 001. This is a dependency observation, not permission to spawn other agents. Keep work single-agent unless the operator authorizes delegation.
 
-Foundation evidence: `pnpm check` completed with 20 passing tests in three suites; eight reviewed source hashes matched; tracked-file and whitespace checks passed. Initial implementation commit: `950b82c`. Remote: https://github.com/JemIIahh/persistara (private). Live-provider and contract acceptance gates remain unexecuted.
+Foundation evidence: `pnpm check` completed with 20 passing tests in three suites; eight reviewed source hashes matched; tracked-file and whitespace checks passed. Initial implementation commit: `950b82c`. Remote: https://github.com/JemIIahh/persistara (private). Public live-provider and contract acceptance gates remain unexecuted.
 
 Provider milestone evidence (2026-11-06): isolated Node 24.22.2; pinned 0G SDK 1.2.13 and NEAR AI SDK 0.2.1 import successfully; 38 tests in seven suites pass. Read-only Galileo RPC reports the expected chain ID, and the public NEAR AI catalog is reachable. No paid upload/inference, real storage proof roundtrip, or live TEE verification has been completed. See `docs/INTEGRATIONS.md` for setup and acceptance commands.
+
+Contract milestone evidence (2026-11-06): optimized authority WASM builds with Rust 1.96.0 / near-sdk 5.30.1 / cargo-near 0.22.0. 25 unit tests and two deployed-WASM scenarios on local NEAR sandbox 2.14.0 pass. Scenarios include scoped keys, revoked delegates, stale checkpoints, budget/storage rollback, exact native payouts, failed-payment retry, duplicate prevention and withdrawal. TypeScript checks still pass all 38 tests. See `docs/CONTRACTS.md` for artifact checksum, accounting and release limitations. Plan 003 stays in progress until restricted client wiring and public testnet evidence exist.
 
 ## Release priorities
 
@@ -39,4 +41,4 @@ Do not skip a P0 gate to preserve a date. Reduce secondary features instead. A l
 
 Existing foundation commands: `pnpm install`, `pnpm typecheck`, `pnpm build`, `pnpm test`, `pnpm check`.
 
-Contract, provider, API, and browser scripts named in later plans are **planned interfaces**, not existing commands. Each plan's first implementation step must add its script and document its toolchain. Do not report them passing until they exist and have actually run.
+Provider diagnostic/spike commands and `contract:build`, `contract:test`, `contract:sandbox`, `contract:check` now exist. API and browser scripts named in later plans remain **planned interfaces**. Each plan's first implementation step must add its script and document its toolchain. Do not report a command passing until it has actually run.

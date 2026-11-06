@@ -1,0 +1,21 @@
+[package]
+name = "persistara-contract-tests"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "Apache-2.0"
+publish = false
+
+[features]
+sandbox = []
+
+[dev-dependencies]
+near-workspaces = { version = "=0.24.0", default-features = false, features = ["rustls"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+serde_json.workspace = true
+anyhow = "1"
+
+[[test]]
+name = "sandbox"
+path = "tests/sandbox.rs"
+required-features = ["sandbox"]

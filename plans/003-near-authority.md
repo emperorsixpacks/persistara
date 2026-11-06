@@ -4,7 +4,9 @@ Priority P0 · risk high · effort two to three days. Depends on 001, independen
 
 ## Current state and scope
 
-`packages/protocol/src/memory.ts` defines `MemoryHeadStore` but has no live implementation. Add Rust NEAR contracts in `contracts/registry` and `contracts/treasury`, clients in `packages/near/src`, and sandbox tests. Native NEAR is the only purchasing asset in v1. Do not add Intents, NFTs, stablecoins, or cross-owner agent sales to this milestone.
+The Rust NEAR authority contract is implemented in `contracts/authority`, split into registry and treasury modules, with unit and deployed-WASM sandbox scenarios. `packages/protocol/src/memory.ts` defines `MemoryHeadStore` but has no live NEAR client yet. Finalized-view/restricted-signer clients in `packages/near/src` and a public testnet smoke flow remain. Native NEAR is the only purchasing asset in v1. Do not add Intents, NFTs, stablecoins, or cross-owner agent sales to this milestone.
+
+Implementation decision: co-locate registry and treasury in one deployed contract so delegate generations, pause state, and budgets are checked atomically when funds are reserved. Independent contracts would add an asynchronous authorization race without adding first-release product value. Payments to workers still require asynchronous transfer/callback accounting.
 
 ## Contract requirements
 
@@ -22,7 +24,7 @@ Every job creation and payment request binds an operation ID to a canonical requ
 2. Implement registry owner/delegate management and compare-and-swap checkpoints. Check expected version, generation, status, epoch, reference bounds, and signer authority. Events include versions and operation IDs, not sensitive memory.
 3. Implement native-NEAR funding and reservations with checked integer arithmetic and explicit storage/gas reserves. Reject over-budget, overspend-across-two-jobs, expired quote, unknown provider, and replay cases.
 4. Finalize job deadlines before live funding: worker delivery deadline, buyer review deadline, owner-mediated dispute authority, and an escalation/expiry path that does not leave unbounded unresolved states. Encode transitions in a testable state machine; document what happens if the owner never responds.
-5. Implement `payout_pending`/`refund_pending` and callback outcome processing. A failed transfer remains claimable; duplicate callbacks/claims cannot pay twice. Cross-contract calls are asynchronous and may fail independently.
+5. Implement pending transfer/callback outcome processing. A failed payout remains claimable; duplicate callbacks/claims cannot pay twice. Refunds move reservations back to the internal treasury; owner withdrawals use their own pending transfer/callback. Cross-contract calls are asynchronous and may fail independently.
 6. Implement clients that wait for the documented final outcome and return `unknown` on unresolved submission status. Do not turn a timeout into a new operation with a new job ID.
 7. Run sandbox integration tests and then a small native-NEAR testnet smoke flow with user-owned development accounts. Record exact network, deployed code hash, transactions, and final states.
 

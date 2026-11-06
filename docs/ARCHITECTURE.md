@@ -19,7 +19,7 @@ flowchart TD
 
 ## Authority
 
-NEAR owns the canonical agent record: agent ID, owner, active/paused status, delegated runtime public keys and expiry, memory checkpoint version and reference, key epoch, and policy version. Do not treat a provider ID or an uploader EVM address as agent identity.
+NEAR owns the canonical agent record: agent ID, owner, active/paused status, delegated runtime public keys and expiry, memory checkpoint version and reference, key epoch, and policy version. Do not treat a provider ID or an uploader EVM address as agent identity. Registry and treasury are modules of one authority contract, so authorization and budget reservation execute atomically. See [contract semantics and limitations](CONTRACTS.md).
 
 Register a delegate through an owner-authorized transaction. The runtime signs with a NEAR function-call key scoped to the intended contract/methods. Because calls use the account holding the access key, contract authorization must validate the actual account and signer key, not only a claimed `agent_id` argument. Contract tests must cover two agents under one owner and cross-contract/cross-account calls. Owner-only methods are excluded from runtime key permissions.
 
@@ -47,7 +47,7 @@ Recovery requires both a finalized registry head and valid owner-held decryption
 
 The search index is an expendable cache, scoped by agent and key epoch. Use full-text retrieval plus vector search where justified. Plaintext/vector indexes run only in the trusted owner-controlled runtime in v1. Remote index deployment requires an explicit updated threat model; embeddings can leak information.
 
-NEAR AI supplies inference and embeddings through provider adapters. Use a currently available TEE-hosted model for private-inference claims. The official JavaScript verification SDK currently documents Node >=24.22.1; validate an isolated compatible toolchain before adopting it. Foundation modules remain compatible with Node >=22.22. If runtime24 or the required model is unavailable, retain the provider interface and label inference as unverified until a working verifier exists. Do not silently replace verification with an API success check.
+NEAR AI supplies inference and embeddings through provider adapters. Use a currently available TEE-hosted model for private-inference claims. The project now pins an isolated Node 24.22.2 runtime compatible with the SDK's documented requirement of Node >=24.22.1. Offline evidence validation is implemented; live private inference remains unverified until credentials, credits and a working model/evidence flow are tested. Do not silently replace verification with an API success check.
 
 Verified inference evidence is not proof that a tool ran correctly, a report is true, or a job was worth paying. Capture only the evidence actually provided and verified. Never store model chain-of-thought as an application receipt.
 
@@ -61,7 +61,7 @@ The mission journal is SQLite with explicit migrations for a single operator dep
 
 Use one native asset and a curated specialist for v1. Quotes bind buyer, agent, worker, artifact criteria hash, amount, asset/network, expiry, and operation ID. Worker envelopes are signed and include sequence, recipient, and expiry. Shared keys are not derived by concatenating private and public keys.
 
-Job lifecycle: `funded -> delivered -> accepted -> payout_pending -> paid`; alternatively `funded -> refund_pending -> refunded`, or `delivered -> disputed -> resolved`. Promise callbacks update transfer outcomes. Failed payouts remain claimable exactly once. Workers cannot replace an accepted artifact reference or recipient. Delivery/review deadlines and dispute authority must be specified and tested before funding live jobs. The default release decision is owner-mediated dispute resolution, with explicit timeouts; automated quality assessment alone does not resolve disputes.
+Contract lifecycle: `funded -> delivered -> payout_pending -> paid`; a failed transfer becomes `payout_failed` and can be retried to the original worker. Cancellation/expiry returns funds internally to the treasury and records `refunded`; a separate owner withdrawal uses a transfer/callback. Delivered work can become `disputed`, with an owner-mediated all-pay/all-refund resolution and a seven-day refund timeout. Unchallenged delivery becomes payable after its review deadline. This dispute policy trusts the buyer and does not provide impartial arbitration. Workers cannot replace a delivered artifact reference or payout recipient. See [exact deadlines and settlement rules](CONTRACTS.md#deadlines-and-settlement).
 
 For daily limits, count each reservation against its UTC window. Refunds return balance but do not reset that window's allocation counter in v1; document this conservative policy. Use integer base units, checked arithmetic, and bounded storage growth.
 
@@ -78,8 +78,8 @@ packages/storage/             local development and live 0G adapters
 packages/near/                registry/treasury clients and event reconciliation
 packages/inference/           NEAR AI adapters and evidence verification
 packages/runtime/             journal, leases, action execution
-contracts/registry/           Rust NEAR agent identity/checkpoints
-contracts/treasury/           Rust NEAR budget/job accounting
+contracts/authority/          Rust NEAR registry and treasury modules
+contracts/integration-tests/  deployed-WASM NEAR sandbox scenarios
 tests/                        cross-boundary invariant tests
 docs/                         product, architecture, trust, evidence
 plans/                        implementation order and done criteria

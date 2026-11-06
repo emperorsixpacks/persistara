@@ -31,4 +31,4 @@ Reviewed 2026-11-06. Recheck endpoint values and dependency versions when implem
 
 Pinned 2026-11-06: 0G SDK 1.2.13, its ethers peer 6.13.1, NEAR AI inference SDK 0.2.1, and project-local Node 24.22.2. Actual package exports and declarations were inspected; both SDKs import successfully. The 0G SDK's CommonJS ethers declarations and NEAR AI's transitive curves peer mismatch are handled explicitly and documented in `INTEGRATIONS.md`.
 
-Read-only live checks: Galileo RPC returned chain ID 16602; NEAR AI's public `/v1/models` catalog included `z-ai/glm-5.3-flash`. This identifies a candidate, not a verified private/tool-capable model. Paid provider spikes remain unexecuted until the dedicated uploader is funded and a NEAR AI key/credits are configured.
+Read-only live checks: Galileo RPC returned chain ID 16602; NEAR AI's public `/v1/models` catalog included `z-ai/glm-5.3-flash`. This identifies a candidate, not a verified private/tool-capable model. Paid provider spikes remain unexecuted. The dedicated uploader now holds 0.5 testnet 0G; NEAR AI credentials/credits are deferred at the user's request.
