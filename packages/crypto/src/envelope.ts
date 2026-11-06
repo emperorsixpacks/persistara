@@ -5,7 +5,7 @@ export interface EnvelopeContext {
   agentId: string;
   recordId: string;
   keyEpoch: number;
-  purpose: "memory" | "manifest";
+  purpose: "memory" | "manifest" | "recovery";
 }
 
 const MAX_PLAINTEXT_BYTES = 1_000_000;
@@ -18,7 +18,7 @@ export function sha256(bytes: Uint8Array): string {
 function validateContext(ctx: EnvelopeContext): void {
   if (!isIdentifier(ctx.agentId) || !isIdentifier(ctx.recordId) ||
       !Number.isSafeInteger(ctx.keyEpoch) || ctx.keyEpoch < 1 ||
-      (ctx.purpose !== "memory" && ctx.purpose !== "manifest")) {
+      (ctx.purpose !== "memory" && ctx.purpose !== "manifest" && ctx.purpose !== "recovery")) {
     throw new MemoryError("INVALID_INPUT", "Invalid encryption context");
   }
 }

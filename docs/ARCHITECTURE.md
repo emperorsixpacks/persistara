@@ -35,6 +35,8 @@ Use AES-256-GCM through Node's standard crypto library for the application envel
 
 Each encrypted memory contains its source and revision metadata. A versioned, encrypted manifest lists record references and operation IDs. NEAR stores a public reference to the encrypted manifest and the expected checkpoint version. Sensitive metadata stays inside encrypted blobs. Public timing, size, addresses, and checkpoint frequency remain observable.
 
+New manifests use schema 2 with an encryption epoch on each record entry. Schema 1 remains readable by inheriting the manifest epoch. Keyrings preserve historical epochs; a new manifest can use the active key without rewriting old records. Owner backup envelopes bind agent/network/contract/storage identity to a separate random recovery secret. [Recovery details](RECOVERY.md) distinguish keyring preparation from live revocation/rotation.
+
 Commit order: persist intent -> encrypt/upload records -> verify retrievability -> upload encrypted manifest -> compare-and-swap the NEAR checkpoint -> wait for finality -> mark committed -> index. A failed index update never invalidates the committed source data. Never publish a head before its referenced content is retrievable.
 
 Two writers use checkpoint compare-and-swap; a loser reloads the committed head and merges its append, preserving the operation ID. Same ID plus different payload is a conflict, not a success. Uploaded-but-unreferenced blobs are orphaned costs, not committed memories.
@@ -46,6 +48,8 @@ Recovery requires both a finalized registry head and valid owner-held decryption
 ## Index and inference
 
 The search index is an expendable cache, scoped by agent and key epoch. Use full-text retrieval plus vector search where justified. Plaintext/vector indexes run only in the trusted owner-controlled runtime in v1. Remote index deployment requires an explicit updated threat model; embeddings can leak information.
+
+The implemented first cache uses local SQLite FTS5 with atomic replacement of a fully authenticated snapshot. Reads require the expected finalized head, verify cache integrity, preserve revision history and mark content untrusted. Keyword recall is implemented; embeddings remain deferred. Durable memory-upload intents and full live recovery are still release gates.
 
 NEAR AI supplies inference and embeddings through provider adapters. Use a currently available TEE-hosted model for private-inference claims. The project now pins an isolated Node 24.22.2 runtime compatible with the SDK's documented requirement of Node >=24.22.1. Offline evidence validation is implemented; live private inference remains unverified until credentials, credits and a working model/evidence flow are tested. Do not silently replace verification with an API success check.
 

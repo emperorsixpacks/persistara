@@ -6,6 +6,12 @@ Priority P0 · risk high · effort one to two days. Depends on 002 and 003. Sour
 
 A committed memory survives loss of the original runtime and index. Recovery requires a finalized NEAR checkpoint and valid owner-held decryption material. Do not promise recovery from the agent ID alone or imply that changing an owner field erases old keys.
 
+## Implementation checkpoint
+
+Owner backup/keyring modules, schema-1-compatible schema 2 manifests, authenticated snapshot recovery and a private lexical recall index are implemented. Recovery commands are read-only with respect to NEAR/0G; a local separate-process drill and the deployed-WASM sandbox flow verify removal of the original keys/journal/index before restoration. See `docs/RECOVERY.md` for exact commands, trust boundaries and test evidence.
+
+This milestone deliberately keeps plan 004 IN PROGRESS. Durable memory-upload intents/reconciliation, the full owner revocation/epoch activation workflow, embeddings, real 0G/public-testnet recovery and live measurements remain unexecuted. Keyring epoch preparation alone is not a completed on-chain rotation. No live write path may bypass those gates merely because local recovery passes.
+
 ## Scope
 
 Extend `packages/memory/src`, add index and recovery/keyring modules and `memory:recover` verification scripts. Wire live 0G and NEAR adapters without changing their trust boundaries. Do not add shared public indexes or cross-owner agent transfer. Existing application encryption, operation deduplication, read-before-checkpoint, and CAS tests remain required.

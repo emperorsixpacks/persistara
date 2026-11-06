@@ -465,7 +465,7 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
     let mut input = json!({"phase":"write","directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"publicKey":key.public_key().to_string(),"runtimeSecretKey":key.to_string(),"workerId":specialist.id(),"nowNs":now.to_string()});
     let result: Result<()> = async {
         let written = run_application_fixture(&input)?;
-        assert_eq!(written["version"], 1);
+        assert_eq!(written["version"], 3);
         assert!(written["transactionHash"].is_string());
         input["checkpointOperationId"] = written["operationId"].clone();
         input.as_object_mut().unwrap().remove("runtimeSecretKey");
@@ -495,16 +495,18 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
         input["phase"] = json!("reconcile");
         assert_eq!(run_application_fixture(&input)?["status"], "confirmed");
         std::fs::remove_dir_all(directory.join("journal"))?;
+        std::fs::remove_dir_all(directory.join("original-runtime"))?;
         input["phase"] = json!("recover");
         input.as_object_mut().unwrap().remove("runtimeSecretKey");
         let recovered = run_application_fixture(&input)?;
-        assert_eq!(recovered["recovered"], 1);
-        assert_eq!(recovered["version"], 1);
+        assert_eq!(recovered["recovered"], 3);
+        assert_eq!(recovered["currentFacts"], 2);
+        assert_eq!(recovered["version"], 3);
         Ok(())
     }
     .await;
     std::fs::remove_dir_all(directory)?;
     result?;
-    assert_eq!(agent(&contract, &id).await?["head"]["version"], "1");
+    assert_eq!(agent(&contract, &id).await?["head"]["version"], "3");
     Ok(())
 }

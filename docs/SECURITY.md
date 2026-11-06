@@ -41,6 +41,8 @@ Never persist decrypted content or private keys to receipts/logs. API secrets ar
 
 ## Production boundary
 
+Owner recovery uses a separately generated random secret to encrypt a network/contract/agent-bound historical keyring. The bundle restores memory keys, not wallet ownership or treasury control. Recall is a private plaintext cache on the trusted owner machine, with source-bearing untrusted results and no execution capability. Backups must be verified and copied off the runtime machine; a locally generated pair alone does not establish off-device protection. See [recovery controls and remaining gates](RECOVERY.md).
+
 The current authority contract binds ownership to the registration account and signing key. Owner-key rotation and cross-owner transfer are not implemented. Storage credit is prepaid and cannot yet be withdrawn; it is separate from purchasing funds. Dispute resolution is buyer-controlled, with a bounded refund timeout, and does not protect specialists against a malicious buyer. These limitations must be visible before any public funding flow. See [contract rules](CONTRACTS.md).
 
 Production launch requires independent contract/crypto review, measured storage availability, operational recovery drills, deployed session/signer isolation, adversarial tests, actual provider quotas/costs, backup monitoring, and a documented incident procedure. A successful hackathon demo is evidence of its demonstrated paths, not a blanket production guarantee.

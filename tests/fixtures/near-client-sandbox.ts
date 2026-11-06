@@ -1,14 +1,20 @@
-/** Local integration fixture ONLY. Synthetic roots and a public fixture memory key are not 0G proofs. */
+/** Local integration fixture ONLY. Random owner backups and real sandbox checkpoints use synthetic blob roots, not 0G proofs. */
 import assert from "node:assert/strict";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { MemoryService } from "../../packages/memory/src/service.js";
+import { MemoryKeyring } from "../../packages/memory/src/keyring.js";
+import { createOwnerBackup, encodePrivateKeyring, verifyOwnerBackup } from "../../packages/memory/src/backup.js";
+import { readPrivateFile, writePrivateFile } from "../../packages/memory/src/files.js";
+import { MemoryRecallIndex } from "../../packages/memory/src/index.js";
+import { rebuildFromOwnerBackup, recallCommitted } from "../../packages/memory/src/recovery.js";
+import type { MemoryBinding } from "../../packages/memory/src/binding.js";
 import { sha256 } from "../../packages/crypto/src/envelope.js";
 import { NearAuthorityReader, NearMemoryHeadStore, NearTreasuryClient } from "../../packages/near/src/client.js";
 import { IsolatedNearSigner } from "../../packages/near/src/isolated.js";
 import { NearRpc } from "../../packages/near/src/rpc.js";
 import type { NearSignerConfig } from "../../packages/near/src/protocol.js";
-import { isObject, type BlobRef, type BlobStore } from "../../packages/protocol/src/memory.js";
+import { isObject, MemoryError, type BlobRef, type BlobStore } from "../../packages/protocol/src/memory.js";
 import { ProviderError } from "../../packages/protocol/src/providers.js";
 
 let fixtureStage = "bootstrap";
@@ -45,11 +51,20 @@ async function main(): Promise<void> {
   const reader = new NearAuthorityReader(new NearRpc(config));
   const signer = new IsolatedNearSigner(config);
   const blobs = new SyntheticFixtureBlobs(join(input.directory, "ciphertext"));
+  const binding: MemoryBinding = { agentId: config.agentId, authorityNetwork: "near:sandbox", chainId: config.chainId, contractId: config.contractId, storageNetwork: "0g:16602:turbo" };
+  const bundlePath = join(input.directory, "owner-backup", "memory.bundle");
+  const secretPath = join(input.directory, "owner-secret", "recovery.key");
   const inputMemory = { operationId: "memory:fixture", text: "Research reports must cite dated primary sources.", source: { kind: "owner" as const, reference: "sandbox:owner-preference" } };
   if (input.phase === "write") {
     fixtureStage = "write-checkpoint";
     assert.equal(typeof input.runtimeSecretKey, "string");
     await writeFile(config.runtimeKeyFile, String(input.runtimeSecretKey), { flag: "wx", mode: 0o600 });
+    const keys = MemoryKeyring.create();
+    const backup = createOwnerBackup(binding, keys);
+    await writePrivateFile(secretPath, Buffer.from(backup.recoverySecret));
+    await writePrivateFile(bundlePath, backup.bundle);
+    verifyOwnerBackup(await readPrivateFile(bundlePath), Buffer.from(await readPrivateFile(secretPath)).toString(), binding, keys);
+    await writePrivateFile(join(input.directory, "original-runtime", "memory-keyring.json"), encodePrivateKeyring(binding, keys));
     let transactionHash: string | undefined;
     let operationId: string | undefined;
     const loseResponse = {
@@ -63,13 +78,19 @@ async function main(): Promise<void> {
       },
       reconcile: (id: string) => signer.reconcile(id),
     };
-    const memory = new MemoryService(config.agentId, Buffer.alloc(32, 42), 1, blobs, new NearMemoryHeadStore(reader, config, loseResponse));
+    const memory = new MemoryService(config.agentId, keys, 1, blobs, new NearMemoryHeadStore(reader, config, loseResponse), { binding });
     await assert.rejects(memory.remember(inputMemory), { code: "OUTCOME_UNKNOWN" });
     assert.ok(transactionHash);
+    const normal = new MemoryService(config.agentId, keys, 1, blobs, new NearMemoryHeadStore(reader, config, signer), { binding });
+    const original = (await normal.recover())[0]!;
+    await normal.remember({ operationId: "memory:budget", text: "Research missions must count pending reservations in their budget.", source: { kind: "owner", reference: "sandbox:owner-budget" } });
+    await normal.remember({ operationId: "memory:revision", text: "Research reports must cite dated primary sources and state uncertainty.", source: inputMemory.source, supersedes: original.id });
+    const index = new MemoryRecallIndex(join(input.directory, "original-runtime", "cache", "recall.sqlite"), binding);
+    try { index.replace(await normal.recoverSnapshot()); } finally { index.close(); }
     fixtureStage = "read-written-checkpoint";
     const a = await reader.agent(config.agentId);
-    assert.equal(a.head?.version, 1);
-    console.log(JSON.stringify({ phase: "write", evidence: "local-sandbox-synthetic-storage", transactionHash, operationId, version: 1 }));
+    assert.equal(a.head?.version, 3);
+    console.log(JSON.stringify({ phase: "write", evidence: "local-sandbox-synthetic-storage", transactionHash, operationId, version: 3 }));
   } else if (input.phase === "reconcile") {
     fixtureStage = "reconcile-without-key";
     await assert.rejects(readFile(config.runtimeKeyFile));
@@ -100,20 +121,27 @@ async function main(): Promise<void> {
     assert.equal(input.phase, "recover");
     await assert.rejects(readFile(config.runtimeKeyFile));
     await assert.rejects(readFile(config.journalFile));
-    const memory = new MemoryService(config.agentId, Buffer.alloc(32, 42), 1, blobs, new NearMemoryHeadStore(reader, config, signer));
-    const records = await memory.recover();
-    assert.equal(records.length, 1);
-    assert.equal(records[0]?.text, inputMemory.text);
-    assert.deepEqual(records[0]?.source, inputMemory.source);
-    assert.equal((await memory.remember(inputMemory)).duplicate, true);
-    assert.equal((await reader.agent(config.agentId)).head?.version, 1);
-    console.log(JSON.stringify({ phase: "recover", evidence: "local-sandbox-synthetic-storage", recovered: 1, version: 1 }));
+    await assert.rejects(stat(join(input.directory, "original-runtime")), { code: "ENOENT" });
+    const index = new MemoryRecallIndex(join(input.directory, "recovered-runtime", "recall.sqlite"), binding);
+    try {
+      const readOnlyBlobs = { get: (ref: BlobRef) => blobs.get(ref), put: async (): Promise<never> => { throw new Error("Recovery must not upload"); } };
+      const heads = { get: async (id: string) => (await reader.agent(id)).head };
+      const result = await rebuildFromOwnerBackup({ binding, bundle: await readPrivateFile(bundlePath), recoverySecret: Buffer.from(await readPrivateFile(secretPath)).toString(), blobs: readOnlyBlobs, heads, index });
+      assert.equal(result.recordCount, 3); assert.equal(result.currentCount, 2);
+      const recalled = await recallCommitted(index, heads, config.agentId, "dated primary sources");
+      assert.equal(recalled.matches.length, 1); assert.equal(recalled.matches[0]?.operationId, "memory:revision");
+      assert.deepEqual(recalled.matches[0]?.source, inputMemory.source); assert.equal(recalled.matches[0]?.untrusted, true);
+      const history = await recallCommitted(index, heads, config.agentId, "dated primary sources", { includeSuperseded: true });
+      assert.equal(history.matches.length, 2);
+      assert.equal(result.version, 3);
+      console.log(JSON.stringify({ phase: "recover", evidence: "local-sandbox-synthetic-storage", recovered: 3, currentFacts: 2, version: 3 }));
+    } finally { index.close(); }
   }
 }
 main().catch((error: unknown) => {
   // Test diagnostics keep source locations/statuses, never assertions' actual
   // payloads, input, SDK exception messages, keys, or decrypted content.
   const locations = error instanceof Error ? error.stack?.split("\n").filter((line) => /^\s+at /.test(line)).slice(0, 4) : [];
-  console.error(JSON.stringify({ status: "failed", code: error instanceof ProviderError ? error.code : "FIXTURE_ASSERTION_FAILED", stage: fixtureStage, observedStatus, locations }));
+  console.error(JSON.stringify({ status: "failed", code: error instanceof ProviderError || error instanceof MemoryError ? error.code : "FIXTURE_ASSERTION_FAILED", stage: fixtureStage, observedStatus, locations }));
   process.exitCode = 1;
 });

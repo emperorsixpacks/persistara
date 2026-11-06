@@ -49,7 +49,10 @@ export type FailureCode =
   | "OPERATION_CONFLICT"
   | "CHECKPOINT_CONFLICT"
   | "KEY_EPOCH_MISMATCH"
-  | "MEMORY_LIMIT";
+  | "MEMORY_LIMIT"
+  | "INDEX_STALE"
+  | "INDEX_BUSY"
+  | "INVALID_BACKUP";
 
 export class MemoryError extends Error {
   constructor(readonly code: FailureCode, message: string) {
