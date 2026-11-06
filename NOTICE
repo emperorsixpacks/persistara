@@ -1,0 +1,8 @@
+Persistara
+
+This project adapts the generic tool-interface declaration from Sofer,
+https://github.com/JemIIahh/sofer, commit 542813f.
+Sofer identifies its license as Apache-2.0 in its README and package metadata.
+The source snapshot and content hashes are recorded in migration/provenance.json.
+
+All new integrations and application behavior are tracked separately in this repository.

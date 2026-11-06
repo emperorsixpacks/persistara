@@ -1,0 +1,55 @@
+{
+  "sourceRepository": "https://github.com/JemIIahh/sofer",
+  "sourceCommit": "542813fb86c72f869668308c39de3b415fc11c5f",
+  "reviewedAt": "2026-11-06",
+  "entries": [
+    {
+      "source": "packages/core/src/brain/types.ts",
+      "sha256": "3ab53604b91ed712dbb58ca92d891e120546b37fa47d079760c6ee95b9b651fe",
+      "decision": "adapted",
+      "destination": "packages/protocol/src/tools.ts"
+    },
+    {
+      "source": "packages/core/src/brain/loop.ts",
+      "sha256": "380fc4a1878b34348121195020cad88bea254866ec8ed67cadc6017c8f225f0e",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    },
+    {
+      "source": "packages/core/src/brain/loop.test.ts",
+      "sha256": "12f8277a2e81d35fff2057aa612be34d47b32bf5d0edbbe73193cb97562b3f54",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    },
+    {
+      "source": "packages/core/src/agent/runtime.ts",
+      "sha256": "bc586bed71d4b27648c51ce463b2958a4f904303387b51b284f25caab493ecc8",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    },
+    {
+      "source": "packages/core/src/storage/types.ts",
+      "sha256": "61bbaee303f340ecc41bf4f641a11f909574f910276404109d6543a25d155d66",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    },
+    {
+      "source": "packages/core/src/messaging/e2ee.ts",
+      "sha256": "da55551415cffdbf8def1eabf6471f08260980c017d44e55e01849690dd5733d",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    },
+    {
+      "source": "packages/core/src/messaging/mailbox.ts",
+      "sha256": "dd5aa9e580468105b6841219bfef518bee736573747ae2cf6c98191a4cb1ef56",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    },
+    {
+      "source": "packages/core/src/tools/system.ts",
+      "sha256": "30a642a7bbb573d9f234e93bc16ea32224828a81d9e8e3fa08106b5c9a0f43c9",
+      "decision": "reviewed-reference-only",
+      "destination": null
+    }
+  ]
+}

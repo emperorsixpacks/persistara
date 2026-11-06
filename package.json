@@ -1,0 +1,20 @@
+{
+  "name": "persistara",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Owner-controlled agents with recoverable memory, durable missions, and bounded commerce on NEAR.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.26.0",
+  "engines": { "node": ">=22.22.0" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "pnpm build && node --test dist/tests/*.test.js",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "typescript": "5.9.3"
+  }
+}
