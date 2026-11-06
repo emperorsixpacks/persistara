@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { isObject } from "./memory.js";
 import { ProviderError, validateDeadline, type ProviderErrorCode, type WorkerExecutor } from "./providers.js";
 
-const knownCodes = new Set<ProviderErrorCode>(["NOT_CONFIGURED", "INVALID_INPUT", "NETWORK_MISMATCH", "UPSTREAM_ERROR", "INTEGRITY_FAILED", "VERIFICATION_FAILED", "UNSUPPORTED", "OUTCOME_UNKNOWN", "PROTOCOL_ERROR"]);
+const knownCodes = new Set<ProviderErrorCode>(["NOT_CONFIGURED", "INVALID_INPUT", "NETWORK_MISMATCH", "UPSTREAM_ERROR", "INTEGRITY_FAILED", "VERIFICATION_FAILED", "UNSUPPORTED", "OUTCOME_UNKNOWN", "PROTOCOL_ERROR", "OPERATION_CONFLICT", "SIGNER_BUSY", "AUTHORIZATION_FAILED", "TRANSACTION_FAILED"]);
 
 function wireSize(value: unknown): number {
   let bytes = 0;

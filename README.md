@@ -12,7 +12,9 @@ Repository: https://github.com/JemIIahh/persistara. Development visibility: priv
 
 Implemented: typed storage and registry boundaries, authenticated memory encryption, encrypted manifests, idempotent memory writes, checkpoint conflict handling, recovery from a committed head, and a local disk-backed blob adapter. Provider adapters connect the pinned 0G and NEAR AI SDKs through isolated processes, with strict evidence validation and reproducible diagnostic/spike commands. A Rust NEAR authority contract now implements owner/delegate permissions, revocation, memory checkpoints, native budgets, escrow, callbacks and timeout refunds.
 
-**Not implemented yet:** application NEAR signer/client wiring, durable mission worker, authenticated API, or product console. Public NEAR testnet deployment and live-provider acceptance remain pending. The 0G uploader has 0.5 testnet 0G; NEAR AI credentials/credits are deferred. No upload transaction or paid inference has been performed. Galileo RPC identity and the public NEAR AI model catalog have been checked. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
+NEAR clients now wire memory checkpoints and job reservation/acceptance through a restricted signer process and a durable SQLite transaction journal. Finalized reads and same-transaction reconciliation keep uncertain outcomes separate from success or failure.
+
+**Not implemented yet:** durable mission worker, owner recovery bundle/index, authenticated API, or product console. Public NEAR testnet deployment and live-provider acceptance remain pending. The 0G uploader has 0.5 testnet 0G; NEAR AI credentials/credits are deferred. No upload transaction or paid inference has been performed. Galileo RPC identity and the public NEAR AI model catalog have been checked. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
 
 ## Development
 
@@ -27,7 +29,7 @@ pnpm check
 
 `pnpm check` typechecks, builds, and runs the foundation tests. No credentials, faucet, or network is needed to execute those tests after installation.
 
-Verification: **38 tests passing**, covering authenticated encryption, memory recovery, concurrency, corruption, provider contracts, evidence rejection and worker cancellation. These are offline tests; they are not evidence of a deployed NEAR or 0G integration.
+Verification: **58 TypeScript tests pass**, covering authenticated encryption, memory recovery, concurrency, corruption, provider contracts, evidence rejection, worker cancellation, signer restart/reconciliation and finalized client semantics. Offline test fixtures remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
 For provider setup, run `pnpm provider:doctor` and follow [live integration instructions](docs/INTEGRATIONS.md). Missing prerequisites exit nonzero; the commands never silently substitute test fixtures.
 
@@ -35,7 +37,7 @@ For provider setup, run `pnpm provider:doctor` and follow [live integration inst
 pnpm contract:check
 ```
 
-Contract checks cover formatting, Clippy, unit tests, optimized WASM compilation, and deployed-WASM sandbox tests. **25 Rust unit tests and two sandbox scenarios pass locally.** They require no AI credentials or public funds. The contract has development limitations, including registration-key custody, prepaid storage credit, and buyer-controlled disputes; review [contract rules](docs/CONTRACTS.md) before public funding.
+Contract checks pass **25 Rust unit tests and three sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. The application scenario commits memory, settles a native payment, prevents duplicate acceptance, and recovers memory in a fresh process without its signer key or journal. It uses explicitly synthetic local storage. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md) and [client setup/recovery limits](docs/NEAR-CLIENTS.md) before public funding.
 
 ## Build specification
 
@@ -47,6 +49,7 @@ Contract checks cover formatting, Clippy, unit tests, optimized WASM compilation
 - [Verified integration references](docs/REFERENCES.md)
 - [Provider setup and live acceptance](docs/INTEGRATIONS.md)
 - [NEAR authority, accounting and settlement](docs/CONTRACTS.md)
+- [NEAR client setup and transaction recovery](docs/NEAR-CLIENTS.md)
 
 ## License and provenance
 

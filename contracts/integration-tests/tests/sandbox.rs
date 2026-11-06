@@ -386,3 +386,102 @@ async fn failed_transfer_retries_once_and_storage_failure_rolls_back() -> Result
     assert_conservation(&agent(&contract, &id).await?);
     Ok(())
 }
+
+fn run_application_fixture(input: &Value) -> Result<Value> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut child = Command::new(root.join("node_modules/node/bin/node"))
+        .arg(root.join("dist/tests/fixtures/near-client-sandbox.js"))
+        .current_dir(&root)
+        .env_clear()
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(&serde_json::to_vec(input)?)?;
+    let output = child.wait_with_output()?;
+    // The fixture prints only sanitized status; never include its input/key material.
+    anyhow::ensure!(
+        output.status.success(),
+        "application fixture failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+#[tokio::test]
+async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    let (worker, contract, owner, specialist, id) = fixture(NearToken::from_near(1)).await?;
+    let key = SecretKey::from_seed(KeyType::ED25519, "persistara-application-runtime-fixture");
+    owner
+        .batch(owner.id())
+        .add_key(
+            key.public_key(),
+            AccessKey::function_call_access(
+                contract.id(),
+                &["checkpoint_memory", "create_job", "accept_job"],
+                Some(NearToken::from_near(5)),
+            ),
+        )
+        .transact()
+        .await?
+        .into_result()?;
+    let now = worker.view_block().await?.timestamp();
+    owner.call(contract.id(), "set_delegate").args_json(json!({"agent_id":id,"delegate":{"publicKey":key.public_key().to_string(),"expiresAtNs":(now+24*HOUR).to_string(),"canCheckpoint":true,"canSpend":true}})).max_gas().transact().await?.into_result()?;
+    let directory = std::env::temp_dir().join(format!(
+        "persistara-application-{}-{now}",
+        std::process::id()
+    ));
+    std::fs::DirBuilder::new().mode(0o700).create(&directory)?;
+    let mut input = json!({"phase":"write","directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"publicKey":key.public_key().to_string(),"runtimeSecretKey":key.to_string(),"workerId":specialist.id(),"nowNs":now.to_string()});
+    let result: Result<()> = async {
+        let written = run_application_fixture(&input)?;
+        assert_eq!(written["version"], 1);
+        assert!(written["transactionHash"].is_string());
+        input["checkpointOperationId"] = written["operationId"].clone();
+        input.as_object_mut().unwrap().remove("runtimeSecretKey");
+        input["phase"] = json!("reserve");
+        assert_eq!(run_application_fixture(&input)?["status"], "funded");
+        specialist
+            .call(contract.id(), "deliver")
+            .args_json(json!({"agent_id":id,"operation_id":"job:client","result":blob("d")}))
+            .max_gas()
+            .transact()
+            .await?
+            .into_result()?;
+        settle_gas_refunds(&worker).await?;
+        let balance = specialist.view_account().await?.balance.as_yoctonear();
+        input["phase"] = json!("accept");
+        assert_eq!(run_application_fixture(&input)?["status"], "paid");
+        assert_eq!(
+            specialist.view_account().await?.balance.as_yoctonear(),
+            balance + NEAR
+        );
+        assert_eq!(run_application_fixture(&input)?["status"], "paid");
+        assert_eq!(
+            specialist.view_account().await?.balance.as_yoctonear(),
+            balance + NEAR
+        );
+        std::fs::remove_file(directory.join("runtime.key"))?;
+        input["phase"] = json!("reconcile");
+        assert_eq!(run_application_fixture(&input)?["status"], "confirmed");
+        std::fs::remove_dir_all(directory.join("journal"))?;
+        input["phase"] = json!("recover");
+        input.as_object_mut().unwrap().remove("runtimeSecretKey");
+        let recovered = run_application_fixture(&input)?;
+        assert_eq!(recovered["recovered"], 1);
+        assert_eq!(recovered["version"], 1);
+        Ok(())
+    }
+    .await;
+    std::fs::remove_dir_all(directory)?;
+    result?;
+    assert_eq!(agent(&contract, &id).await?["head"]["version"], "1");
+    Ok(())
+}

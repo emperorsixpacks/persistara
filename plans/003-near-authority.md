@@ -4,7 +4,9 @@ Priority P0 · risk high · effort two to three days. Depends on 001, independen
 
 ## Current state and scope
 
-The Rust NEAR authority contract is implemented in `contracts/authority`, split into registry and treasury modules, with unit and deployed-WASM sandbox scenarios. `packages/protocol/src/memory.ts` defines `MemoryHeadStore` but has no live NEAR client yet. Finalized-view/restricted-signer clients in `packages/near/src` and a public testnet smoke flow remain. Native NEAR is the only purchasing asset in v1. Do not add Intents, NFTs, stablecoins, or cross-owner agent sales to this milestone.
+The Rust NEAR authority contract is implemented in `contracts/authority`, split into registry and treasury modules. `packages/near/src` implements finalized readers, `MemoryHeadStore`, job reservation/acceptance, an isolated restricted signer and a durable transaction journal. The application workflow runs against real deployed WASM in sandbox with synthetic storage. Public NEAR testnet smoke evidence remains. Native NEAR is the only purchasing asset in v1. Do not add Intents, NFTs, stablecoins, or cross-owner agent sales to this milestone.
+
+The narrow transaction journal is implemented here because this plan requires persisted intent and unknown-outcome reconciliation. It is not the mission journal or a claim that plan 005 is complete. See `docs/NEAR-CLIENTS.md` for dropped-transaction/expiry recovery limits.
 
 Implementation decision: co-locate registry and treasury in one deployed contract so delegate generations, pause state, and budgets are checked atomically when funds are reserved. Independent contracts would add an asynchronous authorization race without adding first-release product value. Payments to workers still require asynchronous transfer/callback accounting.
 

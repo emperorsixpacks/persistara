@@ -15,13 +15,15 @@
     "test": "pnpm build && node --test dist/tests/*.test.js",
     "check": "pnpm typecheck && pnpm test",
     "provider:doctor": "pnpm build && node dist/scripts/provider-doctor.js",
+    "near:doctor": "pnpm build && node dist/scripts/near-doctor.js",
+    "near:reconcile": "pnpm build && node dist/scripts/near-reconcile.js",
     "storage:wallet": "pnpm build && node dist/scripts/storage-wallet.js",
     "inference:models": "pnpm build && node dist/scripts/inference-models.js",
     "spike:storage": "pnpm build && node dist/scripts/storage-roundtrip.js",
     "spike:inference": "pnpm build && node dist/scripts/inference-verify.js",
     "contract:build": "cargo near build non-reproducible-wasm --manifest-path contracts/authority/Cargo.toml --locked --no-abi",
     "contract:test": "cargo test -p persistara-authority --locked",
-    "contract:sandbox": "pnpm contract:build && cargo test -p persistara-contract-tests --features sandbox --locked -- --test-threads=1",
+    "contract:sandbox": "pnpm build && pnpm contract:build && cargo test -p persistara-contract-tests --features sandbox --locked -- --test-threads=1",
     "contract:check": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets --features sandbox --locked -- -D warnings && pnpm contract:test && pnpm contract:sandbox"
   },
   "devDependencies": {
@@ -38,6 +40,7 @@
   "dependencies": {
     "@0gfoundation/0g-storage-ts-sdk": "1.2.13",
     "@nearai/inference-sdk": "0.2.1",
-    "ethers": "6.13.1"
+    "ethers": "6.13.1",
+    "near-api-js": "7.4.0"
   }
 }

@@ -2,7 +2,7 @@
 
 The first contract milestone implements agent authority, public encrypted-memory checkpoints, native NEAR budgets, and job escrow in `contracts/authority`. Registry and treasury are Rust modules in **one deployed contract**: permission, generation, pause, and reservation checks execute atomically. Worker transfers are asynchronous.
 
-This is a development implementation. Public testnet deployment, application signer/client wiring, and independent review remain release gates. The sandbox references are synthetic ciphertext identifiers; sandbox success does not demonstrate 0G availability or private inference.
+This is a development implementation. Public testnet deployment and independent review remain release gates. [Application clients and a restricted durable signer](NEAR-CLIENTS.md) are implemented and tested against deployed sandbox WASM. Sandbox references are synthetic ciphertext identifiers; sandbox success does not demonstrate 0G availability or private inference.
 
 ## Build and local verification
 
@@ -19,7 +19,7 @@ pnpm contract:check
 
 The build outputs `target/near/persistara_authority/persistara_authority.wasm`. It uses cargo-near's WASM optimization. The command explicitly says `non-reproducible-wasm`: a local binary checksum is evidence of that artifact, not a reproducible build claim.
 
-Local evidence (2026-11-06): `pnpm contract:check` exits zero. 25 Rust unit tests pass; two deployed-WASM sandbox scenarios pass, including real function-call key restrictions, revoked-key rejection, stale checkpoint CAS, budget and storage rollback, exact native payouts, duplicate payment prevention, a failed transfer and successful retry, and owner withdrawal. The optimized macOS build is 267,149 bytes, SHA-256 `e93a0b04a3b441feb6f87e4aa0dfd9347cfc0caf56f12f511f583350af5a1944`. This checksum is local build evidence; no public deployment hash or transaction is claimed.
+Local evidence (2026-11-06): `pnpm contract:check` exits zero. 25 Rust unit tests and three deployed-WASM sandbox scenarios pass, including real function-call key restrictions, revoked-key rejection, stale checkpoint CAS, budget and storage rollback, exact native payouts, duplicate payment prevention, a failed transfer and successful retry, owner withdrawal, and the application client's settlement/fresh-process recovery flow. The optimized macOS build is 267,149 bytes, SHA-256 `e93a0b04a3b441feb6f87e4aa0dfd9347cfc0caf56f12f511f583350af5a1944`. This checksum is local build evidence; no public deployment hash or transaction is claimed.
 
 ## Authority and keys
 
@@ -112,7 +112,7 @@ The mission journal and signer integration must persist operation ID, exact argu
 
 ## Remaining release gates
 
-1. Wire finalized views and restricted signing into the memory/mission clients, with durable unknown-outcome reconciliation.
+1. Validate the implemented finalized readers, memory/job clients and restricted signer against a public testnet deployment; complete mission-runner integration in plan 005.
 2. Run a small public NEAR testnet workflow, recording network, code hash, transaction references and final states.
 3. Connect real 0G encrypted artifacts; keep synthetic sandbox references visibly separate.
 4. Complete owner recovery, upgrade/key custody policy, independent review and operating monitoring before mainnet.

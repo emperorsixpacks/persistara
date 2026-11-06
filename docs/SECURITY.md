@@ -36,6 +36,7 @@ Never persist decrypted content or private keys to receipts/logs. API secrets ar
 - Wrong key or modified envelope: typed failure; no partial content to the model.
 - Inference unavailable/unverified: show exact evidence state; never fake a verification badge.
 - Runtime crashes during payment: reconcile existing reservation/payout; do not create a new job for the same operation.
+- NEAR signer interruption: its private SQLite journal binds exact arguments, nonce and signed transaction before broadcast. A submitted/unknown row fences new signing until reconciled; use one dedicated key and journal per agent. A dropped/unseen transaction can remain unknown because expiry proofs and nonce replacement are not implemented. See [client recovery limits](NEAR-CLIENTS.md).
 - Paused/revoked runtime: stop new effects and checkpoint writes; handle already submitted transactions according to observed finality.
 
 ## Production boundary

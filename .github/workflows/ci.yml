@@ -27,6 +27,7 @@ jobs:
           node-version: 24.22.2
       - name: Install the pinned Rust toolchain
         run: rustup show active-toolchain
+      - run: pnpm install --frozen-lockfile
       - name: Install cargo-near 0.22.0
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh -o /tmp/cargo-near-installer.sh
