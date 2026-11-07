@@ -6,8 +6,10 @@ import { isObject } from "../../protocol/src/memory.js";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { OwnerAuth } from "./auth.js";
 import { OwnerService } from "./service.js";
+import { missionId } from "../../runtime/src/journal.js";
+import type { MissionService } from "../../runtime/src/service.js";
 
-export interface OwnerServerOptions { port: number; staticDirectory: string; service: OwnerService; fixture?: boolean; now?: () => number }
+export interface OwnerServerOptions { port: number; staticDirectory: string; service: OwnerService; missions?: MissionService; fixture?: boolean; now?: () => number }
 const cookieValue = (request: IncomingMessage, name: string) => {
   const parts = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).filter((part) => part.startsWith(`${name}=`));
   if (parts.length !== 1) return undefined;
@@ -90,6 +92,34 @@ export function createOwnerServer(options: OwnerServerOptions) {
         }
         const view = await service.read();
         authorize(view);
+        if (url.pathname === "/api/missions" || url.pathname.startsWith("/api/missions/")) {
+          const missions = options.missions;
+          if (!missions) throw new ProviderError("NOT_CONFIGURED", "Mission journal is not configured");
+          if (url.pathname === "/api/missions/activity" && request.method === "GET") return send(response, { events: missions.journal.activity() });
+          if (url.pathname === "/api/missions") {
+            if (request.method === "GET") return send(response, { missions: missions.journal.list(), capabilities: missions.capabilities() });
+            const input = await body(request);
+            // Body parsing can await; recheck the session before each local mutation too.
+            authorize(view);
+            return send(response, missions.create(input, view));
+          }
+          const parts = url.pathname.slice("/api/missions/".length).split("/");
+          const id = parts[0];
+          if (!missionId(id) || parts.length > 2) throw new ProviderError("INVALID_INPUT", "Invalid mission route");
+          if (request.method === "GET" && parts.length === 1) return send(response, missions.journal.get(id));
+          if (request.method !== "POST" || parts.length !== 2) return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
+          const input = await body(request); authorize(view);
+          if (parts[1] === "events") { exact(input, ["after"]); return send(response, { events: missions.journal.events(id, input.after as number) }); }
+          exact(input, parts[1] === "approve" ? ["version", "artifactDigest"] : ["version"]);
+          if (!Number.isSafeInteger(input.version) || Number(input.version) < 1) throw new ProviderError("INVALID_INPUT", "Invalid mission version");
+          if (parts[1] === "run") return send(response, missions.start(id, Number(input.version), view));
+          if (parts[1] === "cancel") return send(response, missions.cancel(id, Number(input.version)));
+          if (parts[1] === "approve") {
+            if (typeof input.artifactDigest !== "string" || !/^[a-f0-9]{64}$/.test(input.artifactDigest)) throw new ProviderError("INVALID_INPUT", "Missing reviewed artifact digest");
+            return send(response, missions.approve(id, Number(input.version), input.artifactDigest));
+          }
+          return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
+        }
         if (url.pathname === "/api/session" && request.method === "GET") return send(response, { authenticated: true, csrf: session.csrf, expiresAt: session.expiresAt });
         if (url.pathname === "/api/state" && request.method === "GET") return send(response, { view, pending: service.journal.pending(), recent: service.journal.recent() });
         if (request.method !== "POST") return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
@@ -121,7 +151,7 @@ export function createOwnerServer(options: OwnerServerOptions) {
       return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
     })().catch((error: unknown) => {
       const code = error instanceof ProviderError ? error.code : "UPSTREAM_ERROR";
-      if (!response.headersSent) send(response, { status: "failed", code }, code === "AUTHORIZATION_FAILED" ? 403 : code === "INVALID_INPUT" ? 400 : ["OPERATION_CONFLICT", "OUTCOME_UNKNOWN", "INTEGRITY_FAILED"].includes(code) ? 409 : 503);
+      if (!response.headersSent) send(response, { status: "failed", code }, code === "AUTHORIZATION_FAILED" ? 403 : code === "INVALID_INPUT" ? 400 : ["OPERATION_CONFLICT", "OUTCOME_UNKNOWN", "INTEGRITY_FAILED", "MISSION_BLOCKED"].includes(code) ? 409 : 503);
       else response.end();
     });
   });

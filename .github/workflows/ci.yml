@@ -19,6 +19,7 @@ jobs:
       - run: pnpm check
       - run: pnpm memory:recover:fixture
       - run: pnpm memory:writes:fixture
+      - run: pnpm missions:recover:fixture
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4

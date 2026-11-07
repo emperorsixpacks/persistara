@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "status": "verified_live_source_dossier",
+  "network": "near:testnet",
+  "owner": "persistara-owner.testnet",
+  "ownerPublicKey": "ed25519:Bb9psi3hsJh7eJd2ukyMvvdc9QTmSRChLzwC5XeTKHTa",
+  "agentId": "persistara-owner.testnet:research",
+  "contractId": "authority.persistara-owner.testnet",
+  "missionId": "mission:a5546463-9d6a-437d-967d-231a3d75c90e",
+  "authorityBlockHash": "8orH28KH48jL938NZd7eTYhpoKLGhtfvpk6qpKREUsFm",
+  "codeHash": "GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ",
+  "artifactDigest": "25ae58e79737e0028affb45a021f3bec1e604dc66d235354ea7d803cd56d30f7",
+  "state": "completed",
+  "capturedSources": [
+    {
+      "url": "https://docs.near.org/",
+      "title": "Home - NEAR Docs",
+      "contentSha256": "157cc298191d35e24bfdd564d9a7b3a7e8fbbef5e70f9ad096d840db8bbd39b5",
+      "byteLength": 185419,
+      "capturedAt": "2026-11-07T19:47:57.353Z",
+      "excerptTruncated": false,
+      "attempts": 1
+    },
+    {
+      "url": "https://docs.0g.ai/",
+      "title": "0G Documentation",
+      "contentSha256": "d6bb75ab8255ac6149d8744e3f9b60c80647d8c1d478b963b886dd3868b8b399",
+      "byteLength": 44231,
+      "capturedAt": "2026-11-07T19:48:01.102Z",
+      "excerptTruncated": false,
+      "attempts": 1
+    }
+  ],
+  "externalSigner": "official-near-cli-keychain-nep413",
+  "ownerPrivateKeyLoadedByApplication": false,
+  "nearAiUsed": false,
+  "publicTransactionSubmitted": false,
+  "storageUploaded": false,
+  "spentYoctoNear": "0",
+  "browserWalletTransportVerified": false,
+  "sessionLoggedOut": true,
+  "verifiedAt": "2026-11-07T19:48:06.047Z"
+}

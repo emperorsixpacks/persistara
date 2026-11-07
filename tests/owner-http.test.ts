@@ -8,14 +8,21 @@ import { join } from "node:path";
 import { createOwnerServer } from "../packages/owner/src/server.js";
 import { ownerFixture, signChallenge } from "./fixtures/owner-support.js";
 import type { OwnerChallenge, OwnerOperation, OwnerView } from "../packages/owner/src/types.js";
+import { MissionJournal } from "../packages/runtime/src/journal.js";
+import { MissionService } from "../packages/runtime/src/service.js";
+import { captureSource } from "../packages/runtime/src/sources.js";
+import { randomUUID } from "node:crypto";
+import type { MissionDetail } from "../packages/runtime/src/types.js";
 
 async function httpFixture() {
   const f = await ownerFixture();
+  const missionJournal = new MissionJournal(join(f.directory, "missions.sqlite"), { owner: f.view.owner, agentId: f.view.agentId, contractId: f.view.contractId, chainId: f.view.chainId, codeHash: f.view.codeHash }, ["https://docs.near.org"]);
+  const missions = new MissionService(missionJournal, { read: async (url) => captureSource(url, Buffer.from("Explicit HTTP fixture source text. No live retrieval or payment occurs."), "text/plain", Date.now()) }, f.read);
   const probe = createServer(); probe.listen(0, "127.0.0.1"); await once(probe, "listening");
   const address = probe.address(); assert.ok(address && typeof address !== "string"); const port = address.port;
   await new Promise<void>((resolve) => probe.close(() => resolve()));
   await writeFile(join(f.directory, "index.html"), '<html><head><meta name="csp-nonce" content="__CSP_NONCE__"></head><body><script type="module" src="/assets/app.js"></script></body></html>');
-  const { server, origin } = createOwnerServer({ port, staticDirectory: f.directory, service: f.service() });
+  const { server, origin } = createOwnerServer({ port, staticDirectory: f.directory, service: f.service(), missions });
   server.listen(port, "127.0.0.1"); await once(server, "listening");
   const post = (path: string, value: unknown, headers: Record<string, string> = {}) => fetch(`${origin}/api/${path}`, { method: "POST", headers: { origin, "content-type": "application/json", ...headers }, body: JSON.stringify(value) });
   async function login() {
@@ -29,12 +36,43 @@ async function httpFixture() {
     const session = await result.json() as { csrf: string };
     return { cookie: sessionCookie, "x-persistara-csrf": session.csrf };
   }
-  return { ...f, origin, server, post, login, closeHttp: async () => {
-    server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); await f.close();
+  return { ...f, origin, server, post, login, missions, closeHttp: async () => {
+    server.closeAllConnections(); await missions.close(); await new Promise<void>((resolve) => server.close(() => resolve())); missionJournal.close(); await f.close();
   } };
 }
 
 describe("loopback owner console HTTP boundary", () => {
+  it("authenticates every mission route, enforces CSRF/scope/fields, and executes/reviews a key-free source dossier", async () => {
+    const f = await httpFixture();
+    try {
+      assert.equal((await fetch(`${f.origin}/api/missions`)).status, 403);
+      const headers = await f.login();
+      const brief = { requestId: randomUUID(), title: "A bounded mission", objective: "Collect the source.", criteria: "Review its captured text.", sources: ["https://docs.near.org/"] };
+      assert.equal((await f.post("missions", brief, { cookie: headers.cookie })).status, 403);
+      assert.equal((await f.post("missions", { ...brief, owner: "other.testnet" }, headers)).status, 400);
+      assert.equal((await f.post("missions", { ...brief, budget: "1" }, headers)).status, 400);
+      assert.equal((await f.post("missions", { ...brief, sources: ["http://127.0.0.1/"] }, headers)).status, 400);
+      const created = await (await f.post("missions", brief, headers)).json() as MissionDetail;
+      const id = created.mission.id;
+      assert.equal((await f.post(`missions/${id}/run`, { version: 1 }, headers)).status, 200); await f.missions.wait(id);
+      const ready = await (await fetch(`${f.origin}/api/missions/${id}`, { headers: { cookie: headers.cookie } })).json() as MissionDetail;
+      assert.equal(ready.mission.state, "awaiting_review"); assert.equal(ready.artifact?.value.inference, "not_used");
+      assert.equal((await f.post(`missions/${id}/approve`, { version: ready.mission.version, artifactDigest: "0".repeat(64) }, headers)).status, 409);
+      assert.equal((await f.post(`missions/${id}/approve`, { version: ready.mission.version, artifactDigest: ready.artifact!.digest }, headers)).status, 200);
+      const replay = await (await f.post(`missions/${id}/events`, { after: ready.events[0]!.cursor }, headers)).json() as { events: unknown[] }; assert.ok(replay.events.length > 0);
+      assert.equal((await fetch(`${f.origin}/api/missions/mission:${randomUUID()}`, { headers: { cookie: headers.cookie } })).status, 400);
+      assert.equal((await fetch(`${f.origin}/api/missions/activity`, { headers: { cookie: headers.cookie } })).status, 200);
+      f.view.paused = true;
+      const paused = await f.post("missions", { ...brief, requestId: randomUUID() }, headers);
+      assert.equal(paused.status, 409); assert.equal((await paused.json() as { code: string }).code, "MISSION_BLOCKED");
+      assert.equal((await fetch(`${f.origin}/api/missions`, { headers: { cookie: headers.cookie } })).status, 200);
+      f.view.paused = false;
+      await f.post("logout", {}, headers);
+      assert.equal((await fetch(`${f.origin}/api/missions/${id}`, { headers: { cookie: headers.cookie } })).status, 403);
+      assert.equal((await f.post(`missions/${id}/events`, { after: 0 }, headers)).status, 403);
+      assert.equal(f.transport.calls, 0);
+    } finally { await f.closeHttp(); }
+  });
   it("serves a nonce-protected page and only public information before authentication", async () => {
     const f = await httpFixture();
     try {

@@ -8,7 +8,7 @@ Create `apps/console` using the authenticated API from 005. Add browser acceptan
 
 ## Experience and visual direction
 
-Create a calm operational workspace: warm neutral canvas, dark text, one restrained signal color, clear typography, generous spacing, and visible artifact/evidence hierarchy. Brand symbol should express continuity without a generic robot face. Use a code-native mark unless generated imagery has a concrete role. Respect reduced motion, keyboard navigation, contrast, small screens, and readable monetary values.
+Updated by the owner on 2026-11-07: take Tender as a visual-quality reference with a different palette. The implemented design uses graphite surfaces, copper highlights, cool neutral text, an application sidebar, task cards and a dedicated dossier/timeline layout. Preserve clear typography, spacing and artifact/evidence hierarchy. Brand symbol should express continuity without a generic robot face. Use a code-native mark unless generated imagery has a concrete role. Respect reduced motion, keyboard navigation, contrast, small screens, and readable monetary values.
 
 Primary navigation: Missions, Memory, Controls, Evidence. The first screen helps the user start or resume a mission. A mission combines objective, timeline, budget/reservations, worker quote, sourced artifact preview, review actions, and precise settlement status. Keep provider implementation details in inspectable evidence panels, not mandatory onboarding prose.
 

@@ -4,7 +4,11 @@ Priority P0 · risk high · effort two days. Depends on 003 and 004. Project: Pe
 
 ## Current state and scope
 
-The new repo has crypto/memory primitives, not a mission runner. Sofer's original `brain/loop.ts` and tests are behavioral references only: provider types, history and in-process concurrency are unsuitable as the durable mission state. Build `packages/runtime`, `apps/worker`, `apps/api`, and signed task envelopes. Preserve `packages/protocol/src/tools.ts` provenance while upgrading validation/outcomes.
+Active no-credit milestone (2026-11-07): implement a complete owner-authenticated source-dossier workflow: persist a bounded brief and zero-NEAR budget, explicitly run an HTTPS-only source collector, retain captured sources, interrupt/recover with fenced leases, assemble a local artifact and record owner review. No inference, model quality assessment, specialist hiring, payment, memory checkpoint or 0G upload is implied by this mode. Existing canonical NEAR/storage journals remain separate. Paid commerce, the model tool loop and signed specialist protocol remain later steps in this plan. The console will expose actual journal projections and preserve the existing owner controls.
+
+Design update: use Tender's local interface as a visual reference for its application shell, navigation, type hierarchy, task cards and detail composition. Implement Persistara's own source and code-native artwork with graphite surfaces, copper highlights and cool neutral text. Do not copy Tender source, brand assets or its red accent. Verify desktop, mobile, keyboard, empty/loading/failure and interrupted states.
+
+The source-only mission journal/worker and owner-authenticated local API are now implemented. The model-driven runner and specialist-commerce workflow remain unimplemented. Sofer's original `brain/loop.ts` and tests are behavioral references only: provider types, history and in-process concurrency are unsuitable as the durable mission state. Build `packages/runtime`, `apps/worker`, `apps/api`, and signed task envelopes. Preserve `packages/protocol/src/tools.ts` provenance while upgrading validation/outcomes.
 
 ## Required model
 
@@ -31,3 +35,8 @@ Negative tests cover expired leases, two workers racing, malicious retrieved ins
 ## Stop conditions
 
 An action can execute without persisted authorization; an owner key reaches model tools; an unresolved payment is retried as a new request; user/session scoping is only in the browser; a worker continues after lease revocation. Fix these before adding the console.
+
+
+## Source-only milestone evidence
+
+Implemented: versioned mission/source/event/artifact tables, one immutable brief per request ID, private scope binding, bounded zero-spend inputs, expiring fenced leases, cancellation/shutdown, retained captures, explicit public-read retries, one transactional dossier, exact-digest review and replayable event cursors. The redesigned console consumes these actual projections. Verification: 179 TypeScript tests, eight browser tests, three-process abrupt-exit/recovery fixture, 34 Rust tests and five sandbox scenarios. A real original-owner CLI-keychain login completed a two-source public-documentation dossier with zero spending, no AI and no upload. See `docs/MISSIONS.md` and its sanitized evidence. This does not satisfy the remaining model-loop, signed quote/delivery, commerce, SSE, memory-publication or golden-demo requirements above.

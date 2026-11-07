@@ -63,6 +63,8 @@ Verified inference evidence is not proof that a tool ran correctly, a report is 
 
 ## Execution and external effects
 
+The implemented [source-dossier mission workflow](MISSIONS.md) provides a private versioned SQLite brief/source/event/artifact journal and fenced source worker, exposed through the local owner-authenticated host. It has no inference, signing, upload or payment capability. It captures approved public HTTPS text, resumes remaining reads after interruption, creates one local dossier and records digest-bound review. Mission plaintext stays local and is outside encrypted memory backups. The model loop, specialist protocol, mission-linked settlement and remote API below remain target architecture.
+
 An action has a stable operation ID, canonical request digest, policy version, authorization generation, attempt count, and external reference. Persist intent before an external effect, then persist its observed outcome. States distinguish `queued`, `authorized`, `submitted`, `unknown`, `confirmed`, `failed`, and `canceled`. Unknown transactions are reconciled using their recorded transaction hash/nonce before retrying. Do not claim exactly-once external execution; implement deduplication and reconciliation.
 
 The mission journal is SQLite with explicit migrations for a single operator deployment. One process owns writes; background workers use leases plus fencing tokens and stop on lease loss. Persist event cursor before acknowledging it. API/UI projections rebuild from journal records. A separate signer service holds runtime signing keys; no owner key or uploader key is available to model-visible tools.

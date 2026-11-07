@@ -14,6 +14,8 @@
     "build": "tsc",
     "test": "pnpm build && node --test dist/tests/*.test.js",
     "check": "pnpm typecheck && pnpm test",
+    "runtime:test": "pnpm build && node --test dist/tests/missions.test.js",
+    "missions:recover:fixture": "pnpm build && node dist/scripts/mission-recovery-fixture.js",
     "web:build": "tsc -p apps/console/tsconfig.json && tsc -p apps/console/tsconfig.test.json && vite build --config apps/console/vite.config.ts",
     "owner:console": "pnpm build && pnpm web:build && node dist/scripts/owner-console.js",
     "test:e2e": "pnpm build && pnpm web:build && playwright test --config apps/console/playwright.config.ts",

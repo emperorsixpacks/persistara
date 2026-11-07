@@ -12,12 +12,15 @@ import { OwnerReader } from "../packages/owner/src/reader.js";
 import { OwnerService } from "../packages/owner/src/service.js";
 import { createOwnerServer } from "../packages/owner/src/server.js";
 import { ProviderError } from "../packages/protocol/src/providers.js";
+import { MissionJournal } from "../packages/runtime/src/journal.js";
+import { MissionService } from "../packages/runtime/src/service.js";
+import { PublicSourceReader, sourceOrigins } from "../packages/runtime/src/sources.js";
 import { loadEnvironment, printFailure } from "./common.js";
 import { publicMemoryBinding } from "./memory-config.js";
 
 async function main() {
   loadEnvironment();
-  const defaults: Record<string, string> = { "--port": "3377", "--memory-state-dir": ".persistara/runtime/research", "--state-dir": ".persistara/owner-console", "--keyring": ".persistara/keys/memory-keyring.json", "--bundle": ".persistara/recovery/research.bundle", "--secret-file": ".persistara/keys/research-recovery.secret" };
+  const defaults: Record<string, string> = { "--port": "3377", "--mission-state-dir": ".persistara/missions/research", "--memory-state-dir": ".persistara/runtime/research", "--state-dir": ".persistara/owner-console", "--keyring": ".persistara/keys/memory-keyring.json", "--bundle": ".persistara/recovery/research.bundle", "--secret-file": ".persistara/keys/research-recovery.secret" };
   const args = process.argv.slice(2); const supplied = new Set<string>();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i], value = args[i + 1];
@@ -45,10 +48,19 @@ async function main() {
   });
   const journal = new OwnerJournal(resolve(defaults["--state-dir"]!, "wallet.sqlite"), config, codeHash);
   const service = new OwnerService(config, journal, () => reader.read(), rpc);
-  const { server, origin } = createOwnerServer({ port, staticDirectory: resolve("apps/console/dist"), service });
-  server.on("error", (error) => { journal.close(); printFailure(error); });
+  const origins = sourceOrigins(process.env.PERSISTARA_SOURCE_ORIGINS);
+  const missionJournal = new MissionJournal(resolve(defaults["--mission-state-dir"]!, "missions.sqlite"), { owner: config.signerId, agentId: config.agentId, contractId: config.contractId, chainId: config.chainId, codeHash }, origins);
+  const missions = new MissionService(missionJournal, new PublicSourceReader(origins), () => reader.read());
+  const { server, origin } = createOwnerServer({ port, staticDirectory: resolve("apps/console/dist"), service, missions });
+  server.on("error", (error) => { void missions.close().finally(() => { missionJournal.close(); journal.close(); printFailure(error); }); });
   server.listen(port, "127.0.0.1", () => console.log(JSON.stringify({ status: "owner_console_listening", url: origin, network: "near:testnet", owner: config.signerId, agentId: config.agentId, ownerKeyLoaded: false, nearAiUsed: false })));
-  const close = () => { server.close(() => { journal.close(); process.exit(0); }); server.closeIdleConnections(); };
+  let closing = false;
+  const close = () => {
+    if (closing) return; closing = true;
+    const stopped = missions.close();
+    server.close(() => { void stopped.finally(() => { missionJournal.close(); journal.close(); process.exit(0); }); });
+    server.closeIdleConnections();
+  };
   process.once("SIGINT", close); process.once("SIGTERM", close);
 }
 main().catch(printFailure);

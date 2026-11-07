@@ -2,7 +2,7 @@
 
 The console connects an external NEAR wallet to the **existing configured agent**, verifies its original registered owner key, displays finalized authority/runtime/treasury state and local backup readiness, and supports reviewed pause/resume transactions. It requires no AI credits. The server never loads a wallet owner key, signs a transaction or broadcasts one. The wallet keeps those capabilities.
 
-This is the first owner-console workflow, not the full mission dashboard or new-agent enrollment. Browser registration, key installation/grants, funding and execution of prepared rotation requests remain follow-up work. Their CLI/contract implementations remain separate. Public hosting and multi-tenant API authentication are outside this local host's trust boundary.
+The host now includes the redesigned [source mission desk](MISSIONS.md), alongside these owner controls. Model-driven research, specialist commerce and new-agent enrollment remain pending. Browser registration, key installation/grants, funding and execution of prepared rotation requests remain follow-up work. Their CLI/contract implementations remain separate. Public hosting and multi-tenant API authentication are outside this local host's trust boundary.
 
 ## Run
 
@@ -21,6 +21,7 @@ Default owner-local paths:
 | Argument | Default |
 | --- | --- |
 | `--state-dir` | `.persistara/owner-console` |
+| `--mission-state-dir` | `.persistara/missions/research` |
 | `--memory-state-dir` | `.persistara/runtime/research` |
 | `--keyring` | `.persistara/keys/memory-keyring.json` |
 | `--bundle` | `.persistara/recovery/research.bundle` |
@@ -64,12 +65,12 @@ pnpm test:e2e
 pnpm contract:check
 ```
 
-On 2026-11-07, **167 TypeScript tests in 24 suites** pass, covering standard owner signatures, wrong/runtime keys, replay/expiry/CSRF, Host/Origin restrictions, private-path isolation, exact request/receipt matching, concurrent/restarted handoffs, changed authority, wrong-block/truncated key lists and bounded readiness. The production browser build passes. **Four Chromium tests** exercise reviewed pause/resume, safe review cancellation, lost-response recovery after reload, wrong-key rejection and desktop/mobile/keyboard behavior. These use an explicitly labeled disposable wallet and simulated transport; they are not live-wallet evidence. Screenshots were visually inspected. The browser artifact contains no server/recovery modules or actual application key material.
+At the first owner-console milestone, **167 TypeScript tests in 24 suites** passed, covering standard owner signatures, wrong/runtime keys, replay/expiry/CSRF, Host/Origin restrictions, private-path isolation, exact request/receipt matching, concurrent/restarted handoffs, changed authority, wrong-block/truncated key lists and bounded readiness. The production browser build passes. **Four Chromium tests** exercise reviewed pause/resume, safe review cancellation, lost-response recovery after reload, wrong-key rejection and desktop/mobile/keyboard behavior. These use an explicitly labeled disposable wallet and simulated transport; they are not live-wallet evidence. Screenshots were visually inspected. The browser artifact contains no server/recovery modules or actual application key material.
 
 **34 Rust tests and five deployed-WASM sandbox scenarios** pass. The new scenario hands public unsigned requests to an external Rust owner signer, verifies actual finalized pause/resume receipts across processes, blocks repeated handoff and rejects administrative calls from the restricted runtime key. No owner/runtime secret is supplied to that application fixture. Its backup readiness is explicitly a fixture; actual local backup authentication is independently recorded in the live login report.
 
 The real original owner also signed an origin-bound NEP-413 challenge through the external official NEAR CLI keychain. The local console authenticated it, read finalized authority and locally authenticated backup readiness, then logged out. [Sanitized live evidence](evidence/owner-wallet-login-2026-11-07.json) contains no signature, nonce, cookie, CSRF token, recovery secret or private key. No public transaction or AI call was made in that check. The environment had no connected real browser/wallet surface, so **actual browser-provider approval remains unverified**; neither the external CLI proof nor the fixture browser tests are mislabeled as that gate.
 
-The host trusts the operator's machine, pinned dependencies, selected external wallet and configured RPC. It is not a light client, general untrusted-code sandbox or protection against another process with the owner's filesystem/OS access. Wallet executors use the connector's sandboxed iframes and dynamic manifest. The page applies nonce-based script CSP and blocks framing; provider network access remains necessary. Public hosting, new-agent enrollment, rotation UI, physical off-device recovery, complete research missions and independent review remain release work.
+The host trusts the operator's machine, pinned dependencies, selected external wallet and configured RPC. It is not a light client, general untrusted-code sandbox or protection against another process with the owner's filesystem/OS access. Wallet executors use the connector's sandboxed iframes and dynamic manifest. The page applies nonce-based script CSP and blocks framing; provider network access remains necessary. Public hosting, new-agent enrollment, rotation UI, physical off-device recovery, model-driven research/commerce and independent review remain release work. The current mission milestone passes 179 TypeScript tests and eight Chromium tests; its real public-source captures remain separate from live browser-wallet approval.
 
 Primary references: [NEAR wallet login](https://docs.near.org/web3-apps/tutorials/wallet-login), [NEP-413 authentication](https://docs.near.org/web3-apps/backend/backend), [connector source](https://github.com/azbang/near-connect), [pinned SDK NEP-413 implementation](https://github.com/near/near-api-js).

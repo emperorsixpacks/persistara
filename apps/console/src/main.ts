@@ -2,25 +2,11 @@ import { NearConnector, type NearWalletBase } from "@hot-labs/near-connect";
 import type { OwnerChallenge, OwnerOperation, OwnerView } from "../../../packages/owner/src/types.js";
 import "./style.css";
 
+import { shell } from "./shell.js";
+import { MissionDesk } from "./missions.js";
+
 const root = document.querySelector<HTMLDivElement>("#app")!;
-root.innerHTML = `
-  <header class="topbar"><a class="brand" href="/" aria-label="Persistara home"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M28 10H15a10 10 0 0 0 0 20h10a10 10 0 0 0 0-20M12 30h13M12 10v20m16-20v20"/></svg>Persistara<span class="brand-note">OWNER WORKSPACE</span></a><span class="network"><i></i>NEAR testnet</span></header>
-  <div id="fixture-banner" class="fixture" hidden>LOCAL TEST FIXTURE · Wallet and chain transport are simulated. No live verification is claimed.</div>
-  <main>
-    <section class="intro"><div><p class="eyebrow">01 / OWNER CONNECTION</p><h1>Your agent.<br><em>Your authority.</em></h1><p class="lede">Connect the wallet that owns your agent.<br>Review every change before it reaches the chain.</p></div><div class="intro-note"><span class="orbit" aria-hidden="true">↗</span><p>Memory carries forward.<br>Control stays with you.</p></div></section>
-    <div class="workspace">
-      <aside class="journey" aria-label="Connection progress"><p class="eyebrow">GET CONNECTED</p><ol><li id="step-connect" class="current"><span>01</span><div>Connect wallet<small>Choose your owner wallet</small></div></li><li id="step-verify"><span>02</span><div>Verify ownership<small>Sign a one-time message</small></div></li><li id="step-control"><span>03</span><div>Review controls<small>Check permissions and recovery</small></div></li></ol><div class="aside-note"><span class="small-mark">↳</span><p>Your wallet keeps its private key. Connecting does not grant runtime permissions.</p></div></aside>
-      <div class="content">
-        <section class="panel connect-panel" aria-labelledby="connect-title"><div class="panel-heading"><div><p class="eyebrow">OWNER WALLET</p><h2 id="connect-title">A connection you control.</h2></div><span id="session-status" class="pill">Disconnected</span></div><p id="connect-copy" class="muted">Use the original owner key registered for this agent. Another key on the same account cannot enable these controls.</p><dl class="identity"><div><dt>Expected owner</dt><dd id="expected-owner">Loading…</dd></div><div><dt>Agent</dt><dd id="expected-agent">Loading…</dd></div></dl><div class="button-row"><button id="connect" class="primary" disabled>Connect NEAR wallet <span aria-hidden="true">↗</span></button><button id="disconnect" class="quiet" hidden>Disconnect</button><span id="session-expiry" class="tiny"></span></div></section>
-        <div id="notice" class="notice" role="status" aria-live="polite">Loading the local owner workspace…</div>
-        <section class="panel" aria-labelledby="readiness-title"><div class="panel-heading"><div><p class="eyebrow">BEFORE YOU CONTINUE</p><h2 id="readiness-title">Know where things stand.</h2></div><button id="refresh" class="quiet" hidden>Refresh state ↻</button></div><div class="readiness"><div><span class="readiness-icon">↗</span><h3>Owner authority</h3><p id="authority-status">Connect to verify</p><small id="authority-detail">The registered key must have full access.</small></div><div><span class="readiness-icon">⌁</span><h3>Runtime permissions</h3><p id="runtime-status">Not checked</p><small id="runtime-detail">Restricted calls and a bounded gas allowance.</small></div><div><span class="readiness-icon">◇</span><h3>Memory recovery</h3><p id="backup-status">Not checked</p><small id="backup-detail">Local backup authentication is checked separately from off-device custody.</small></div></div><p class="footnote" id="offdevice">Off-device backup has not been verified.</p></section>
-        <section class="panel" aria-labelledby="controls-title"><div class="panel-heading"><div><p class="eyebrow">AGENT CONTROLS</p><h2 id="controls-title">Stay in the driver's seat.</h2></div><span id="agent-status" class="pill">Not checked</span></div><p class="muted">Pausing stops new runtime authorizations and memory checkpoints. Existing payment obligations continue.</p><div class="metrics"><div><span>Available treasury</span><strong id="balance">—</strong></div><div><span>Memory checkpoint</span><strong id="checkpoint">—</strong></div><div><span>Key epoch</span><strong id="epoch">—</strong></div><div><span>Per-job limit</span><strong id="job-limit">—</strong></div><div><span>Daily limit</span><strong id="daily-limit">—</strong></div></div><div class="button-row"><button id="pause" class="secondary" disabled>Review pause</button><button id="resume" class="secondary" disabled>Review resume</button><span id="resume-reason" class="tiny">Verify your owner connection to continue.</span></div></section>
-        <section id="pending-panel" class="panel pending-panel" hidden aria-labelledby="pending-title"><p class="eyebrow">PENDING WALLET OUTCOME</p><h2 id="pending-title">Resolve the existing request.</h2><p id="pending-copy" class="muted"></p><p id="pending-id" class="mono"></p><label for="transaction-hash">Transaction hash from your wallet</label><div class="hash-row"><input id="transaction-hash" type="text" autocomplete="off" spellcheck="false" placeholder="Paste the NEAR transaction hash"/><button id="reconcile" class="secondary">Check transaction</button></div><button id="reopen" class="quiet" hidden>Open prepared review</button></section>
-        <details id="evidence" class="panel"><summary>Inspect authority & transaction evidence <span aria-hidden="true">＋</span></summary><div class="evidence-body"><p id="block" class="mono">Finalized state has not been checked.</p><p id="contract" class="mono"></p><p id="owner-key" class="mono"></p><div id="history"></div><p class="footnote">A confirmed owner transaction proves the requested chain action. It does not verify storage availability, AI inference or research quality.</p></div></details>
-      </div>
-    </div><footer><span>PERSISTARA</span><p>Owner-controlled agents. Recoverable memory. Reviewable work.</p><span>LOCAL WORKSPACE / TESTNET</span></footer>
-  </main>
-  <dialog id="review"><div class="review-inner"><p class="eyebrow">REVIEW OWNER ACTION</p><h2 id="review-title">Review this change.</h2><p id="review-copy" class="muted"></p><dl class="review-details"><div><dt>Agent</dt><dd id="review-agent"></dd></div><div><dt>Contract</dt><dd id="review-contract"></dd></div><div><dt>Owner key</dt><dd id="review-key" class="mono"></dd></div><div><dt>Action</dt><dd id="review-method"></dd></div><div><dt>Attached NEAR</dt><dd>0 NEAR · network gas applies, maximum 100 Tgas</dd></div><div><dt>Request fingerprint</dt><dd id="review-digest" class="mono"></dd></div></dl><label class="ack"><input id="ack" type="checkbox"/>I have reviewed this owner action.</label><div class="button-row"><button id="sign" class="primary" disabled>Sign in wallet ↗</button><button id="cancel-review" class="quiet">Cancel review</button></div></div></dialog>`;
+root.innerHTML = shell;
 
 function element<T extends HTMLElement = HTMLElement>(id: string): T { return document.getElementById(id) as T; }
 const button = (id: string) => element<HTMLButtonElement>(id);
@@ -44,13 +30,17 @@ const messages: Record<string, string> = {
   UPSTREAM_ERROR: "The local workspace or NEAR RPC is unavailable. Refresh to check the recorded state.",
   NETWORK_MISMATCH: "The configured RPC is not NEAR testnet. Restore the expected testnet endpoint before continuing.",
   PROTOCOL_ERROR: "The chain response could not be verified. Controls stay unavailable until a valid finalized read.",
+  MISSION_BLOCKED: "Mission execution is held. Check that your agent is active and its local rotation hold is clear, then refresh.",
 };
 class ApiError extends Error { constructor(readonly code: string) { super(messages[code] ?? "The request could not be completed. Refresh the recorded state."); } }
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api/${path}`, { method: body === undefined ? "GET" : "POST", credentials: "same-origin", signal: AbortSignal.timeout(120_000),
     ...(body === undefined ? {} : { headers: { "content-type": "application/json", "x-persistara-csrf": csrf }, body: JSON.stringify(body) }) });
   const data = await response.json() as T & { code?: string };
-  if (!response.ok) throw new ApiError(data.code ?? "UPSTREAM_ERROR");
+  if (!response.ok) {
+    if (data.code === "AUTHORIZATION_FAILED") { csrf = ""; view = null; desk.disconnected(); text("session-status", "Verify owner again"); element("session-status").classList.remove("good"); controls(); }
+    throw new ApiError(data.code ?? "UPSTREAM_ERROR");
+  }
   return data;
 }
 function money(value: string): string {
@@ -73,7 +63,7 @@ async function work(action: () => Promise<void>) {
   try { await action(); }
   catch (error) {
     if (error instanceof ApiError && ["AUTHORIZATION_FAILED", "UPSTREAM_ERROR", "INTEGRITY_FAILED", "NETWORK_MISMATCH", "PROTOCOL_ERROR"].includes(error.code)) {
-      view = null; text("agent-status", "Refresh required");
+      view = null; desk.disconnected(); text("agent-status", "Refresh required");
       if (error.code === "AUTHORIZATION_FAILED") { csrf = ""; text("session-status", "Verify owner again"); element("session-status").classList.remove("good"); }
     }
     status(error instanceof ApiError ? error.message : "The wallet or connection returned no confirmed outcome. Refresh the recorded state before another action.", true);
@@ -112,8 +102,8 @@ async function refresh() {
     }
     history.append(item);
   }
-  element("step-connect").classList.add("done"); element("step-verify").classList.add("done"); element("step-control").classList.add("current");
   show("refresh", true); controls();
+  await desk.connected();
 }
 function openReview(operation: OwnerOperation) {
   reviewed = operation; ack.checked = false;
@@ -128,9 +118,10 @@ async function assertWallet() {
   const accounts = await wallet.getAccounts({ network: "testnet" });
   if (!accounts.some((account) => account.accountId === view!.owner && (!account.publicKey || account.publicKey === view!.ownerKey))) throw new ApiError("AUTHORIZATION_FAILED");
 }
+const desk = new MissionDesk({ api, work, authenticated: () => Boolean(csrf && view), notice: status });
 button("connect").onclick = () => void work(async () => {
   if (csrf) await api("logout", {});
-  csrf = ""; view = null; wallet = undefined;
+  csrf = ""; view = null; wallet = undefined; desk.disconnected();
   text("session-status", "Disconnected"); element("session-status").classList.remove("good");
   text("authority-status", "Connect to verify"); text("runtime-status", "Not checked"); text("backup-status", "Not checked");
   text("agent-status", "Not checked"); text("balance", "—"); text("checkpoint", "—"); text("epoch", "—"); text("job-limit", "—"); text("daily-limit", "—"); text("session-expiry", "");
