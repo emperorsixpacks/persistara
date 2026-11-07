@@ -31,6 +31,7 @@ Never persist decrypted content or private keys to receipts/logs. API secrets ar
 
 - 0G unavailable: do not advance NEAR head; retain a retryable write intent.
 - NEAR checkpoint outcome unknown: reconcile final chain state; do not announce committed memory.
+- Memory write interruption: preserve encrypted intents, fixed roots and exact checkpoint attempts in the canonical write journal. Dispatched uploads are probed, never automatically repeated. Read-only reconciliation cannot sign or upload. A missing/replaced signer-journal identity fences old checkpoint attempts; lease loss fences further journal mutations. An already dispatched effect may complete late. See [durable write limits](MEMORY-WRITES.md).
 - Index unavailable: recover from authenticated blobs; no silent cross-agent fallback.
 - Key missing: require recovery material; no automatic plaintext mode or generated replacement key.
 - Wrong key or modified envelope: typed failure; no partial content to the model.

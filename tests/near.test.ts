@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -228,6 +228,63 @@ describe("durable restricted NEAR signer (offline RPC fixtures)", () => {
 });
 
 describe("finalized NEAR memory and treasury clients", () => {
+  it("persists a durable checkpoint identity and reconciles its exact transaction after the head advances", async () => {
+    const f = await fixture();
+    try {
+      const store = new NearMemoryHeadStore(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      const plan = (await store.prepare(f.config.agentId, 0, head))!;
+      assert.ok(plan); const identity = f.journal.identity();
+      f.mock.lostResponse = true;
+      await assert.rejects(store.submit(plan), { code: "OUTCOME_UNKNOWN" });
+      f.restart(); assert.equal(f.journal.identity(), identity);
+      f.mock.agent.paused = true; // Reconciliation cannot depend on new write authorization.
+      assert.equal(await new NearMemoryHeadStore(new NearAuthorityReader(f.rpc), f.config, f.signer()).reconcile(plan), "accepted");
+      assert.equal(f.mock.sends, 1);
+    } finally { await f.close(); }
+  });
+  it("fences a checkpoint if the signer journal was replaced and permits RPC endpoint failover", async () => {
+    const f = await fixture();
+    const other = new NearJournal(join(f.directory, "replacement.sqlite"), f.config);
+    try {
+      const store = new NearMemoryHeadStore(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      const plan = (await store.prepare(f.config.agentId, 0, head))!;
+      const replaced = new NearMemoryHeadStore(new NearAuthorityReader(f.rpc), f.config, new DurableNearSigner(f.config, f.rpc, other, new KeyPairSigner(f.key)));
+      await assert.rejects(replaced.submit(plan), { code: "INTEGRITY_FAILED" });
+      await assert.rejects(replaced.reconcile(plan), { code: "INTEGRITY_FAILED" });
+      assert.equal(f.mock.sends, 0);
+      const rpc = new NearRpc({ ...f.config, rpcUrl: "https://failover.invalid" }, (method, params) => f.rpc.request(method, params));
+      const failover = new NearMemoryHeadStore(new NearAuthorityReader(rpc), f.config, f.signer());
+      assert.equal(await failover.submit(plan), true); assert.equal(f.mock.sends, 1);
+    } finally { other.close(); await f.close(); }
+  });
+  it("checks active runtime checkpoint permission before preparing a durable effect", async () => {
+    const f = await fixture();
+    try {
+      const store = new NearMemoryHeadStore(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      for (const change of [{ canCheckpoint: false }, { expiresAtNs: "1" }]) {
+        const previous = { ...f.mock.agent.delegates[0]! };
+        Object.assign(f.mock.agent.delegates[0]!, change);
+        await assert.rejects(store.assertWritable(1), { code: "AUTHORIZATION_FAILED" });
+        Object.assign(f.mock.agent.delegates[0]!, previous);
+      }
+      f.mock.permission = "FullAccess";
+      await assert.rejects(store.assertWritable(1), { code: "AUTHORIZATION_FAILED" });
+      assert.equal(f.mock.sends, 0);
+    } finally { await f.close(); }
+  });
+  it("checks the expected journal identity inside the isolated worker and replays terminal outcomes without loading a key", async () => {
+    const f = await fixture();
+    try {
+      const isolated = new IsolatedNearSigner(f.config);
+      const identity = await isolated.journalIdentity(false);
+      assert.equal(identity, f.journal.identity());
+      await assert.rejects(isolated.submit("op:wrong-journal", call(), { journalIdentity: randomUUID() }), { code: "INTEGRITY_FAILED" });
+      const result = await f.signer().submit("op:terminal", call());
+      // The fixture never created runtime.key. A terminal replay must not load it or contact the public RPC.
+      assert.deepEqual(await isolated.submit("op:terminal", call(), { journalIdentity: identity }), result);
+      assert.equal(f.mock.sends, 1);
+    } finally { await f.close(); }
+  });
   it("uses the real memory port with string U64 encoding and a confirmed CAS result", async () => {
     const f = await fixture();
     try {

@@ -1,6 +1,6 @@
 # Owner recovery and private recall
 
-This milestone implements encrypted owner backups, historical memory keyrings, authenticated snapshot recovery and a private full-text recall cache. It needs no AI credits. Public NEAR/0G recovery acceptance, durable memory-upload intents, embeddings and the complete owner rotation workflow remain release gates; plan 004 is in progress.
+This milestone implements encrypted owner backups, historical memory keyrings, authenticated snapshot recovery and a private full-text recall cache. [Durable encrypted write intents and reconciliation](MEMORY-WRITES.md) are also implemented. No AI credits are required. Public NEAR/0G recovery acceptance, embeddings and the complete owner rotation workflow remain release gates; plan 004 is in progress.
 
 ## What the backup recovers
 
@@ -86,6 +86,6 @@ The explicitly labeled local recovery drill creates random memory keys, an encry
 
 The deployed-WASM sandbox scenario uses actual NEAR restricted keys/checkpoints and native settlement with explicitly synthetic blob storage. It now backs up random memory keys, commits three records including a revision, settles a job once, removes original runtime keys/journal/index, and restores sourced recall from the backup in a fresh process. This is separate from the real 0G/public-testnet acceptance gate.
 
-Before the full release, complete durable encrypted memory-write intents and unknown upload reconciliation, owner rotation orchestration, real-provider clean-machine recovery, cost/latency measurements, mission integration and independent review. The generic foundation writer is not the durable live mission service. Committed recovery does not recover unfinished local writes or authorize retrying an uncertain paid upload.
+Before the full release, complete owner rotation orchestration, real-provider clean-machine recovery, cost/latency measurements, mission integration and independent review. Durable writes use a separate private journal; the generic foundation writer is not the durable live mission service. Owner backup recovery restores committed memory, while unfinished local writes additionally require their original write/signer journals. Neither recovery nor a missing root authorizes retrying an uncertain paid upload.
 
 Primary references: [Node authenticated encryption](https://nodejs.org/api/crypto.html), [SQLite atomic transactions](https://www.sqlite.org/atomiccommit.html), [FTS5](https://www.sqlite.org/fts5.html). Implementation uses the pinned project runtime and has no new cryptographic dependency.

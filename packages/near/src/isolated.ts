@@ -10,14 +10,19 @@ export class IsolatedNearSigner implements NearSigner {
     if (!config.journalFile || !config.runtimeKeyFile) throw new ProviderError("NOT_CONFIGURED", "Configure separate NEAR runtime key and journal files");
     this.config = structuredClone(config);
   }
-  async submit(id: string, call: ContractCall, options: CallOptions = {}): Promise<NearOutcome> {
+  async submit(id: string, call: ContractCall, options: CallOptions & { journalIdentity?: string } = {}): Promise<NearOutcome> {
     if (!operationId(id)) throw new ProviderError("INVALID_INPUT", "Invalid NEAR operation ID");
     validateCall(call, this.config);
-    return this.run({ operation: "submit", id, call: structuredClone(call) }, options, "may-charge");
+    return this.run({ operation: "submit", id, call: structuredClone(call), ...(options.journalIdentity ? { expectedJournalIdentity: options.journalIdentity } : {}) }, options, "may-charge");
   }
-  async reconcile(id: string, options: CallOptions = {}): Promise<NearOutcome> {
+  async journalIdentity(create: boolean): Promise<string> {
+    const value = await this.execute(new URL("./signer-worker.js", import.meta.url), { operation: "identify", id: "journal:identity", config: this.config, create }, { effect: "read" });
+    if (typeof value !== "string" || !/^[a-f0-9-]{36}$/.test(value)) throw new ProviderError("PROTOCOL_ERROR", "Invalid signer journal identity");
+    return value;
+  }
+  async reconcile(id: string, options: CallOptions & { journalIdentity?: string } = {}): Promise<NearOutcome> {
     if (!operationId(id)) throw new ProviderError("INVALID_INPUT", "Invalid NEAR operation ID");
-    return this.run({ operation: "reconcile", id }, options, "read");
+    return this.run({ operation: "reconcile", id, ...(options.journalIdentity ? { expectedJournalIdentity: options.journalIdentity } : {}) }, options, "read");
   }
   private async run(request: Record<string, unknown>, options: CallOptions, effect: "read" | "may-charge"): Promise<NearOutcome> {
     const value = await this.execute(new URL("./signer-worker.js", import.meta.url), { ...request, config: this.config }, { ...options, effect, timeoutMs: options.timeoutMs ?? 90_000 });

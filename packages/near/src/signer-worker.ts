@@ -23,13 +23,17 @@ async function loadRuntimeKey(path: string): Promise<KeyPairSigner> {
 process.once("message", async (request: unknown) => {
   let journal: NearJournal | undefined;
   try {
-    if (!isObject(request) || !isObject(request.config) || typeof request.id !== "string" || !["submit", "reconcile"].includes(String(request.operation))) throw new ProviderError("INVALID_INPUT", "Invalid signer worker command");
+    if (!isObject(request) || !isObject(request.config) || typeof request.id !== "string" || !["submit", "reconcile", "identify"].includes(String(request.operation))) throw new ProviderError("INVALID_INPUT", "Invalid signer worker command");
     const config = request.config as unknown as NearSignerConfig;
     validateNetwork(config); validateIdentity(config);
     if (typeof config.journalFile !== "string" || typeof config.runtimeKeyFile !== "string") throw new ProviderError("NOT_CONFIGURED", "Missing signer paths");
-    journal = new NearJournal(config.journalFile, config, request.operation === "submit");
+    journal = new NearJournal(config.journalFile, config, (request.operation === "submit" && request.expectedJournalIdentity === undefined) || (request.operation === "identify" && request.create === true));
+    if (request.operation === "identify") { const identity = journal.identity(); journal.close(); journal = undefined; reply(identity); return; }
+    if (request.expectedJournalIdentity !== undefined && request.expectedJournalIdentity !== journal.identity()) throw new ProviderError("INTEGRITY_FAILED", "Signer journal was replaced; submission is fenced");
     const rpc = new NearRpc(config);
-    const key = request.operation === "submit" ? await loadRuntimeKey(config.runtimeKeyFile) : undefined;
+    const existing = journal.get(request.id);
+    const needsKey = request.operation === "submit" && (!existing || existing.state === "allocated" || existing.state === "prepared");
+    const key = needsKey ? await loadRuntimeKey(config.runtimeKeyFile) : undefined;
     const signer = new DurableNearSigner(config, rpc, journal, key, (reference) => progress("prepared", reference));
     const result = request.operation === "submit" ? await signer.submit(request.id, request.call as ContractCall) : await signer.reconcile(request.id);
     progress("completion", result.transactionHash);

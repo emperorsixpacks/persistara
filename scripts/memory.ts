@@ -2,7 +2,6 @@ import { resolve } from "node:path";
 import { NearAuthorityReader } from "../packages/near/src/client.js";
 import { NearRpc } from "../packages/near/src/rpc.js";
 import { createOwnerBackup, decodePrivateKeyring, encodePrivateKeyring, verifyOwnerBackup } from "../packages/memory/src/backup.js";
-import { assertBinding, type MemoryBinding } from "../packages/memory/src/binding.js";
 import { MemoryKeyring } from "../packages/memory/src/keyring.js";
 import { MemoryRecallIndex } from "../packages/memory/src/index.js";
 import { readPrivateFile, writePrivateFile } from "../packages/memory/src/files.js";
@@ -10,8 +9,8 @@ import { rebuildFromOwnerBackup, recallCommitted } from "../packages/memory/src/
 import { ZeroGBlobStore } from "../packages/storage/src/zero-g.js";
 import { storageConfig } from "../packages/protocol/src/config.js";
 import { MemoryError } from "../packages/protocol/src/memory.js";
-import { ProviderError } from "../packages/protocol/src/providers.js";
 import { loadEnvironment, printFailure } from "./common.js";
+import { publicMemoryBinding } from "./memory-config.js";
 
 function argumentsOf(argv: string[]): Map<string, string> {
   const result = new Map<string, string>();
@@ -27,18 +26,11 @@ function required(args: Map<string, string>, name: string): string {
   if (!value) throw new MemoryError("INVALID_INPUT", `Missing ${name}`);
   return value;
 }
-function publicBinding(): MemoryBinding {
-  if (!process.env.NEAR_AGENT_ID || !process.env.NEAR_AUTHORITY_CONTRACT) throw new ProviderError("NOT_CONFIGURED", "Configure the public NEAR agent and authority contract first");
-  const storage = storageConfig(process.env);
-  const binding: MemoryBinding = { agentId: process.env.NEAR_AGENT_ID, authorityNetwork: "near:testnet", chainId: "testnet", contractId: process.env.NEAR_AUTHORITY_CONTRACT,
-    storageNetwork: `0g:16602:${storage.mode}` };
-  assertBinding(binding); return binding;
-}
 async function main(): Promise<void> {
   loadEnvironment();
   const [command, ...argv] = process.argv.slice(2);
   const args = argumentsOf(argv);
-  const binding = publicBinding();
+  const binding = publicMemoryBinding();
   if (command === "keys") {
     const keys = MemoryKeyring.create();
     await writePrivateFile(required(args, "--keyring"), encodePrivateKeyring(binding, keys));

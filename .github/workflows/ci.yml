@@ -17,6 +17,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm memory:recover:fixture
+      - run: pnpm memory:writes:fixture
   contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 30

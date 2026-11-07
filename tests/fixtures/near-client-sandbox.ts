@@ -4,7 +4,9 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { MemoryService } from "../../packages/memory/src/service.js";
 import { MemoryKeyring } from "../../packages/memory/src/keyring.js";
-import { createOwnerBackup, encodePrivateKeyring, verifyOwnerBackup } from "../../packages/memory/src/backup.js";
+import { createOwnerBackup, decodePrivateKeyring, encodePrivateKeyring, verifyOwnerBackup } from "../../packages/memory/src/backup.js";
+import { MemoryWriteJournal } from "../../packages/memory/src/write-journal.js";
+import { DurableMemoryWriter } from "../../packages/memory/src/writer.js";
 import { readPrivateFile, writePrivateFile } from "../../packages/memory/src/files.js";
 import { MemoryRecallIndex } from "../../packages/memory/src/index.js";
 import { rebuildFromOwnerBackup, recallCommitted } from "../../packages/memory/src/recovery.js";
@@ -14,14 +16,22 @@ import { NearAuthorityReader, NearMemoryHeadStore, NearTreasuryClient } from "..
 import { IsolatedNearSigner } from "../../packages/near/src/isolated.js";
 import { NearRpc } from "../../packages/near/src/rpc.js";
 import type { NearSignerConfig } from "../../packages/near/src/protocol.js";
-import { isObject, MemoryError, type BlobRef, type BlobStore } from "../../packages/protocol/src/memory.js";
+import { isObject, MemoryError, sameBlob, type BlobRef, type PreparedBlobStore } from "../../packages/protocol/src/memory.js";
 import { ProviderError } from "../../packages/protocol/src/providers.js";
 
 let fixtureStage = "bootstrap";
 let observedStatus: string | undefined;
 
-class SyntheticFixtureBlobs implements BlobStore {
+class SyntheticFixtureBlobs implements PreparedBlobStore {
   constructor(private readonly directory: string) {}
+  async assertUploadReady(): Promise<void> { /* Explicitly synthetic; no uploader account or paid provider. */ }
+  async prepare(bytes: Uint8Array): Promise<BlobRef> {
+    const digest = sha256(bytes);
+    return { provider: "0g", network: "0g:16602:turbo", objectId: `0x${digest}`, ciphertextSha256: digest, byteLength: bytes.length };
+  }
+  async putPrepared(ref: BlobRef, bytes: Uint8Array, _submitted: (hash: string) => void): Promise<BlobRef> {
+    assert.ok(sameBlob(ref, await this.prepare(bytes))); return this.put(bytes);
+  }
   async put(bytes: Uint8Array): Promise<BlobRef> {
     const digest = sha256(bytes);
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
@@ -77,20 +87,37 @@ async function main(): Promise<void> {
         throw new ProviderError("OUTCOME_UNKNOWN", "Injected lost checkpoint response", false, outcome.transactionHash);
       },
       reconcile: (id: string) => signer.reconcile(id),
+      journalIdentity: (create: boolean) => signer.journalIdentity(create),
     };
-    const memory = new MemoryService(config.agentId, keys, 1, blobs, new NearMemoryHeadStore(reader, config, loseResponse), { binding });
-    await assert.rejects(memory.remember(inputMemory), { code: "OUTCOME_UNKNOWN" });
-    assert.ok(transactionHash);
+    const journal = new MemoryWriteJournal(join(input.directory, "original-runtime", "writes.sqlite"), binding);
+    try {
+      const memory = new DurableMemoryWriter(binding, keys, blobs, new NearMemoryHeadStore(reader, config, loseResponse), journal);
+      await assert.rejects(memory.remember(inputMemory), { code: "OUTCOME_UNKNOWN" });
+      assert.equal(journal.operation(inputMemory.operationId)?.status, "pending");
+      assert.ok(transactionHash);
+      assert.equal((await reader.agent(config.agentId)).head?.version, 1);
+      console.log(JSON.stringify({ phase: "write", evidence: "local-sandbox-synthetic-storage", transactionHash, operationId, version: 1, memoryWriteStatus: "pending" }));
+    } finally { journal.close(); }
+  } else if (input.phase === "resume-memory") {
+    fixtureStage = "reconcile-and-resume-memory-in-new-process";
+    const keys = decodePrivateKeyring(await readPrivateFile(join(input.directory, "original-runtime", "memory-keyring.json")), binding);
     const normal = new MemoryService(config.agentId, keys, 1, blobs, new NearMemoryHeadStore(reader, config, signer), { binding });
-    const original = (await normal.recover())[0]!;
-    await normal.remember({ operationId: "memory:budget", text: "Research missions must count pending reservations in their budget.", source: { kind: "owner", reference: "sandbox:owner-budget" } });
-    await normal.remember({ operationId: "memory:revision", text: "Research reports must cite dated primary sources and state uncertainty.", source: inputMemory.source, supersedes: original.id });
+    const journal = new MemoryWriteJournal(join(input.directory, "original-runtime", "writes.sqlite"), binding, Date.now, false);
+    try {
+      const writer = new DurableMemoryWriter(binding, keys, blobs, new NearMemoryHeadStore(reader, config, signer), journal);
+      const reconciled = await writer.reconcile(inputMemory.operationId);
+      assert.equal(reconciled.status, "committed"); assert.equal(reconciled.version, 1);
+      assert.equal((await writer.remember(inputMemory)).recordId, reconciled.recordId);
+      const original = (await normal.recover())[0]!;
+      await writer.remember({ operationId: "memory:budget", text: "Research missions must count pending reservations in their budget.", source: { kind: "owner", reference: "sandbox:owner-budget" } });
+      await writer.remember({ operationId: "memory:revision", text: "Research reports must cite dated primary sources and state uncertainty.", source: inputMemory.source, supersedes: original.id });
+    } finally { journal.close(); }
     const index = new MemoryRecallIndex(join(input.directory, "original-runtime", "cache", "recall.sqlite"), binding);
     try { index.replace(await normal.recoverSnapshot()); } finally { index.close(); }
     fixtureStage = "read-written-checkpoint";
     const a = await reader.agent(config.agentId);
     assert.equal(a.head?.version, 3);
-    console.log(JSON.stringify({ phase: "write", evidence: "local-sandbox-synthetic-storage", transactionHash, operationId, version: 3 }));
+    console.log(JSON.stringify({ phase: "resume-memory", evidence: "local-sandbox-synthetic-storage", version: 3, memoryWriteStatus: "committed" }));
   } else if (input.phase === "reconcile") {
     fixtureStage = "reconcile-without-key";
     await assert.rejects(readFile(config.runtimeKeyFile));

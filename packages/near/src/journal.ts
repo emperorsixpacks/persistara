@@ -1,6 +1,7 @@
 import { constants, closeSync, mkdirSync, openSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { canonical, decimal, hash, operationId, type ContractCall, type NearOutcome, type NearSignerConfig } from "./protocol.js";
 
@@ -25,6 +26,7 @@ export class NearJournal {
     try {
       this.db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=1000; PRAGMA trusted_schema=OFF;");
       this.db.exec(`CREATE TABLE IF NOT EXISTS near_binding (id INTEGER PRIMARY KEY CHECK(id=1), binding TEXT NOT NULL) STRICT;
+        CREATE TABLE IF NOT EXISTS near_instance (id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL) STRICT;
         CREATE TABLE IF NOT EXISTS near_operations (
           id TEXT PRIMARY KEY, digest TEXT NOT NULL, call_json TEXT NOT NULL, nonce TEXT NOT NULL UNIQUE, block_hash TEXT NOT NULL,
           state TEXT NOT NULL CHECK(state IN ('allocated','prepared','submitted','unknown','confirmed','failed')),
@@ -34,6 +36,7 @@ export class NearJournal {
       const binding = canonical({ schemaVersion: 1, kind: config.kind, chainId: config.chainId, contractId: config.contractId,
         signerId: config.signerId, publicKey: config.publicKey, agentId: config.agentId });
       this.atomic(() => {
+        this.db.prepare("INSERT OR IGNORE INTO near_instance VALUES(1,?)").run(randomUUID());
         this.db.prepare("INSERT OR IGNORE INTO near_binding VALUES (1, ?)").run(binding);
         if (this.db.prepare("SELECT binding FROM near_binding WHERE id=1").get()?.binding !== binding) {
           throw new ProviderError("NETWORK_MISMATCH", "Journal belongs to another chain, contract, agent or key");
@@ -42,6 +45,11 @@ export class NearJournal {
     } catch (error) { this.db.close(); throw error; }
   }
   close(): void { this.db.close(); }
+  identity(): string {
+    const value = this.db.prepare("SELECT identity FROM near_instance WHERE id=1").get()?.identity;
+    if (typeof value !== "string" || !/^[a-f0-9-]{36}$/.test(value)) throw new ProviderError("INTEGRITY_FAILED", "Signer journal identity is invalid");
+    return value;
+  }
   private atomic<T>(action: () => T): T {
     this.db.exec("BEGIN IMMEDIATE");
     try { const result = action(); this.db.exec("COMMIT"); return result; }

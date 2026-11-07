@@ -13,8 +13,9 @@ export type NearOutcome =
   | { status: "failed"; transactionHash: string; failureCode: string }
   | { status: "unknown"; transactionHash: string };
 export interface NearSigner {
-  submit(operationId: string, call: ContractCall): Promise<NearOutcome>;
-  reconcile(operationId: string): Promise<NearOutcome>;
+  submit(operationId: string, call: ContractCall, options?: { journalIdentity?: string }): Promise<NearOutcome>;
+  reconcile(operationId: string, options?: { journalIdentity?: string }): Promise<NearOutcome>;
+  journalIdentity?(create: boolean): Promise<string>;
 }
 export const GAS = "100000000000000";
 const U64_MAX = (1n << 64n) - 1n;
@@ -63,6 +64,12 @@ export function validateNetwork(config: NearNetwork): void {
 export function validateIdentity(identity: RuntimeIdentity): void {
   if (!accountId(identity.signerId) || !publicKey(identity.publicKey) || !identity.publicKey.startsWith("ed25519:") || typeof identity.agentId !== "string" || !identity.agentId.startsWith(`${identity.signerId}:`) ||
       !/^[A-Za-z0-9_-]{1,32}$/.test(identity.agentId.slice(identity.signerId.length + 1))) failInput();
+}
+export function runtimePermission(permission: unknown, contractId: string, method: RuntimeMethod): boolean {
+  if (!isObject(permission) || !isObject(permission.FunctionCall)) return false;
+  const call = permission.FunctionCall;
+  return call.receiver_id === contractId && Array.isArray(call.method_names) && call.method_names.length > 0 && call.method_names.includes(method) &&
+    call.method_names.every((m: unknown) => RUNTIME_METHODS.includes(m as RuntimeMethod)) && decimal(call.allowance, 128, true);
 }
 export function validateBlob(value: unknown): asserts value is BlobRef {
   if (!isObject(value)) failInput();

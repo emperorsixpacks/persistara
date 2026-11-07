@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { Indexer, MemData, StorageNode } from "@0gfoundation/0g-storage-ts-sdk";
 import type { JsonRpcProvider as RpcProvider } from "ethers" with { "resolution-mode": "require" };
 import { sha256 } from "../../crypto/src/envelope.js";
-import { assertBlobRef, isObject, type BlobRef } from "../../protocol/src/memory.js";
+import { assertBlobRef, isObject, sameBlob, type BlobRef } from "../../protocol/src/memory.js";
 import { storageConfig, type StorageConfig } from "../../protocol/src/config.js";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { fail, progress, reply } from "../../protocol/src/worker.js";
@@ -48,6 +48,21 @@ process.once("message", async (request: unknown) => {
     }
     const config = storageConfig({ ZG_RPC_URL: raw.rpcUrl, ZG_INDEXER_URL: raw.indexerUrl, ZG_STORAGE_MODE: raw.mode,
       ...(typeof raw.uploaderKeyFile === "string" ? { ZG_UPLOADER_KEY_FILE: raw.uploaderKeyFile } : {}) });
+    let preparedFile: MemData | undefined;
+    let preparedRef: BlobRef | undefined;
+    if (request.operation === "prepare" || request.operation === "upload") {
+      if (!(request.bytes instanceof Uint8Array) || request.bytes.length < 1 || request.bytes.length > 1_500_000) throw new ProviderError("INVALID_INPUT", "Invalid encrypted upload");
+      preparedFile = new MemData(request.bytes);
+      const [tree, error] = await preparedFile.merkleTree();
+      const rootHash = tree?.rootHash();
+      if (error || !rootHash || !ROOT.test(rootHash)) throw new ProviderError("INVALID_INPUT", "Could not prepare storage Merkle root");
+      preparedRef = { provider: "0g", network: `0g:${config.chainId}:${config.mode}`, objectId: rootHash, ciphertextSha256: sha256(request.bytes), byteLength: request.bytes.length };
+      if (request.operation === "prepare") { reply(preparedRef); return; }
+      if (request.expected !== undefined) {
+        assertBlobRef(request.expected);
+        if (!sameBlob(request.expected, preparedRef)) throw new ProviderError("INTEGRITY_FAILED", "Upload root differs from its prepared reference");
+      }
+    }
     provider = new JsonRpcProvider(config.rpcUrl);
     if ((await provider.getNetwork()).chainId !== BigInt(config.chainId)) throw new ProviderError("NETWORK_MISMATCH", "RPC is not Galileo testnet");
     if (request.operation === "download") {
@@ -58,7 +73,8 @@ process.once("message", async (request: unknown) => {
       reply((await download(config, request.ref)).bytes);
       return;
     }
-    if (request.operation !== "upload" || !(request.bytes instanceof Uint8Array) || request.bytes.length < 1 || request.bytes.length > 1_500_000 || !config.uploaderKeyFile) {
+    if (!["upload", "check-upload"].includes(String(request.operation)) || !config.uploaderKeyFile ||
+        (request.operation === "upload" && (!(request.bytes instanceof Uint8Array) || request.bytes.length < 1 || request.bytes.length > 1_500_000))) {
       throw new ProviderError("INVALID_INPUT", "Invalid encrypted upload or missing uploader key file");
     }
     const permissions = await stat(config.uploaderKeyFile);
@@ -67,10 +83,9 @@ process.once("message", async (request: unknown) => {
     if (!ROOT.test(privateKey)) throw new ProviderError("NOT_CONFIGURED", "Uploader key file must contain one EVM private key");
     const signer = new Wallet(privateKey, provider);
     if ((await provider.getBalance(signer.address)) === 0n) throw new ProviderError("NOT_CONFIGURED", "Uploader wallet needs testnet funds");
-    const file = new MemData(request.bytes);
-    const [tree, treeError] = await file.merkleTree();
-    const rootHash = tree?.rootHash();
-    if (treeError || !rootHash || !ROOT.test(rootHash)) throw new ProviderError("INVALID_INPUT", "Could not prepare storage Merkle root");
+    if (request.operation === "check-upload") { reply({ ready: true }); return; }
+    const file = preparedFile!;
+    const rootHash = preparedRef!.objectId;
     progress("prepared", rootHash);
     const indexer = new Indexer(config.indexerUrl);
     submissionPossible = true;
@@ -86,7 +101,7 @@ process.once("message", async (request: unknown) => {
       const receipt = await provider.getTransactionReceipt(result.txHash);
       if (!receipt || receipt.status !== 1) throw new ProviderError("OUTCOME_UNKNOWN", "Upload transaction has not been confirmed successful");
     }
-    const ref: BlobRef = { provider: "0g", network: `0g:${config.chainId}:${config.mode}`, objectId: rootHash, ciphertextSha256: sha256(request.bytes), byteLength: request.bytes.length };
+    const ref = preparedRef!;
     const recovered = await download(config, ref);
     reply({ ref, evidence: { rootHash, txHash: result.txHash || null, txSequence: recovered.txSequence, finalized: true, proofVerified: true } });
   } catch (error) {

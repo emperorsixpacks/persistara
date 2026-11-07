@@ -79,6 +79,37 @@ describe("0G adapter contracts (offline transport fixtures)", () => {
     assert.equal(error, null);
     assert.match(tree?.rootHash() ?? "", /^0x[a-f0-9]{64}$/);
   });
+  it("prepares the real 0G root in an isolated process without an uploader key or network access", async () => {
+    const [tree] = await new MemData(bytes).merkleTree();
+    const prepared = await new ZeroGBlobStore(storageConfig({ ZG_RPC_URL: "https://never-contact.invalid", ZG_INDEXER_URL: "https://never-contact.invalid" })).prepare(bytes);
+    assert.equal(prepared.objectId, tree!.rootHash());
+    assert.equal(prepared.ciphertextSha256, sha256(bytes));
+  });
+  it("checks upload readiness through a read-only worker before authorizing any paid dispatch", async () => {
+    let calls = 0;
+    const store = new ZeroGBlobStore(config, async (_module, request, options) => {
+      calls++; assert.equal((request as { operation: string }).operation, "check-upload"); assert.equal(options.effect, "read"); return { ready: true };
+    });
+    await store.assertUploadReady(); assert.equal(calls, 1);
+    await assert.rejects(new ZeroGBlobStore(storageConfig({}), async () => { calls++; }).assertUploadReady(), { code: "NOT_CONFIGURED" });
+    assert.equal(calls, 1);
+  });
+  it("binds prepared uploads to their fixed root and persists submitted transaction references", async () => {
+    const progress: string[] = [];
+    const store = new ZeroGBlobStore(config, async (_module, request, options) => {
+      assert.equal((request as { expected: { objectId: string } }).expected.objectId, rootHash);
+      options.onProgress?.({ type: "progress", stage: "prepared", reference: rootHash });
+      options.onProgress?.({ type: "progress", stage: "submitted", reference: txHash });
+      return uploadResult();
+    });
+    assert.deepEqual(await store.putPrepared(ref(), bytes, (hash) => progress.push(hash)), ref());
+    assert.deepEqual(progress, [txHash]);
+    await assert.rejects(store.putPrepared({ ...ref(), ciphertextSha256: "f".repeat(64) }, bytes, () => {}), { code: "INTEGRITY_FAILED" });
+    const otherRoot = new ZeroGBlobStore(config, async (_module, _request, options) => {
+      options.onProgress?.({ type: "progress", stage: "prepared", reference: `0x${"f".repeat(64)}` }); return uploadResult();
+    });
+    await assert.rejects(otherRoot.putPrepared(ref(), bytes, () => {}), { code: "INTEGRITY_FAILED" });
+  });
 });
 
 const inference = inferenceConfig({ NEARAI_API_KEY: "fixture-only-not-a-real-key", NEARAI_MODEL: "fixture/tee-model" });

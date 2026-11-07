@@ -37,7 +37,9 @@ Each encrypted memory contains its source and revision metadata. A versioned, en
 
 New manifests use schema 2 with an encryption epoch on each record entry. Schema 1 remains readable by inheriting the manifest epoch. Keyrings preserve historical epochs; a new manifest can use the active key without rewriting old records. Owner backup envelopes bind agent/network/contract/storage identity to a separate random recovery secret. [Recovery details](RECOVERY.md) distinguish keyring preparation from live revocation/rotation.
 
-Commit order: persist intent -> encrypt/upload records -> verify retrievability -> upload encrypted manifest -> compare-and-swap the NEAR checkpoint -> wait for finality -> mark committed -> index. A failed index update never invalidates the committed source data. Never publish a head before its referenced content is retrievable.
+Commit order: encrypt and persist intent -> prepare/persist the record root -> mark upload dispatched -> upload and verify retrievability -> persist/prepare/upload the encrypted manifest -> persist the exact checkpoint attempt -> compare-and-swap the NEAR checkpoint -> wait for finality -> mark committed -> index. A failed index update never invalidates the committed source data. Never publish a head before its referenced content is retrievable.
+
+`DurableMemoryWriter` implements this sequence with a private per-agent SQLite journal, immutable ciphertext, one pending operation and renewable fenced leases. A dispatched upload is only probed at its fixed root, never automatically uploaded again. Checkpoint attempts bind the NEAR signer's persistent journal identity; resume uses the exact request and existing nonce history. Read-only reconciliation cannot upload or submit. [Write details](MEMORY-WRITES.md) document indefinitely unknown outcomes, cancellation limits and the separate recall refresh.
 
 Two writers use checkpoint compare-and-swap; a loser reloads the committed head and merges its append, preserving the operation ID. Same ID plus different payload is a conflict, not a success. Uploaded-but-unreferenced blobs are orphaned costs, not committed memories.
 
@@ -49,7 +51,7 @@ Recovery requires both a finalized registry head and valid owner-held decryption
 
 The search index is an expendable cache, scoped by agent and key epoch. Use full-text retrieval plus vector search where justified. Plaintext/vector indexes run only in the trusted owner-controlled runtime in v1. Remote index deployment requires an explicit updated threat model; embeddings can leak information.
 
-The implemented first cache uses local SQLite FTS5 with atomic replacement of a fully authenticated snapshot. Reads require the expected finalized head, verify cache integrity, preserve revision history and mark content untrusted. Keyword recall is implemented; embeddings remain deferred. Durable memory-upload intents and full live recovery are still release gates.
+The implemented first cache uses local SQLite FTS5 with atomic replacement of a fully authenticated snapshot. Reads require the expected finalized head, verify cache integrity, preserve revision history and mark content untrusted. Keyword recall and durable write intents are implemented; embeddings and full live-provider recovery remain release gates.
 
 NEAR AI supplies inference and embeddings through provider adapters. Use a currently available TEE-hosted model for private-inference claims. The project now pins an isolated Node 24.22.2 runtime compatible with the SDK's documented requirement of Node >=24.22.1. Offline evidence validation is implemented; live private inference remains unverified until credentials, credits and a working model/evidence flow are tested. Do not silently replace verification with an API success check.
 

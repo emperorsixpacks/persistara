@@ -36,6 +36,8 @@ Use **one dedicated runtime key per agent and one journal per key**. Do not use 
 
 Key and journal files require private permissions. Journal directories require mode 0700, files 0600. The worker refuses a symlink key/file through `O_NOFOLLOW`. The journal contains signed transactions, which are capabilities while valid; keep it private and include it in trusted operational backups. It does not contain private keys or decrypted memory. OS/process isolation and the trusted owner machine remain part of the threat model; a child process is not a filesystem/network sandbox.
 
+The journal now records a persistent random instance identity. Durable memory checkpoint plans bind that identity with chain/contract/account/key/agent scope. A replacement or missing journal blocks those plans; the RPC URL is not part of the binding, permitting endpoint failover. The isolated worker checks the expected identity before submission and can replay submitted/terminal outcomes without loading a key. [Durable memory commands](MEMORY-WRITES.md) retain the exact generation/request instead of recalculating a new attempt when an outcome is unknown.
+
 ```sh
 pnpm near:doctor
 pnpm near:reconcile 'checkpoint:YOUR_RECORDED_OPERATION_HASH'
@@ -73,9 +75,9 @@ Create matching clients in the trusted host with `createNearClients(config)`. Pa
 
 ## Verification evidence
 
-The application sandbox scenario runs the TypeScript client in separate processes and uses the real compiled authority WASM and real restricted access keys. It commits encrypted memory, injects a lost response, reserves a job, delivers through the worker account, settles exactly one native payment, repeats acceptance without another payment, reconciles after removing the signing key, then removes the original keyring, journal and index. A fresh process restores three sourced records, including a revision, from an encrypted owner backup and rebuilds recall. Balance checks allow gas refund receipts to settle first.
+The application sandbox scenario runs the TypeScript client in separate processes and uses the real compiled authority WASM and real restricted access keys. The durable memory writer commits a checkpoint with an injected lost response and leaves its local intent pending. A new process reconciles that intent through the existing signer journal before appending two more records. It then reserves a job, delivers through the worker account, settles exactly one native payment, repeats acceptance without another payment, reconciles after removing the signing key, then removes the original keyring, journals and index. A fresh process restores three sourced records, including a revision, from an encrypted owner backup and rebuilds recall. Balance checks allow gas refund receipts to settle first.
 
-Storage in this scenario is explicitly **synthetic local ciphertext storage**, with placeholder 0G-shaped roots. Memory keys and the separate backup secret are random. The scenario is not 0G availability evidence, public testnet deployment or live provider acceptance. [Owner backup and recall modules](RECOVERY.md) are implemented; plan 004 remains in progress for durable write intents, live rotation, embeddings and real-provider recovery.
+Storage in this scenario is explicitly **synthetic local ciphertext storage**, with placeholder 0G-shaped roots. Memory keys and the separate backup secret are random. The scenario is not 0G availability evidence, public testnet deployment or live provider acceptance. [Owner backup and recall modules](RECOVERY.md) and durable write intents are implemented; plan 004 remains in progress for live rotation, embeddings and real-provider recovery.
 
 The client milestone passed 58 TypeScript tests, 25 contract unit tests and three deployed-WASM scenarios; the current recovery milestone extends that inventory in `plans/README.md`. The absent-deployment `near:doctor` path exits 2 with `NOT_CONFIGURED`.
 

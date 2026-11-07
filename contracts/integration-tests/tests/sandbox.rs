@@ -465,10 +465,15 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
     let mut input = json!({"phase":"write","directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"publicKey":key.public_key().to_string(),"runtimeSecretKey":key.to_string(),"workerId":specialist.id(),"nowNs":now.to_string()});
     let result: Result<()> = async {
         let written = run_application_fixture(&input)?;
-        assert_eq!(written["version"], 3);
+        assert_eq!(written["version"], 1);
+        assert_eq!(written["memoryWriteStatus"], "pending");
         assert!(written["transactionHash"].is_string());
         input["checkpointOperationId"] = written["operationId"].clone();
         input.as_object_mut().unwrap().remove("runtimeSecretKey");
+        input["phase"] = json!("resume-memory");
+        let resumed = run_application_fixture(&input)?;
+        assert_eq!(resumed["version"], 3);
+        assert_eq!(resumed["memoryWriteStatus"], "committed");
         input["phase"] = json!("reserve");
         assert_eq!(run_application_fixture(&input)?["status"], "funded");
         specialist

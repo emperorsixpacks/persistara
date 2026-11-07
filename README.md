@@ -16,7 +16,9 @@ NEAR clients now wire memory checkpoints and job reservation/acceptance through 
 
 Owner recovery now includes encrypted backup bundles, historical keyrings, authenticated snapshot restoration and a private full-text recall cache with source/revision metadata. A separate-process drill restores after deleting the original runtime state. See [recovery commands and boundaries](docs/RECOVERY.md).
 
-**Not implemented yet:** durable memory-upload intents, full owner epoch-rotation orchestration, embeddings, durable mission worker, authenticated API, or product console. Public NEAR testnet deployment and live-provider acceptance remain pending. The 0G uploader has 0.5 testnet 0G; NEAR AI credentials/credits are deferred. No upload transaction or paid inference has been performed. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
+Durable memory writes now journal encrypted intents, ciphertext roots and exact checkpoint attempts before external effects. Interrupted uploads are probed without re-uploading; interrupted checkpoints reconcile through the same signer journal. Leases fence stale processes. See [write, resume and reconciliation commands](docs/MEMORY-WRITES.md), including the cases that remain unknown and must not be retried.
+
+**Not implemented yet:** full owner epoch-rotation orchestration, embeddings, durable mission worker, authenticated API, or product console. Public NEAR testnet deployment, real 0G write/recovery acceptance and measured costs remain pending. The 0G uploader was verified with 0.5 testnet 0G on November 6; NEAR AI credentials/credits are deferred. No real upload transaction or paid inference has been performed. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
 
 ## Development
 
@@ -29,13 +31,15 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **77 TypeScript tests in 13 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
+`pnpm check` typechecks, builds, and runs **109 TypeScript tests in 16 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
 For provider setup, run `pnpm provider:doctor` and follow [live integration instructions](docs/INTEGRATIONS.md). Missing prerequisites exit nonzero; the commands never silently substitute test fixtures.
 
 Run `pnpm memory:recover:fixture` for an explicitly local clean-process recovery drill. Live `pnpm memory:recover` requires the configured public deployment, owner backup and real 0G references; it never falls back to that fixture.
+
+Run `pnpm memory:writes:fixture` for an explicitly local process-exit drill at upload/checkpoint boundaries. Fresh processes reconcile each interruption and observe one record upload, one manifest upload and one checkpoint effect. Live write commands use configured providers; they never substitute this fixture.
 
 ```sh
 pnpm contract:check
@@ -55,6 +59,7 @@ Contract checks pass **25 Rust unit tests and three sandbox scenarios**, plus fo
 - [NEAR authority, accounting and settlement](docs/CONTRACTS.md)
 - [NEAR client setup and transaction recovery](docs/NEAR-CLIENTS.md)
 - [Owner backups, recovery and private recall](docs/RECOVERY.md)
+- [Durable memory writes and interrupted-operation reconciliation](docs/MEMORY-WRITES.md)
 
 ## License and provenance
 

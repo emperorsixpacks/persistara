@@ -1,7 +1,7 @@
-import { isObject, type MemoryHead, type MemoryHeadStore } from "../../protocol/src/memory.js";
+import { isObject, type CheckpointAttempt, type DurableMemoryHeads, type MemoryHead } from "../../protocol/src/memory.js";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { NearRpc } from "./rpc.js";
-import { accountId, canonical, decimal, decodeHead, encodeHead, failInput, hash, operationId, publicKey, validateBlob, validateCall, validateIdentity,
+import { accountId, canonical, decimal, decodeHead, encodeHead, failInput, hash, operationId, publicKey, runtimePermission, validateBlob, validateCall, validateIdentity,
   type ContractCall, type NearOutcome, type NearSigner, type RuntimeIdentity } from "./protocol.js";
 
 export interface AgentState {
@@ -53,7 +53,7 @@ export function confirmedResult(outcome: NearOutcome): unknown {
 }
 
 /** Reads need no signing key. Writes use the configured key's durable, isolated signer. */
-export class NearMemoryHeadStore implements MemoryHeadStore {
+export class NearMemoryHeadStore implements DurableMemoryHeads {
   private readonly identity: RuntimeIdentity;
   constructor(private readonly reader: NearAuthorityReader, identity: RuntimeIdentity, private readonly signer: NearSigner) {
     validateIdentity(identity);
@@ -78,6 +78,68 @@ export class NearMemoryHeadStore implements MemoryHeadStore {
     const result = confirmedResult(outcome);
     if (typeof result !== "boolean") throw new ProviderError("PROTOCOL_ERROR", "Checkpoint transaction did not return a CAS result");
     return result;
+  }
+
+  private async writable(keyEpoch: number): Promise<AgentState> {
+    const state = await this.reader.agent(this.identity.agentId);
+    if (state.paused || state.owner !== this.identity.signerId || state.ownerKey === this.identity.publicKey || BigInt(state.keyEpoch) !== BigInt(keyEpoch)) {
+      throw new ProviderError("AUTHORIZATION_FAILED", "Runtime cannot write this memory epoch");
+    }
+    const raw = await this.reader.rpc.view("get_agent", { agent_id: this.identity.agentId });
+    const block = await this.reader.rpc.request("block", { finality: "final" });
+    const access = await this.reader.rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: this.identity.signerId, public_key: this.identity.publicKey });
+    const grant = isObject(raw) && Array.isArray(raw.delegates) ? raw.delegates.find((d: unknown) => isObject(d) && d.publicKey === this.identity.publicKey) : undefined;
+    if (!isObject(access) || !runtimePermission(access.permission, this.reader.rpc.config.contractId, "checkpoint_memory") ||
+        !isObject(raw) || raw.generation !== state.generation || raw.paused !== false || !isObject(grant) || grant.canCheckpoint !== true || !decimal(grant.expiresAtNs, 64, true) ||
+        !isObject(block) || !isObject(block.header) || !decimal(block.header.timestamp_nanosec) || BigInt(grant.expiresAtNs) <= BigInt(block.header.timestamp_nanosec)) {
+      throw new ProviderError("AUTHORIZATION_FAILED", "Runtime checkpoint grant is absent, changed or expired");
+    }
+    return state;
+  }
+  async assertWritable(keyEpoch: number): Promise<void> { await this.writable(keyEpoch); }
+  private async signerBinding(create: boolean): Promise<{ digest: string; journalIdentity: string }> {
+    if (!this.signer.journalIdentity) throw new ProviderError("NOT_CONFIGURED", "Durable memory requires an identifiable signer journal");
+    const journalIdentity = await this.signer.journalIdentity(create);
+    const { kind, chainId, contractId } = this.reader.rpc.config;
+    return { journalIdentity, digest: hash(canonical({ kind, chainId, contractId, signerId: this.identity.signerId,
+      publicKey: this.identity.publicKey, agentId: this.identity.agentId, journalIdentity })) };
+  }
+  private checkpointCall(attempt: CheckpointAttempt): ContractCall {
+    if (!Number.isSafeInteger(attempt.expectedVersion) || attempt.expectedVersion < 0 || attempt.next.version !== attempt.expectedVersion + 1 || !decimal(attempt.generation, 64, true)) failInput();
+    const call: ContractCall = { method: "checkpoint_memory", args: { agent_id: this.identity.agentId, generation: attempt.generation, expected_version: String(attempt.expectedVersion), next: encodeHead(attempt.next) } };
+    if (attempt.operationId !== `checkpoint:${hash(canonical(call))}`) failInput();
+    validateCall(call, this.identity); return call;
+  }
+  async prepare(agentId: string, expectedVersion: number, next: MemoryHead): Promise<CheckpointAttempt | null> {
+    this.assertAgent(agentId);
+    const captured = structuredClone(next);
+    const state = await this.writable(captured.keyEpoch);
+    if ((state.head?.version ?? 0) !== expectedVersion) return null;
+    const call: ContractCall = { method: "checkpoint_memory", args: { agent_id: agentId, generation: state.generation, expected_version: String(expectedVersion), next: encodeHead(captured) } };
+    const attempt = { operationId: `checkpoint:${hash(canonical(call))}`, signerBinding: (await this.signerBinding(true)).digest, generation: state.generation, expectedVersion, next: captured };
+    this.checkpointCall(attempt); return attempt;
+  }
+  async submit(attempt: CheckpointAttempt): Promise<boolean> {
+    const captured = structuredClone(attempt); const call = this.checkpointCall(captured);
+    const binding = await this.signerBinding(false);
+    if (binding.digest !== captured.signerBinding) throw new ProviderError("INTEGRITY_FAILED", "Checkpoint belongs to another signer journal");
+    const result = confirmedResult(await this.signer.submit(captured.operationId, call, { journalIdentity: binding.journalIdentity }));
+    if (typeof result !== "boolean") throw new ProviderError("PROTOCOL_ERROR", "Checkpoint did not return a CAS result");
+    return result;
+  }
+  async reconcile(attempt: CheckpointAttempt): Promise<"accepted" | "rejected" | "unknown" | "unsubmitted" | "failed"> {
+    const captured = structuredClone(attempt); this.checkpointCall(captured);
+    const binding = await this.signerBinding(false);
+    if (binding.digest !== captured.signerBinding) throw new ProviderError("INTEGRITY_FAILED", "Checkpoint belongs to another signer journal");
+    try {
+      const outcome = await this.signer.reconcile(captured.operationId, { journalIdentity: binding.journalIdentity });
+      if (outcome.status === "unknown" || outcome.status === "failed") return outcome.status;
+      if (typeof outcome.result !== "boolean") throw new ProviderError("PROTOCOL_ERROR", "Checkpoint did not return a CAS result");
+      return outcome.result ? "accepted" : "rejected";
+    } catch (error) {
+      if (error instanceof ProviderError && error.code === "INVALID_INPUT") return "unsubmitted";
+      throw error;
+    }
   }
   private assertAgent(agentId: string): void { if (agentId !== this.identity.agentId) throw new ProviderError("AUTHORIZATION_FAILED", "Memory signer is scoped to one agent"); }
 }

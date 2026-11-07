@@ -3,7 +3,7 @@ import { isObject } from "../../protocol/src/memory.js";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { NearJournal, type Operation } from "./journal.js";
 import { NearRpc } from "./rpc.js";
-import { GAS, RUNTIME_METHODS, canonical, decimal, decodeJsonBase64, operationId, validateCall, validateIdentity,
+import { GAS, canonical, decimal, decodeJsonBase64, operationId, runtimePermission, validateCall, validateIdentity,
   type ContractCall, type NearOutcome, type NearSignerConfig } from "./protocol.js";
 
 /** Trusted signer process only. No Account.sendTransaction, SDK retries, or full-access keys. */
@@ -21,10 +21,7 @@ export class DurableNearSigner {
     const value = await this.rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: this.config.signerId, public_key: this.config.publicKey });
     if (!isObject(value) || !Number.isSafeInteger(value.nonce) || Number(value.nonce) < 0 || typeof value.block_hash !== "string" || baseDecode(value.block_hash).length !== 32 ||
         !isObject(value.permission) || !isObject(value.permission.FunctionCall)) throw new ProviderError("AUTHORIZATION_FAILED", "A restricted NEAR function-call key is required");
-    const permission = value.permission.FunctionCall;
-    if (permission.receiver_id !== this.config.contractId || !Array.isArray(permission.method_names) || !permission.method_names.includes(method) ||
-        permission.method_names.length === 0 || permission.method_names.some((m: unknown) => !RUNTIME_METHODS.includes(m as typeof RUNTIME_METHODS[number])) ||
-        !decimal(permission.allowance, 128, true)) throw new ProviderError("AUTHORIZATION_FAILED", "Runtime access key has excessive scope, no gas allowance, or the wrong receiver");
+    if (!runtimePermission(value.permission, this.config.contractId, method as ContractCall["method"])) throw new ProviderError("AUTHORIZATION_FAILED", "Runtime access key has excessive scope, no gas allowance, or the wrong receiver");
     const agent = await this.rpc.view("get_agent", { agent_id: this.config.agentId });
     if (!isObject(agent) || agent.id !== this.config.agentId || agent.owner !== this.config.signerId || agent.ownerKey === this.config.publicKey) {
       throw new ProviderError("AUTHORIZATION_FAILED", "Runtime key must be separate from the registered owner key");
@@ -38,7 +35,9 @@ export class DurableNearSigner {
     }
     return { nonce: String(value.nonce), blockHash: value.block_hash };
   }
-  async submit(id: string, call: ContractCall): Promise<NearOutcome> {
+  async journalIdentity(_create: boolean): Promise<string> { return this.journal.identity(); }
+  async submit(id: string, call: ContractCall, options: { journalIdentity?: string } = {}): Promise<NearOutcome> {
+    if (options.journalIdentity && options.journalIdentity !== this.journal.identity()) throw new ProviderError("INTEGRITY_FAILED", "Signer journal identity changed");
     if (!operationId(id)) throw new ProviderError("INVALID_INPUT", "Invalid NEAR operation ID");
     // Capture the exact caller payload before the first asynchronous boundary.
     validateCall(call, this.config);
@@ -66,7 +65,8 @@ export class DurableNearSigner {
       return this.recordUnknown(row);
     }
   }
-  async reconcile(id: string): Promise<NearOutcome> {
+  async reconcile(id: string, options: { journalIdentity?: string } = {}): Promise<NearOutcome> {
+    if (options.journalIdentity && options.journalIdentity !== this.journal.identity()) throw new ProviderError("INTEGRITY_FAILED", "Signer journal identity changed");
     const row = this.journal.get(id);
     if (!row) throw new ProviderError("INVALID_INPUT", "NEAR operation is not in the journal");
     if (row.outcome_json && (row.state === "confirmed" || row.state === "failed")) return JSON.parse(row.outcome_json) as NearOutcome;

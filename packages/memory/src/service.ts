@@ -10,8 +10,8 @@ import { assertBinding, assertBoundBlob, type MemoryBinding } from "./binding.js
 const MAX_ENTRIES = 1_000;
 const MAX_COMMIT_ATTEMPTS = 16;
 const MAX_RECOVERED_BYTES = 16 * 1024 * 1024;
-interface Entry { id: string; operationId: string; payloadDigest: string; keyEpoch: number; blob: BlobRef }
-interface Manifest { schemaVersion: 2; agentId: string; keyEpoch: number; version: number; entries: Entry[] }
+export interface Entry { id: string; operationId: string; payloadDigest: string; keyEpoch: number; blob: BlobRef }
+export interface Manifest { schemaVersion: 2; agentId: string; keyEpoch: number; version: number; entries: Entry[] }
 export interface RememberInput { operationId: string; text: string; source: MemorySource; supersedes?: string }
 export interface RememberResult { recordId: string; version: number; duplicate: boolean }
 export interface RecoveredMemory extends MemoryRecord { keyEpoch: number }
@@ -26,10 +26,10 @@ function validSource(source: unknown): source is MemorySource {
   return isObject(source) && Object.keys(source).sort().join(",") === "kind,reference" && typeof source.kind === "string" && ["owner", "artifact", "tool"].includes(source.kind) &&
     typeof source.reference === "string" && source.reference.trim().length > 0 && source.reference.length <= 4096;
 }
-function payloadDigest(input: Pick<RememberInput, "text" | "source" | "supersedes">): string {
+export function payloadDigest(input: Pick<RememberInput, "text" | "source" | "supersedes">): string {
   return sha256(encode([input.text, input.source.kind, input.source.reference, input.supersedes ?? null]));
 }
-function validateInput(input: RememberInput): void {
+export function validateInput(input: RememberInput): void {
   if (!isIdentifier(input.operationId) || typeof input.text !== "string" || !input.text.trim() ||
       Buffer.byteLength(input.text) > 65_536 || !validSource(input.source) ||
       (input.supersedes !== undefined && !isIdentifier(input.supersedes))) {
@@ -157,6 +157,12 @@ export class MemoryService {
   async recover(): Promise<RecoveredMemory[]> { return (await this.recoverSnapshot()).records; }
 
   async recoverSnapshot(): Promise<MemorySnapshot> {
+    const { head, records } = await this.readCommitted();
+    return { head, records };
+  }
+
+  /** Fully authenticated committed records plus the manifest needed for a durable append. */
+  async readCommitted(): Promise<MemorySnapshot & { manifest: Manifest }> {
     const head = structuredClone(await this.heads.get(this.agentId));
     const manifest = await this.load(head);
     const records: RecoveredMemory[] = [];
@@ -181,6 +187,6 @@ export class MemoryService {
       records.push(recovered);
       earlier.add(record.id);
     }
-    return { head, records };
+    return { head, records, manifest };
   }
 }

@@ -10,7 +10,9 @@ A committed memory survives loss of the original runtime and index. Recovery req
 
 Owner backup/keyring modules, schema-1-compatible schema 2 manifests, authenticated snapshot recovery and a private lexical recall index are implemented. Recovery commands are read-only with respect to NEAR/0G; a local separate-process drill and the deployed-WASM sandbox flow verify removal of the original keys/journal/index before restoration. See `docs/RECOVERY.md` for exact commands, trust boundaries and test evidence.
 
-This milestone deliberately keeps plan 004 IN PROGRESS. Durable memory-upload intents/reconciliation, the full owner revocation/epoch activation workflow, embeddings, real 0G/public-testnet recovery and live measurements remain unexecuted. Keyring epoch preparation alone is not a completed on-chain rotation. No live write path may bypass those gates merely because local recovery passes.
+Durable memory-upload intents and interrupted-operation reconciliation are now implemented with encrypted write-ahead data, fixed roots, exact checkpoint plans, signer-journal identity binding and fenced leases. Read-only reconciliation is separate from an explicit resume. The abrupt-process-exit drill and deployed-WASM sandbox verify these paths; see `docs/MEMORY-WRITES.md`.
+
+This milestone deliberately keeps plan 004 IN PROGRESS. The full owner revocation/epoch activation workflow, embeddings, real 0G/public-testnet recovery, live measurements and safe resolution of indefinitely unknown outcomes remain unexecuted. Keyring epoch preparation alone is not a completed on-chain rotation. No live write path may bypass those gates merely because local recovery passes.
 
 ## Scope
 
