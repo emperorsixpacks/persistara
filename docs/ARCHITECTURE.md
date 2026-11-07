@@ -29,6 +29,8 @@ Pausing invalidates new economic authorizations and checkpoint writes. Existing 
 
 The [owner rotation coordinator](OWNER-ROTATION.md) prepares verified replacement backups, holds the canonical journals and emits immutable unsigned requests for an external owner wallet. Idempotent contract operations atomically pause/revoke/advance an epoch and later apply the explicit resume policy. Finalized account-key checks precede completion; a new-epoch write and historical recovery precede the verification receipt. Owner signing keys never enter the runtime. Planned rotation does not delay emergency pause/revocation.
 
+The implemented [local owner console](OWNER-CONSOLE.md) authenticates the existing agent's original owner key through NEP-413 and displays finalized authority, runtime and local backup readiness. Reviewed pause/resume uses an external wallet's sign-and-send API. A separate private journal persists the handoff before wallet invocation and fences unknown outcomes until a matching finalized transaction is verified. Real CLI-keychain login is verified; browser-provider approval, new-agent enrollment and rotation execution in the console remain pending.
+
 ## Memory protocol
 
 `BlobRef` carries provider and network, provider-native object identifier (0G Merkle root in the live adapter), ciphertext SHA-256, and byte length. A SHA-256 digest is not the same identifier as a 0G Merkle root. Preserve both.
@@ -76,7 +78,7 @@ For daily limits, count each reservation against its UTC window. Refunds return 
 ## Repository layout
 
 ```text
-apps/console/                 browser product (plan 006)
+apps/console/                 local owner console (plan 007); full dashboard pending
 apps/api/                     authenticated API (plan 005)
 apps/worker/                  mission runner (plan 005)
 packages/protocol/            schemas, ports, structured errors
@@ -84,6 +86,7 @@ packages/crypto/              authenticated envelopes
 packages/memory/              manifests, recall, recovery
 packages/storage/             local development and live 0G adapters
 packages/near/                registry/treasury clients and event reconciliation
+packages/owner/               owner proof, loopback host and wallet handoff journal
 packages/inference/           NEAR AI adapters and evidence verification
 packages/runtime/             journal, leases, action execution
 contracts/authority/          Rust NEAR registry and treasury modules

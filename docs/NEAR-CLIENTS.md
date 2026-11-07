@@ -1,6 +1,6 @@
 # Finalized NEAR clients and restricted signing
 
-`packages/near/src` connects the encrypted memory port and job workflow to the authority contract. AI credentials are not required. A fresh public testnet deployment now exists at `authority.persistara-owner.testnet`, owned by a separate CLI-managed deployment key. The research agent belongs to `persistara-owner.testnet`; the specialist is `worker.persistara-owner.testnet`. Owner/deployer/worker signing stays in the official external NEAR CLI keychain. Application configuration contains public identities and a separate restricted runtime-key path. Browser wallet integration is not implemented.
+`packages/near/src` connects the encrypted memory port and job workflow to the authority contract. AI credentials are not required. A fresh public testnet deployment now exists at `authority.persistara-owner.testnet`, owned by a separate CLI-managed deployment key. The research agent belongs to `persistara-owner.testnet`; the specialist is `worker.persistara-owner.testnet`. Owner/deployer/worker signing stays in the official external NEAR CLI keychain. Application configuration contains public identities and a separate restricted runtime-key path. The [local owner console](OWNER-CONSOLE.md) now implements external-wallet authentication and reviewed pause/resume for this existing agent; actual browser-provider approval remains unverified.
 
 ## Components
 

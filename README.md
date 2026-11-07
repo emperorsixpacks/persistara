@@ -24,7 +24,9 @@ Real 0G Turbo acceptance now passes: an application-encrypted specimen was uploa
 
 Public NEAR acceptance now passes on `authority.persistara-owner.testnet`: a restricted runtime committed memory backed by real Turbo blobs, a clean process recovered the first record from an encrypted owner backup, and a fictional job settled 0.01 testnet NEAR once. Stale checkpoints and over-budget reservations were rejected by the contract. External owner/specialist signing uses the official NEAR CLI keychain. See [public deployment, recovery and settlement evidence](docs/evidence/near-0g-testnet-2026-11-07.json).
 
-**Not implemented yet:** embeddings, durable mission worker, signed specialist protocol, authenticated API, product console or browser owner-wallet signing integration. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
+The local owner console now connects external NEAR wallets, verifies the original registered owner through a one-time NEP-413 proof, displays finalized authority/runtime/backup readiness and supports reviewed pause/resume requests. Its durable journal fences unknown wallet handoffs across restart. The real original owner's off-chain CLI-keychain proof passes; four browser tests use a clearly labeled disposable wallet, and actual pause/resume receipts pass against deployed WASM in sandbox. Real browser-provider approval remains unverified. See [owner console setup, custody and recovery limits](docs/OWNER-CONSOLE.md).
+
+**Not implemented yet:** embeddings, durable mission worker, signed specialist protocol, authenticated mission API, full mission dashboard, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
 
 ## Development
 
@@ -37,7 +39,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **142 TypeScript tests in 20 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
+`pnpm check` typechecks, builds, and runs **167 TypeScript tests in 24 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
@@ -51,7 +53,9 @@ Run `pnpm memory:writes:fixture` for an explicitly local process-exit drill at u
 pnpm contract:check
 ```
 
-Contract checks pass **34 Rust unit tests and four sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. Application scenarios commit memory, settle once, reconcile interruptions, rotate runtime/memory keys, reject revoked keys, and recover in a fresh process after removing runtime keys/journals. They use explicitly synthetic local storage. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md), the pre-public-deployment state-layout change, and [client recovery limits](docs/NEAR-CLIENTS.md) before public funding.
+Contract checks pass **34 Rust unit tests and five sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. Application scenarios commit memory, settle once, reconcile interruptions, rotate runtime/memory keys, reject revoked keys, and recover in a fresh process after removing runtime keys/journals. The fifth scenario validates external owner pause/resume signing and exact finalized receipt reconciliation without supplying owner/runtime secrets to the application. Storage and backup readiness fixtures remain explicit. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md), the pre-public-deployment state-layout change, and [client recovery limits](docs/NEAR-CLIENTS.md) before public funding.
+
+Run `pnpm owner:console` to build and serve the existing agent's owner workflow at **http://127.0.0.1:3377**. It requires the configured public deployment and owner-local recovery files; it has no fake fallback. `pnpm web:build` builds the browser assets with a server-module boundary guard. `pnpm test:e2e` runs four explicitly labeled Chromium fixture tests after installing the pinned test browser (`pnpm exec playwright install chromium`).
 
 ## Build specification
 
@@ -67,6 +71,7 @@ Contract checks pass **34 Rust unit tests and four sandbox scenarios**, plus for
 - [Owner backups, recovery and private recall](docs/RECOVERY.md)
 - [Durable memory writes and interrupted-operation reconciliation](docs/MEMORY-WRITES.md)
 - [Owner-controlled runtime and memory-key rotation](docs/OWNER-ROTATION.md)
+- [Local owner wallet connection and controls](docs/OWNER-CONSOLE.md)
 
 ## License and provenance
 

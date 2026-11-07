@@ -1,6 +1,6 @@
 # Owner-controlled runtime and memory-key rotation
 
-This workflow replaces a dedicated NEAR runtime key and advances memory encryption by one epoch while retaining historical keys. It needs no NEAR AI credits. The complete workflow passes offline tests and deployed-WASM sandbox tests; public testnet/real 0G acceptance and a browser wallet integration remain pending.
+This workflow replaces a dedicated NEAR runtime key and advances memory encryption by one epoch while retaining historical keys. It needs no NEAR AI credits. The complete workflow passes offline tests and deployed-WASM sandbox tests; public testnet/real 0G rotation acceptance and execution through a browser wallet remain pending. The [local owner console](OWNER-CONSOLE.md) currently supports existing-agent login and pause/resume, with actual browser-provider approval still unverified; it does not execute these rotation stages.
 
 The owner wallet remains external. The coordinator never loads an owner private key, signs an owner transaction, uploads data or broadcasts a transaction. It prepares private runtime material and reviewable unsigned wallet requests, then verifies finalized authority/account state. The sandbox owner harness signs those requests outside the application. Runtime signers still cannot call administrative methods.
 

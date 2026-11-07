@@ -410,11 +410,15 @@ async fn failed_transfer_retries_once_and_storage_failure_rolls_back() -> Result
 }
 
 fn run_application_fixture(input: &Value) -> Result<Value> {
+    run_node_fixture("near-client-sandbox", input)
+}
+
+fn run_node_fixture(name: &str, input: &Value) -> Result<Value> {
     use std::io::Write;
     use std::process::{Command, Stdio};
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut child = Command::new(root.join("node_modules/node/bin/node"))
-        .arg(root.join("dist/tests/fixtures/near-client-sandbox.js"))
+        .arg(root.join(format!("dist/tests/fixtures/{name}.js")))
         .current_dir(&root)
         .env_clear()
         .stdin(Stdio::piped())
@@ -434,6 +438,92 @@ fn run_application_fixture(input: &Value) -> Result<Value> {
         String::from_utf8_lossy(&output.stderr)
     );
     Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+#[tokio::test]
+async fn owner_wallet_controls_reconcile_external_signing_without_owner_keys() -> Result<()> {
+    use near_workspaces::types::Gas;
+    use std::os::unix::fs::DirBuilderExt;
+    let (worker, contract, owner, _specialist, id) = fixture(NearToken::from_near(1)).await?;
+    let runtime_key = SecretKey::from_seed(KeyType::ED25519, "owner-console-runtime-fixture");
+    owner
+        .batch(owner.id())
+        .add_key(
+            runtime_key.public_key(),
+            AccessKey::function_call_access(
+                contract.id(),
+                &["checkpoint_memory", "create_job", "accept_job"],
+                Some(NearToken::from_yoctonear(NEAR / 4)),
+            ),
+        )
+        .transact()
+        .await?
+        .into_result()?;
+    let now = worker.view_block().await?.timestamp();
+    owner.call(contract.id(), "set_delegate").args_json(json!({"agent_id":id,"delegate":{"publicKey":runtime_key.public_key().to_string(),"expiresAtNs":(now+24*HOUR).to_string(),"canCheckpoint":true,"canSpend":true}})).max_gas().transact().await?.into_result()?;
+    wait_for_finalized_setup(&contract, &id).await?;
+    let directory = std::env::temp_dir().join(format!(
+        "persistara-owner-console-{}-{now}",
+        std::process::id()
+    ));
+    std::fs::DirBuilder::new().mode(0o700).create(&directory)?;
+    // Public identities only: both owner and runtime secrets stay outside the application.
+    let mut input = json!({"directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"runtimePublicKey":runtime_key.public_key().to_string()});
+    let result: Result<()> = async {
+        for paused in [true, false] {
+            input["phase"] = json!("prepare");
+            input["paused"] = json!(paused);
+            let prepared = run_node_fixture("owner-sandbox", &input)?;
+            let operation = &prepared["operation"];
+            assert_eq!(prepared["ownerPrivateKeySupplied"], false);
+            assert_eq!(prepared["runtimePrivateKeySupplied"], false);
+            assert_eq!(
+                operation["request"]["ownerPublicKey"],
+                owner.secret_key().public_key().to_string()
+            );
+            input["operationId"] = operation["request"]["id"].clone();
+            input["phase"] = json!("repeat");
+            assert_eq!(
+                run_node_fixture("owner-sandbox", &input)?["repeatedHandoffBlocked"],
+                true
+            );
+            let args = operation["request"]["actions"][0]["params"]["args"].clone();
+            let executed = owner
+                .call(contract.id(), "set_paused")
+                .args_json(args)
+                .gas(Gas::from_tgas(100))
+                .transact()
+                .await?;
+            let hash = executed.outcome().transaction_hash.to_string();
+            executed.into_result()?;
+            wait_for_finalized_setup(&contract, &id).await?;
+            input["phase"] = json!("reconcile");
+            input["transactionHash"] = json!(hash);
+            let observed = run_node_fixture("owner-sandbox", &input)?;
+            assert_eq!(observed["status"], "confirmed");
+            assert_eq!(observed["paused"], paused);
+            assert_eq!(
+                run_node_fixture("owner-sandbox", &input)?["transactionHash"],
+                hash
+            );
+        }
+        let runtime = Account::from_secret_key(owner.id().clone(), runtime_key, &worker);
+        let denied = runtime
+            .call(contract.id(), "set_paused")
+            .args_json(json!({"agent_id":id,"paused":true}))
+            .gas(Gas::from_tgas(100))
+            .transact()
+            .await;
+        match denied {
+            Err(error) => assert!(format!("{error:?}").contains("MethodNameMismatch")),
+            Ok(executed) => assert!(executed.into_result().is_err()),
+        }
+        assert_eq!(agent(&contract, &id).await?["paused"], false);
+        Ok(())
+    }
+    .await;
+    std::fs::remove_dir_all(directory)?;
+    result
 }
 
 #[tokio::test]
