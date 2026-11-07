@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "kind": "real_0g_testnet_storage_acceptance",
+  "fixture": false,
+  "upload": {
+    "status": "verified_storage_acceptance",
+    "operationId": "4d4cb1a2-32ec-4aaa-a6c3-cac44b0aee91",
+    "ref": {
+      "provider": "0g",
+      "network": "0g:16602:turbo",
+      "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+      "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+      "byteLength": 328
+    },
+    "txHash": "0x49ff71c3742bcb369900b37548db5853c86fac4f4d73c193e543ee3f4c9ecb68",
+    "dispatchRecorded": true,
+    "checks": [
+      "finalized_storage_metadata",
+      "merkle_proof",
+      "ciphertext_digest_and_length",
+      "authenticated_decryption"
+    ],
+    "verifiedAt": "2026-11-07T13:31:17.230Z",
+    "retrievalAndDecryptionMs": 6121,
+    "sdkVersion": "1.2.13",
+    "specimen": "fictional",
+    "nearCheckpointVerified": false,
+    "nearAiUsed": false
+  },
+  "freshProcessRead": {
+    "status": "verified_storage_acceptance",
+    "operationId": "4d4cb1a2-32ec-4aaa-a6c3-cac44b0aee91",
+    "ref": {
+      "provider": "0g",
+      "network": "0g:16602:turbo",
+      "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+      "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+      "byteLength": 328
+    },
+    "txHash": "0x49ff71c3742bcb369900b37548db5853c86fac4f4d73c193e543ee3f4c9ecb68",
+    "dispatchRecorded": true,
+    "checks": [
+      "finalized_storage_metadata",
+      "merkle_proof",
+      "ciphertext_digest_and_length",
+      "authenticated_decryption"
+    ],
+    "verifiedAt": "2026-11-07T13:32:08.047Z",
+    "retrievalAndDecryptionMs": 7700,
+    "sdkVersion": "1.2.13",
+    "specimen": "fictional",
+    "nearCheckpointVerified": false,
+    "nearAiUsed": false,
+    "uploaderCredentialsProvided": false
+  },
+  "transaction": {
+    "chainId": 16602,
+    "transactionHash": "0x49ff71c3742bcb369900b37548db5853c86fac4f4d73c193e543ee3f4c9ecb68",
+    "blockNumber": "64352165",
+    "receiptStatus": "successful",
+    "uploaderAddress": "0x189109C53C71069850A7ABC19E8BFD11EFC679dE",
+    "flowAddress": "0x22e03a6a89b950f1c82ec5e74f8eca321a105296",
+    "gasUsed": "316577",
+    "effectiveGasPriceWei": "4000000007",
+    "storageValueWei": "61467289924",
+    "gasCostWei": "1266308002216039",
+    "totalCostWei": "1266369469505963",
+    "remainingBalanceWei": "498733630530494037",
+    "observedAt": "2026-11-07T13:32:07.631Z",
+    "asset": "0G",
+    "network": "0g:16602:turbo",
+    "amountUnit": "wei"
+  },
+  "limitations": {
+    "sampleCount": 1,
+    "performanceBenchmark": false,
+    "nearCheckpointVerified": false,
+    "ownerMemoryRecoveryVerified": false,
+    "privateInferenceVerified": false
+  }
+}

@@ -160,10 +160,23 @@ export class NearTreasuryClient {
     if (!job) throw new ProviderError("PROTOCOL_ERROR", "Confirmed reservation is absent from finalized state");
     return job;
   }
-  async accept(jobId: string, generation: string, resultDigest: string): Promise<JobState> {
+  async accept(jobId: string, generation: string, resultDigest: string, retryAttempt = 0): Promise<JobState> {
     const call: ContractCall = { method: "accept_job", args: { agent_id: this.identity.agentId, operation_id: jobId, generation, expected_result_digest: resultDigest } };
     validateCall(call, this.identity);
-    confirmedResult(await this.signer.submit(`accept:${jobId}`, call));
+    if (!Number.isSafeInteger(retryAttempt) || retryAttempt < 0 || retryAttempt > 8) failInput();
+    const current = await this.reader.job(this.identity.agentId, jobId);
+    if (!current?.result || current.result.ciphertextSha256 !== resultDigest || !["delivered", "payout_pending", "payout_failed", "paid"].includes(current.status)) {
+      throw new ProviderError("AUTHORIZATION_FAILED", "Acceptance requires the finalized delivered artifact with its expected digest");
+    }
+    const id = (attempt: number) => `accept:${jobId}${attempt ? `:retry:${attempt}` : ""}`;
+    // Explicit opt-in only after the immediately preceding transaction is conclusively failed.
+    // Unknown/confirmed transactions never authorize a replacement, including failed payouts.
+    if (retryAttempt) {
+      const previous = await this.signer.reconcile(id(retryAttempt - 1));
+      if (previous.status === "unknown") throw new ProviderError("OUTCOME_UNKNOWN", "Reconcile the prior acceptance before choosing another attempt", false, previous.transactionHash);
+      if (previous.status !== "failed") throw new ProviderError("OPERATION_CONFLICT", "Prior acceptance succeeded; observe its payout rather than submitting another attempt");
+    }
+    confirmedResult(await this.signer.submit(id(retryAttempt), call));
     const job = await this.reader.job(this.identity.agentId, jobId);
     if (!job) throw new ProviderError("PROTOCOL_ERROR", "Accepted job is absent from finalized state");
     // A confirmed acceptance is not a paid job; only the finalized view reports settlement.

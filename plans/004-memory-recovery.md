@@ -14,7 +14,7 @@ Durable memory-upload intents and interrupted-operation reconciliation are now i
 
 The owner revocation/epoch activation workflow is now implemented with verified replacement backups, persistent journal barriers, idempotent owner-only contract operations and finalized account-key checks. Unsigned owner requests keep wallet signing outside the runtime. A deployed-WASM scenario rejects the old runtime, writes under the new epoch and restores four records from a new backup after removing both runtimes. See `docs/OWNER-ROTATION.md` for owner commands, interruption/abort behavior and limits.
 
-This milestone deliberately keeps plan 004 IN PROGRESS. Embeddings, public NEAR/real 0G recovery/rotation acceptance, wallet integration, live measurements and safe resolution of indefinitely unknown outcomes remain unexecuted. No live write path may bypass those gates merely because local/sandbox recovery passes.
+This milestone deliberately keeps plan 004 IN PROGRESS. The first real sourced memory was encrypted/uploaded to Turbo, checkpointed on public NEAR, and recovered in a separate clean process from only its backup/secret and public identifiers. That one-record drill does not complete the two-fact/source/revision acceptance, live rotation, cross-machine/off-device backup drill or five-trial measurements. Embeddings, wallet integration and safe resolution of indefinitely unknown outcomes also remain. No live write path may bypass those gates merely because a smaller drill passes.
 
 ## Scope
 

@@ -1,5 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
 import { Wallet } from "ethers";
+import { readPrivateFile } from "../packages/memory/src/files.js";
 import { assertRuntime, storageConfig, inferenceConfig } from "../packages/protocol/src/config.js";
 import { isObject } from "../packages/protocol/src/memory.js";
 import { boundedJson, loadEnvironment, printFailure } from "./common.js";
@@ -8,22 +8,21 @@ try {
   loadEnvironment();
   assertRuntime();
   const storage = storageConfig(process.env);
-  const inference = inferenceConfig(process.env);
+  const storageOnly = process.argv.includes("--storage-only");
+  const inference = storageOnly ? undefined : inferenceConfig(process.env);
   const missing: string[] = [];
   let address: string | null = null;
   if (!storage.uploaderKeyFile) missing.push("ZG_UPLOADER_KEY_FILE");
   else {
     try {
-      const info = await stat(storage.uploaderKeyFile);
-      if (!info.isFile() || (info.mode & 0o077) !== 0) missing.push("uploader key file must be a restricted regular file (chmod 600)");
-      else address = new Wallet((await readFile(storage.uploaderKeyFile, "utf8")).trim()).address;
+      address = new Wallet(Buffer.from(await readPrivateFile(storage.uploaderKeyFile, 128)).toString("utf8").trim()).address;
     } catch { missing.push("uploader key file missing or invalid; run pnpm storage:wallet"); }
   }
-  if (!inference.apiKey) missing.push("NEARAI_API_KEY");
-  if (!inference.model) missing.push("NEARAI_MODEL");
+  if (!storageOnly && !inference?.apiKey) missing.push("NEARAI_API_KEY");
+  if (!storageOnly && !inference?.model) missing.push("NEARAI_MODEL");
   // Import smoke tests are offline; they do not verify attestations or spend funds.
   await import("@0gfoundation/0g-storage-ts-sdk");
-  await import("@nearai/inference-sdk/node");
+  if (!storageOnly) await import("@nearai/inference-sdk/node");
   const online: Record<string, unknown> = {};
   if (process.argv.includes("--online")) {
     const chain = await boundedJson(storage.rpcUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }) });
@@ -37,6 +36,7 @@ try {
   }
   console.log(JSON.stringify({ status: missing.length ? "not_ready" : "configured_not_verified", runtime: process.version,
     sdkImports: "passed", network: `0g:${storage.chainId}:${storage.mode}`, uploaderAddress: address,
-    inferenceModelConfigured: Boolean(inference.model), credentialsConfigured: Boolean(inference.apiKey), missing, online }, null, 2));
+    inferenceChecks: storageOnly ? "deferred" : "configuration_and_import_only",
+    inferenceModelConfigured: Boolean(inference?.model), credentialsConfigured: Boolean(inference?.apiKey), missing, online }, null, 2));
   if (missing.length) process.exitCode = 2;
 } catch (error) { printFailure(error); }

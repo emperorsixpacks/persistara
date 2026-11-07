@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "kind": "real_near_0g_mechanical_acceptance",
+  "fixture": false,
+  "observedAt": "2026-11-07T14:11:57.586Z",
+  "networks": {
+    "authority": "near:testnet",
+    "storage": "0g:16602:turbo",
+    "nativeAmountUnit": "yoctoNEAR",
+    "storageAmountUnit": "wei"
+  },
+  "deployment": {
+    "wasmSha256": "e1ca18486c58e92b46cb6920ef66a3517cd4a2132355e91dc6c6168f4e138375",
+    "wasmBytes": 288692,
+    "accountId": "authority.persistara-owner.testnet",
+    "expectedCodeHash": "GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ",
+    "codeMatches": true,
+    "account": {
+      "amount": "3997733866638850400000000",
+      "block_hash": "CPX2q2E15wTGETEQc4Dv6MUDN6HCFvWPdiwBY7P2fySW",
+      "block_height": 276638593,
+      "code_hash": "GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ",
+      "locked": "0",
+      "storage_paid_at": 0,
+      "storage_usage": 288971
+    },
+    "transaction": {
+      "transactionHash": "C1jhawrZRTvMVKPMUF7fyiuN1uufyuMYvCWZCW1M7GkD",
+      "signerId": "authority.persistara-owner.testnet",
+      "receiverId": "authority.persistara-owner.testnet",
+      "publicKey": "ed25519:8oEUhf2kgRH14wtW8BadjzQuKsh7wUS8ZnDQaFFQ5WU9",
+      "nonce": 276638428000001,
+      "includedBlockHeight": 276638532,
+      "firstCodeBlockHeight": 276638532,
+      "finalExecutionStatus": "FINAL",
+      "status": {
+        "SuccessValue": ""
+      },
+      "actions": [
+        {
+          "DeployContract": {
+            "codeOmitted": true
+          }
+        },
+        {
+          "FunctionCall": {
+            "args": "e30=",
+            "deposit": "0",
+            "gas": 100000000000000,
+            "method_name": "new"
+          }
+        }
+      ]
+    }
+  },
+  "identities": {
+    "ownerAccount": "persistara-owner.testnet",
+    "agentId": "persistara-owner.testnet:research",
+    "runtimePublicKey": "ed25519:3GBuwvqLeuVxABYpSRngt1Ennka6jbpdKzK6GWiBLp9Y",
+    "workerAccount": "worker.persistara-owner.testnet",
+    "ownerDeployerWorkerSigning": "external-official-near-cli-keychain",
+    "applicationOwnerKeyInput": false
+  },
+  "memory": {
+    "writeReceipt": {
+      "operationId": "testnet-memory-20261107-01",
+      "status": "committed",
+      "phase": "finalized",
+      "recordId": "mem:369d112b-c21e-4425-8c60-010b40af7f12",
+      "version": 1,
+      "checkpointOperationId": "checkpoint:8766d618db1760a8de2f16ff7cfdd5aec3209a962f530ee00a6495d9c6bb6369",
+      "recallRefreshRequired": true
+    },
+    "state": {
+      "id": "persistara-owner.testnet:research",
+      "owner": "persistara-owner.testnet",
+      "ownerKey": "ed25519:Bb9psi3hsJh7eJd2ukyMvvdc9QTmSRChLzwC5XeTKHTa",
+      "paused": false,
+      "generation": "3",
+      "keyEpoch": "1",
+      "policyVersion": "1",
+      "head": {
+        "version": 1,
+        "keyEpoch": 1,
+        "manifest": {
+          "provider": "0g",
+          "network": "0g:16602:turbo",
+          "objectId": "0x9c433220baa00dd42619681e66dbb14aefb6537a30e96879e7390b7d0611c029",
+          "ciphertextSha256": "5516e9459c15ea15762d893807828ad024cddd9e67edaa9f01714b06cba1f78d",
+          "byteLength": 931
+        }
+      },
+      "balances": {
+        "deposited": "100000000000000000000000",
+        "available": "90000000000000000000000",
+        "reserved": "0",
+        "pending": "0",
+        "paid": "10000000000000000000000",
+        "withdrawn": "0"
+      }
+    },
+    "checkpoint": {
+      "result": true,
+      "status": "confirmed",
+      "transactionHash": "DGqkRsaHe2RQE69epRFT3muH98YtXUBbTyGgwmjQBcCe"
+    },
+    "blobs": [
+      {
+        "id": "record:4923a8092543684b26f1a2326427aba43c678156b6c2b2896a2fe54cc4b1635e",
+        "state": "available",
+        "ref": {
+          "provider": "0g",
+          "network": "0g:16602:turbo",
+          "objectId": "0x3fa5bba99cca7b5c89ad775303571c62fb3c76d4397af076beff02644f90736d",
+          "ciphertextSha256": "bd6b1db82566cbb0cfbb4786a232330c3dcaf98a35bccfaf604d772e3f2c915d",
+          "byteLength": 728
+        },
+        "transaction_hash": "0x2c033b3d85b98951047b12c5c370678c314c34ecb3dd4d3632f3079c8235c47d"
+      },
+      {
+        "id": "manifest:df4c6d14-ffed-4b31-8253-996cad59d1d0",
+        "state": "available",
+        "ref": {
+          "provider": "0g",
+          "network": "0g:16602:turbo",
+          "objectId": "0x9c433220baa00dd42619681e66dbb14aefb6537a30e96879e7390b7d0611c029",
+          "ciphertextSha256": "5516e9459c15ea15762d893807828ad024cddd9e67edaa9f01714b06cba1f78d",
+          "byteLength": 931
+        },
+        "transaction_hash": "0xe0cc8496e2e438c1b6686b0d952025646dfe0db18eb2b656a020f2097ad4b0f7"
+      }
+    ],
+    "cleanProcessRecovery": {
+      "status": "recovered",
+      "agentId": "persistara-owner.testnet:research",
+      "checkpointVersion": 1,
+      "recordCount": 1,
+      "currentFacts": 1,
+      "recoveredEpochs": [
+        1
+      ],
+      "evidence": "finalized-NEAR-head-and-authenticated-provider-reads"
+    },
+    "suppliedRecoveryInputs": [
+      "encrypted-memory-backup",
+      "memory-recovery-secret",
+      "public-agent-contract-identifiers"
+    ],
+    "uploaderOrRuntimeKeySupplied": false,
+    "originalKeyringIndexOrJournalsSupplied": false,
+    "originalMachineFilesRetained": true
+  },
+  "commerce": {
+    "specimen": "fictional-reused-storage-specimen",
+    "reservation": {
+      "result": {
+        "disputeDeadlineNs": "0",
+        "payoutAttempt": "0",
+        "request": {
+          "agentId": "persistara-owner.testnet:research",
+          "amount": "10000000000000000000000",
+          "brief": {
+            "byteLength": 328,
+            "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+            "network": "0g:16602:turbo",
+            "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+            "provider": "0g"
+          },
+          "criteriaHash": "2332dafb684086391aac9854dbc858154637fd2e880b1988fc6a46aa42fa2aa8",
+          "deliveryDeadlineNs": "1794066963501827193",
+          "generation": "3",
+          "operationId": "live:76551635-cbc9-4b13-a03b-d7f7e07ca10d",
+          "policyVersion": "1",
+          "quoteExpiresAtNs": "1794063363501827193",
+          "reviewWindowNs": "3600000000000",
+          "worker": "worker.persistara-owner.testnet"
+        },
+        "result": null,
+        "reviewDeadlineNs": "0",
+        "status": "funded"
+      },
+      "status": "confirmed",
+      "transactionHash": "J9oG7Ln5zwbXc6GU3y4uMKmcQgtWA7xGiT5NH8XiYZD2"
+    },
+    "delivery": {
+      "transactionHash": "v8p3mWXrZbWxhFZPZRnd2tKYQB9csoQYANzDqVAx6vG",
+      "finalExecutionStatus": "FINAL",
+      "status": "successful",
+      "method": "deliver",
+      "gasTgas": "30",
+      "result": {
+        "request": {
+          "agentId": "persistara-owner.testnet:research",
+          "generation": "3",
+          "policyVersion": "1",
+          "operationId": "live:76551635-cbc9-4b13-a03b-d7f7e07ca10d",
+          "worker": "worker.persistara-owner.testnet",
+          "amount": "10000000000000000000000",
+          "criteriaHash": "2332dafb684086391aac9854dbc858154637fd2e880b1988fc6a46aa42fa2aa8",
+          "brief": {
+            "provider": "0g",
+            "network": "0g:16602:turbo",
+            "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+            "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+            "byteLength": 328
+          },
+          "quoteExpiresAtNs": "1794063363501827193",
+          "deliveryDeadlineNs": "1794066963501827193",
+          "reviewWindowNs": "3600000000000"
+        },
+        "status": "delivered",
+        "result": {
+          "provider": "0g",
+          "network": "0g:16602:turbo",
+          "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+          "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+          "byteLength": 328
+        },
+        "reviewDeadlineNs": "1794063827604090022",
+        "disputeDeadlineNs": "0",
+        "payoutAttempt": "0"
+      }
+    },
+    "acceptance": {
+      "result": {
+        "disputeDeadlineNs": "0",
+        "payoutAttempt": "1",
+        "request": {
+          "agentId": "persistara-owner.testnet:research",
+          "amount": "10000000000000000000000",
+          "brief": {
+            "byteLength": 328,
+            "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+            "network": "0g:16602:turbo",
+            "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+            "provider": "0g"
+          },
+          "criteriaHash": "2332dafb684086391aac9854dbc858154637fd2e880b1988fc6a46aa42fa2aa8",
+          "deliveryDeadlineNs": "1794066963501827193",
+          "generation": "3",
+          "operationId": "live:76551635-cbc9-4b13-a03b-d7f7e07ca10d",
+          "policyVersion": "1",
+          "quoteExpiresAtNs": "1794063363501827193",
+          "reviewWindowNs": "3600000000000",
+          "worker": "worker.persistara-owner.testnet"
+        },
+        "result": {
+          "byteLength": 328,
+          "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+          "network": "0g:16602:turbo",
+          "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+          "provider": "0g"
+        },
+        "reviewDeadlineNs": "1794063827604090022",
+        "status": "payout_pending"
+      },
+      "status": "confirmed",
+      "transactionHash": "FBiS4u1P52zHRa5nyhU3zJVe1BmY82R3ZaM1VE16rpKA"
+    },
+    "explicitAcceptanceRetry": 1,
+    "priorFailedAcceptance": {
+      "failureCode": "NEAR_EXECUTION_FAILED",
+      "status": "failed",
+      "transactionHash": "B1S36KEWYmDXZoyZcHEstrw7inytpn9jDV11pZnRTAeP",
+      "decodedContractFailure": "ERR_DELIVERY_REQUIRED",
+      "historicalJournalFailureCodeRetained": true
+    },
+    "duplicateAcceptance": {
+      "sameTransactionHash": true,
+      "transactionHash": "FBiS4u1P52zHRa5nyhU3zJVe1BmY82R3ZaM1VE16rpKA",
+      "payoutAttempt": "1"
+    },
+    "finalJob": {
+      "operationId": "live:76551635-cbc9-4b13-a03b-d7f7e07ca10d",
+      "status": "paid",
+      "worker": "worker.persistara-owner.testnet",
+      "amount": "10000000000000000000000",
+      "result": {
+        "provider": "0g",
+        "network": "0g:16602:turbo",
+        "objectId": "0xaabebc0d544fc6d3342587eefd471a00f42121682a4be9188799aadf93c4b145",
+        "ciphertextSha256": "76eae7e31d4d577308ee58ba709896e0622ab8d17fcf491f5746c322223cc85c",
+        "byteLength": 328
+      },
+      "payoutAttempt": "1"
+    },
+    "finalBalances": {
+      "deposited": "100000000000000000000000",
+      "available": "90000000000000000000000",
+      "reserved": "0",
+      "pending": "0",
+      "paid": "10000000000000000000000",
+      "withdrawn": "0"
+    },
+    "rejections": {
+      "status": "contract_rejections_verified",
+      "stale": {
+        "status": "confirmed",
+        "transactionHash": "2hvrePAfeJcZNsN5auBt4SjyofZM23oBmC3NbRrNuPif",
+        "result": false
+      },
+      "budget": {
+        "status": "failed",
+        "transactionHash": "BHpRmRsdLTKikXde4EQCzexTJ7mTL6rgjTAXqbc7W6C2",
+        "failureCode": "ERR_JOB_LIMIT"
+      }
+    },
+    "workerBalance": {
+      "accountId": "worker.persistara-owner.testnet",
+      "amountYoctoNear": "109724560564239200000000",
+      "blockHash": "B52HTuh2Nryz3p6YDDfvMimjbv6hxnUo6AkfyrxME36q"
+    }
+  },
+  "costs": {
+    "network": "0g:16602:turbo",
+    "asset": "testnet 0G",
+    "amountUnit": "wei",
+    "transactions": [
+      {
+        "transactionHash": "0x49ff71c3742bcb369900b37548db5853c86fac4f4d73c193e543ee3f4c9ecb68",
+        "gasCostWei": "1266308002216039",
+        "storageValueWei": "61467289924",
+        "totalCostWei": "1266369469505963"
+      },
+      {
+        "transactionHash": "0x2c033b3d85b98951047b12c5c370678c314c34ecb3dd4d3632f3079c8235c47d",
+        "gasCostWei": "1314760002300830",
+        "storageValueWei": "92200934886",
+        "totalCostWei": "1314852203235716"
+      },
+      {
+        "transactionHash": "0xe0cc8496e2e438c1b6686b0d952025646dfe0db18eb2b656a020f2097ad4b0f7",
+        "gasCostWei": "1287244002252677",
+        "storageValueWei": "122934579848",
+        "totalCostWei": "1287366936832525"
+      }
+    ],
+    "totalCostWei": "3868588609574204",
+    "remainingBalanceWei": "496131411390425796"
+  },
+  "limits": {
+    "nearAiUsed": false,
+    "privateInferenceVerified": false,
+    "researchQualityVerified": false,
+    "durableMissionRunner": false,
+    "browserWalletIntegration": false,
+    "liveRotationVerified": false,
+    "recoveredRecordCount": 1,
+    "twoFactSourceRevisionDrill": false,
+    "physicalCrossMachineRecovery": false,
+    "offDeviceBackupVerified": false,
+    "fiveTrialBenchmark": false,
+    "mainnetReadiness": false
+  }
+}

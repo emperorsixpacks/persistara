@@ -328,6 +328,59 @@ describe("finalized NEAR memory and treasury clients", () => {
       assert.equal((await treasury.accept("job:one", "2", ref.ciphertextSha256)).status, "payout_failed");
     } finally { await f.close(); }
   });
+  it("refuses absent deliveries and artifact mismatches before signing acceptance", async () => {
+    const f = await fixture();
+    try {
+      const treasury = new NearTreasuryClient(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256), { code: "AUTHORIZATION_FAILED" });
+      f.mock.job = { request: { agentId: f.config.agentId, operationId: "job:one", worker: "worker.testnet", amount: "1" }, result: ref, payoutAttempt: "0", status: "delivered" };
+      await assert.rejects(treasury.accept("job:one", "2", "c".repeat(64)), { code: "AUTHORIZATION_FAILED" });
+      assert.equal(f.mock.sends, 0);
+    } finally { await f.close(); }
+  });
+  it("permits an explicit idempotent acceptance retry after final failure and decodes newline-prefixed contract errors", async () => {
+    const f = await fixture();
+    try {
+      f.mock.job = { request: { agentId: f.config.agentId, operationId: "job:one", worker: "worker.testnet", amount: "1" }, result: ref, payoutAttempt: "0", status: "delivered" };
+      f.mock.status = { Failure: { ActionError: { kind: { FunctionCallError: { ExecutionError: "Smart contract panicked at source.rs:20:\nERR_DELIVERY_REQUIRED" } } } } };
+      const treasury = new NearTreasuryClient(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256), { code: "TRANSACTION_FAILED" });
+      const prior = await f.signer().reconcile("accept:job:one");
+      assert.equal(prior.status, "failed");
+      if (prior.status === "failed") assert.equal(prior.failureCode, "ERR_DELIVERY_REQUIRED");
+      f.mock.status = null;
+      await treasury.accept("job:one", "2", ref.ciphertextSha256, 1);
+      await treasury.accept("job:one", "2", ref.ciphertextSha256, 1);
+      assert.equal(f.mock.sends, 2);
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256, 2), { code: "OPERATION_CONFLICT" });
+      assert.equal(f.mock.sends, 2);
+    } finally { await f.close(); }
+  });
+  it("never replaces unknown or confirmed acceptance outcomes", async () => {
+    const f = await fixture();
+    try {
+      f.mock.job = { request: { agentId: f.config.agentId, operationId: "job:one", worker: "worker.testnet", amount: "1" }, result: ref, payoutAttempt: "0", status: "delivered" };
+      const treasury = new NearTreasuryClient(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      f.mock.lostResponse = true;
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256), { code: "OUTCOME_UNKNOWN" });
+      const transactions = new Map(f.mock.transactions); f.mock.transactions.clear();
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256, 1), { code: "OUTCOME_UNKNOWN" });
+      assert.equal(f.mock.sends, 1);
+      for (const [key, value] of transactions) f.mock.transactions.set(key, value);
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256, 1), { code: "OPERATION_CONFLICT" });
+      assert.equal(f.mock.sends, 1);
+    } finally { await f.close(); }
+  });
+  it("requires a recorded prior failed acceptance and bounds explicit retry attempts", async () => {
+    const f = await fixture();
+    try {
+      f.mock.job = { request: { agentId: f.config.agentId, operationId: "job:one", worker: "worker.testnet", amount: "1" }, result: ref, payoutAttempt: "0", status: "delivered" };
+      const treasury = new NearTreasuryClient(new NearAuthorityReader(f.rpc), f.config, f.signer());
+      await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256, 1), { code: "INVALID_INPUT" });
+      for (const attempt of [-1, 1.5, 9]) await assert.rejects(treasury.accept("job:one", "2", ref.ciphertextSha256, attempt), { code: "INVALID_INPUT" });
+      assert.equal(f.mock.sends, 0);
+    } finally { await f.close(); }
+  });
   it("rejects malformed balances and unsupported blob providers without dispatching", async () => {
     const f = await fixture();
     try {

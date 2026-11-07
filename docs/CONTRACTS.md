@@ -23,6 +23,8 @@ Local evidence (2026-11-07): `pnpm contract:check` exits zero. 34 Rust unit test
 
 This pre-public-deployment revision adds a rotation-record map to the authority root state. Deploy a fresh contract for acceptance. An in-place migration from earlier authority state is not implemented; replacing WASM on a funded existing deployment is not a supported upgrade procedure.
 
+Public testnet deployment (2026-11-07): the same 288,692-byte WASM was deployed and initialized atomically to the fresh `authority.persistara-owner.testnet` account. Finalized code hash: `GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ`; deployment transaction `C1jhawrZRTvMVKPMUF7fyiuN1uufyuMYvCWZCW1M7GkD`. The separate owner registered `persistara-owner.testnet:research`, installed/granted a restricted runtime, prepaid storage and funded a bounded native treasury. Live acceptance reserved/delivered/paid a fictional 0.01 NEAR job once, replayed the same acceptance transaction, and rejected stale CAS and a 0.03 NEAR request above its 0.02 job limit. [Sanitized evidence](evidence/near-0g-testnet-2026-11-07.json) includes real 0G references and a clean-process memory recovery. This completes the small public smoke gate, not mainnet readiness, live rotation or an autonomous research mission.
+
 ## Authority and keys
 
 Registration creates `owner.account:name`, where `name` has 1–32 ASCII alphanumeric, underscore or hyphen characters. The registration transaction binds **both the owner account and its signing public key**. Direct calls are required for owner and runtime actions; a proxy contract cannot reuse the original signer identity. There is no global application administrator in contract state.

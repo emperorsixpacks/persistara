@@ -1,6 +1,6 @@
 # Finalized NEAR clients and restricted signing
 
-`packages/near/src` connects the encrypted memory port and job workflow to the authority contract. AI credentials are not required. Public NEAR testnet acceptance still needs a deployed contract and development accounts; the integration tests deploy the same WASM into a disposable local NEAR sandbox.
+`packages/near/src` connects the encrypted memory port and job workflow to the authority contract. AI credentials are not required. A fresh public testnet deployment now exists at `authority.persistara-owner.testnet`, owned by a separate CLI-managed deployment key. The research agent belongs to `persistara-owner.testnet`; the specialist is `worker.persistara-owner.testnet`. Owner/deployer/worker signing stays in the official external NEAR CLI keychain. Application configuration contains public identities and a separate restricted runtime-key path. Browser wallet integration is not implemented.
 
 ## Components
 
@@ -72,6 +72,26 @@ The clients trust the configured RPC for chain state/finality; they are not ligh
 `NearMemoryHeadStore` scopes access to one agent, reads its finalized head, and encodes `U64` fields as strings. A stale CAS returns false; an uncertain transaction throws `OUTCOME_UNKNOWN` with its reference. The memory service can subsequently recover a committed manifest and deduplicate the original memory operation even if the response was lost. Authorized checkpoint references still require storage retrieval/integrity checks before submission.
 
 `NearTreasuryClient` binds reservation to `reserve:<job operation ID>` and acceptance to `accept:<job operation ID>`. Generations/quote arguments are explicit. After a generation change, reconcile the prior operation and read the existing job before deciding on another authorization. A confirmed acceptance receipt is separate from job settlement; the returned job status is read from finalized storage and may be `payout_pending`, `payout_failed` or `paid`.
+
+Acceptance first requires the finalized delivered artifact and expected digest. It does not sign for an absent delivery, disputed job or different artifact. A conclusively failed acceptance transaction can be corrected through an **explicit** numbered attempt: `treasury.accept(jobId, generation, digest, 1)` uses `accept:<jobId>:retry:1`. Attempts are bounded to 1–8 and require the immediately preceding attempt to be recorded and finally failed. An unknown or confirmed transaction never authorizes a replacement. Repeating the same attempt replays the same journal transaction. A successful acceptance followed by a failed payout must follow the contract's payout recovery path, rather than creating another acceptance attempt. Error extraction reads decoded RPC string leaves so a newline before an `ERR_*` code is preserved; old stored outcomes are not rewritten.
+
+## Mechanical public-testnet acceptance
+
+`near:acceptance` requires an explicitly configured, fresh funded agent, exactly the documented 0.02 NEAR job / 0.05 NEAR daily policy, one approved worker, a committed memory checkpoint, and a successful `storage:acceptance` directory. All amounts are testnet-only. It verifies the real storage specimen before each phase and persists one immutable job request before reserving **0.01 testnet NEAR**.
+
+```sh
+pnpm near:acceptance prepare
+pnpm near:acceptance reserve
+# External specialist signer submits delivery-args.json through `deliver`.
+pnpm near:acceptance accept
+pnpm near:acceptance accept  # replay the same successful request
+pnpm near:acceptance reject
+pnpm near:acceptance verify
+```
+
+Do not rerun `prepare` to replace a pending plan. The phase commands use the same private state directory (`.persistara/acceptance/near` by default), bind deployment/account/runtime identities, and retain sanitized reports. Specialist delivery uses the generated `delivery-args.json`, zero deposit and 30 Tgas through its external CLI keychain. For an already confirmed failed initial acceptance, `pnpm near:acceptance retry-accept` selects explicit attempt 1; repeat that same command to test its replay. `verify` only reads/reconciles receipts and finalized job/accounting state. `reject` submits a stale checkpoint and a 0.03 NEAR over-limit request; it requires a false CAS result and `ERR_JOB_LIMIT` with no created job. These negative transactions consume testnet gas.
+
+The live specimen is deliberately fictional and reused as brief/result to test storage bindings and native settlement. This does **not** demonstrate a research mission, signed specialist quote protocol, autonomous worker, model output or output quality. Those remain plan 005 and the deferred inference gate. See [public evidence](evidence/near-0g-testnet-2026-11-07.json) and [remaining release work](../plans/README.md).
 
 Create matching clients in the trusted host with `createNearClients(config)`. Pass its `heads` to `MemoryService` together with the authorized memory key and blob adapter. Model tools receive narrow capabilities, not this configuration, key files or a generic signing endpoint.
 

@@ -20,7 +20,11 @@ Durable memory writes now journal encrypted intents, ciphertext roots and exact 
 
 Owner-controlled runtime/memory-key rotation now prepares verified replacement backups, drains and holds the original journals, atomically revokes/advances authority, and verifies restricted account-key replacement. Owner signing stays outside the runtime through reviewable unsigned requests. A new sandbox flow writes under the new epoch and recovers historical memory after both runtimes are removed. See [owner rotation and signing boundaries](docs/OWNER-ROTATION.md).
 
-**Not implemented yet:** embeddings, durable mission worker, authenticated API, product console or browser owner-wallet signing integration. Public NEAR testnet deployment, real 0G write/recovery acceptance and measured costs remain pending. The 0G uploader was verified with 0.5 testnet 0G on November 6; NEAR AI credentials/credits are deferred. No real upload transaction or paid inference has been performed. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
+Real 0G Turbo acceptance now passes: an application-encrypted specimen was uploaded, finalized, retrieved with a Merkle proof and decrypted, then retrieved/decrypted in another process without uploader credentials. Durable acceptance intents fence resubmission after interruption; the uploader enforces a per-transaction testnet cost ceiling. See [sanitized live evidence](docs/evidence/0g-testnet-2026-11-07.json).
+
+Public NEAR acceptance now passes on `authority.persistara-owner.testnet`: a restricted runtime committed memory backed by real Turbo blobs, a clean process recovered the first record from an encrypted owner backup, and a fictional job settled 0.01 testnet NEAR once. Stale checkpoints and over-budget reservations were rejected by the contract. External owner/specialist signing uses the official NEAR CLI keychain. See [public deployment, recovery and settlement evidence](docs/evidence/near-0g-testnet-2026-11-07.json).
+
+**Not implemented yet:** embeddings, durable mission worker, signed specialist protocol, authenticated API, product console or browser owner-wallet signing integration. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
 
 ## Development
 
@@ -33,7 +37,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **126 TypeScript tests in 18 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
+`pnpm check` typechecks, builds, and runs **142 TypeScript tests in 20 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 

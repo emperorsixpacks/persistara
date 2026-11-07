@@ -1,12 +1,13 @@
-import { readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { Indexer, MemData, StorageNode } from "@0gfoundation/0g-storage-ts-sdk";
-import type { JsonRpcProvider as RpcProvider } from "ethers" with { "resolution-mode": "require" };
+import type { JsonRpcProvider as RpcProvider, TransactionRequest, TransactionResponse } from "ethers" with { "resolution-mode": "require" };
 import { sha256 } from "../../crypto/src/envelope.js";
+import { readPrivateFile } from "../../memory/src/files.js";
 import { assertBlobRef, isObject, sameBlob, type BlobRef } from "../../protocol/src/memory.js";
 import { storageConfig, type StorageConfig } from "../../protocol/src/config.js";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { fail, progress, reply } from "../../protocol/src/worker.js";
+import { assertUploadTransaction, TURBO_FLOW } from "./upload-policy.js";
 
 const ROOT = /^0x[a-fA-F0-9]{64}$/;
 // 0G publishes CJS-resolved ethers declarations. Use that same ethers entry point.
@@ -77,25 +78,45 @@ process.once("message", async (request: unknown) => {
         (request.operation === "upload" && (!(request.bytes instanceof Uint8Array) || request.bytes.length < 1 || request.bytes.length > 1_500_000))) {
       throw new ProviderError("INVALID_INPUT", "Invalid encrypted upload or missing uploader key file");
     }
-    const permissions = await stat(config.uploaderKeyFile);
-    if (!permissions.isFile() || (permissions.mode & 0o077) !== 0) throw new ProviderError("NOT_CONFIGURED", "Uploader key file permissions must be restricted");
-    const privateKey = (await readFile(config.uploaderKeyFile, "utf8")).trim();
+    const privateKey = Buffer.from(await readPrivateFile(config.uploaderKeyFile, 128)).toString("utf8").trim();
     if (!ROOT.test(privateKey)) throw new ProviderError("NOT_CONFIGURED", "Uploader key file must contain one EVM private key");
-    const signer = new Wallet(privateKey, provider);
+    let expectedFlow = "";
+    let attempted = false;
+    class BoundedUploader extends Wallet {
+      override async sendTransaction(tx: TransactionRequest): Promise<TransactionResponse> {
+        const populated = await this.populateTransaction(tx);
+        assertUploadTransaction(populated, expectedFlow);
+        if (attempted) throw new ProviderError("AUTHORIZATION_FAILED", "Only one submission attempt is authorized per upload");
+        attempted = true;
+        return super.sendTransaction(populated);
+      }
+    }
+    const signer = new BoundedUploader(privateKey, provider);
     if ((await provider.getBalance(signer.address)) === 0n) throw new ProviderError("NOT_CONFIGURED", "Uploader wallet needs testnet funds");
-    if (request.operation === "check-upload") { reply({ ready: true }); return; }
+    const indexer = new Indexer(config.indexerUrl);
+    const [uploader, selectionError] = await indexer.newUploaderFromIndexerNodes(config.rpcUrl, signer, 1);
+    if (selectionError || !uploader || !uploader.nodes.length) throw new ProviderError("UPSTREAM_ERROR", "No eligible storage nodes");
+    expectedFlow = (await uploader.flow.getAddress()).toLowerCase();
+    for (const node of uploader.nodes) {
+      const status = await node.getStatus();
+      if (status.networkIdentity.chainId !== config.chainId || status.networkIdentity.flowAddress.toLowerCase() !== expectedFlow ||
+          (config.mode === "turbo" && expectedFlow !== TURBO_FLOW)) {
+        throw new ProviderError("NETWORK_MISMATCH", "Selected storage node or flow is on another network");
+      }
+    }
+    if (request.operation === "check-upload") { uploader.provider.destroy(); reply({ ready: true }); return; }
     const file = preparedFile!;
     const rootHash = preparedRef!.objectId;
     progress("prepared", rootHash);
-    const indexer = new Indexer(config.indexerUrl);
     submissionPossible = true;
-    const [result, uploadError] = await indexer.upload(file, config.rpcUrl, signer, {
+    const [result, uploadError] = await uploader.uploadFile(file, {
       finalityRequired: true, expectedReplica: 1, skipIfFinalized: true, skipTx: true,
       onProgress: (message) => {
         const hash = /^Transaction submitted: (0x[a-fA-F0-9]{64})$/.exec(message)?.[1];
         if (hash) progress("submitted", hash);
       },
     }, { Retries: 1, Interval: 1_000, MaxGasPrice: 0, TooManyDataRetries: 1 });
+    uploader.provider.destroy();
     if (uploadError || !("rootHash" in result) || result.rootHash !== rootHash) throw new ProviderError("OUTCOME_UNKNOWN", "Upload needs root/transaction reconciliation");
     if (result.txHash) {
       const receipt = await provider.getTransactionReceipt(result.txHash);

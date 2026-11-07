@@ -4,9 +4,9 @@ Priority P0 · risk medium/high · effort one to two days, contingent on credent
 
 ## Intent and current state
 
-Persistara stores encrypted memory under NEAR authority, but currently has only `LocalBlobStore` and a tested application encryption envelope. Add real 0G upload/download and NEAR AI inference through explicit adapters. Never silently substitute fixtures when credentials or providers fail.
+The pinned 0G and strict NEAR AI adapters are implemented. On 2026-11-07, real Turbo storage acceptance passed upload, finalization, proof-enabled retrieval, authenticated decryption and fresh-process retrieval without uploader credentials. See `docs/evidence/0g-testnet-2026-11-07.json`. Verified inference/tool calling remains deferred at the user's request until AI credits are available. Never silently substitute fixtures when credentials or providers fail.
 
-0G roots and ciphertext SHA-256 are different identifiers. The documented TS SDK uses an EVM signer and offers proof-enabled downloads. NEAR AI's current verified SDK documents Node >=24.22.1 and model-specific E2EE support. Current development runtime is Node 22.22.2. These are integration constraints, not reasons to claim an untested path works.
+0G roots and ciphertext SHA-256 are different identifiers. The TS SDK uses a separate EVM uploader and proof-enabled downloads. The project now pins Node 24.22.2, compatible with NEAR AI SDK's documented minimum. Real storage proof does not establish private inference, NEAR checkpoint recovery or long-term availability.
 
 ## Scope
 

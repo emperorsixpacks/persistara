@@ -98,8 +98,17 @@ export class DurableNearSigner {
       return { status: "confirmed", transactionHash: row.tx_hash!, result: decodeJsonBase64(response.status.SuccessValue) };
     }
     if (Object.hasOwn(response.status, "Failure") && !Object.hasOwn(response.status, "SuccessValue")) {
-      const message = JSON.stringify(response.status.Failure);
-      const code = /\bERR_[A-Z0-9_]{1,80}\b/.exec(message)?.[0] ?? "NEAR_EXECUTION_FAILED";
+      // Inspect decoded string leaves: JSON.stringify turns a preceding newline into
+      // the word characters "nERR_", which defeats a word-boundary match.
+      const pending: unknown[] = [response.status.Failure];
+      let code = "NEAR_EXECUTION_FAILED";
+      for (let checked = 0; pending.length && checked < 128; checked++) {
+        const value = pending.shift();
+        if (typeof value === "string") {
+          const match = /\bERR_[A-Z0-9_]{1,80}\b/.exec(value)?.[0];
+          if (match) { code = match; break; }
+        } else if (isObject(value) || Array.isArray(value)) pending.push(...Object.values(value).slice(0, 128 - checked));
+      }
       return { status: "failed", transactionHash: row.tx_hash!, failureCode: code };
     }
     return unknown;
