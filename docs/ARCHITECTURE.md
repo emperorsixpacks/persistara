@@ -51,6 +51,8 @@ For v1, bound the manifest and memory count. The foundation uses at most 1,000 e
 
 Recovery requires both a finalized registry head and valid owner-held decryption/recovery material. A blockchain record alone cannot decrypt anything. Recover ciphertext, authenticate the manifest and records, rebuild retrieval metadata and embeddings, and then resume. An agent transfer cannot make an old owner forget old keys; cross-owner transfer is deferred.
 
+A [portable recovery kit](RECOVERY-KIT.md) can additionally wrap the memory keyring and the independent buyer delivery-recipient key, with fixed signed commission descriptors. Restore checks an independently recorded fingerprint, finalized authority/code/head and each immutable delivered result using public reads only. It never restores pending signer journals or replays effects. Physical device separation remains an independently observed acceptance property.
+
 ## Index and inference
 
 The search index is an expendable cache, scoped by agent and key epoch. Use full-text retrieval plus vector search where justified. Plaintext/vector indexes run only in the trusted owner-controlled runtime in v1. Remote index deployment requires an explicit updated threat model; embeddings can leak information.
@@ -92,6 +94,7 @@ packages/owner/               owner proof, loopback host and wallet handoff jour
 packages/inference/           NEAR AI adapters and evidence verification
 packages/runtime/             mission journal, leases, bounded source collection
 packages/commerce/            signed commission protocol, JWE, journal, specialist executor
+packages/recovery/            portable encrypted owner kit and read-only recovery
 contracts/authority/          Rust NEAR registry and treasury modules
 contracts/integration-tests/  deployed-WASM NEAR sandbox scenarios
 tests/                        cross-boundary invariant tests

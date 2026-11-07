@@ -15,6 +15,12 @@ import { privateDirectory, readPrivateFile, writePrivateFile } from "../../packa
 import { IsolatedNearSigner } from "../../packages/near/src/isolated.js";
 import { canonical, hash, type NearSignerConfig, type NearSigner } from "../../packages/near/src/protocol.js";
 import { NearRpc } from "../../packages/near/src/rpc.js";
+import { NearAuthorityReader, NearMemoryHeadStore } from "../../packages/near/src/client.js";
+import { MemoryService } from "../../packages/memory/src/service.js";
+import { MemoryKeyring } from "../../packages/memory/src/keyring.js";
+import { decodePrivateKeyring, encodePrivateKeyring } from "../../packages/memory/src/backup.js";
+import { createRecoveryKit, openRecoveryKit, recoverKit, recoveryCommission } from "../../packages/recovery/src/kit.js";
+import { RecoveryAuthorityReader } from "../../packages/recovery/src/near.js";
 import { OwnerReader } from "../../packages/owner/src/reader.js";
 import { isObject, type BlobRef, type PreparedBlobStore } from "../../packages/protocol/src/memory.js";
 import { ProviderError } from "../../packages/protocol/src/providers.js";
@@ -33,6 +39,7 @@ try {
     runtimeKeyFile: resolve(input.directory, "buyer/runtime.key"), journalFile: resolve(input.directory, "buyer/signer/near.sqlite") };
   const codeHash = baseEncode(createHash("sha256").update(await readFile("target/near/persistara_authority/persistara_authority.wasm")).digest());
   const scope = { owner: config.signerId, agentId: config.agentId, contractId: config.contractId, chainId: config.chainId, codeHash };
+  const memoryBinding = { agentId: config.agentId, authorityNetwork: "near:sandbox" as const, chainId: config.chainId, contractId: config.contractId, storageNetwork: "0g:16602:turbo" as const };
   const rpc = new NearRpc(config), chain = new NearCommissionChain(rpc, config);
   const owner = new OwnerReader(rpc, config, codeHash, async () => ({ backup: { status: "unavailable", offDeviceVerified: false }, localRotationHold: false }));
   const view = await owner.read();
@@ -86,6 +93,11 @@ try {
     await writePrivateFile(path("worker/profile.json"), Buffer.from(canonical(await sign("profile", pending.payload, pending.nonce))));
     assert.equal(typeof input.runtimeSecretKey, "string"); await writePrivateFile(config.runtimeKeyFile, Buffer.from(input.runtimeSecretKey!));
     const b = await buyer();
+    const memoryKeys = MemoryKeyring.create();
+    await writePrivateFile(path("buyer/keys/memory-keyring.json"), encodePrivateKeyring(memoryBinding, memoryKeys));
+    const memory = new MemoryService(config.agentId, memoryKeys, 1, store, new NearMemoryHeadStore(new NearAuthorityReader(rpc), config, new IsolatedNearSigner(config)), { binding: memoryBinding });
+    await memory.remember({ operationId: "kit:source-preference", text: "Use dated primary sources.", source: { kind: "owner", reference: "fixture:owner-preference" } });
+    await memory.remember({ operationId: "kit:delivery-preference", text: "Keep encrypted deliverables recoverable.", source: { kind: "artifact", reference: "fixture:delivery-preference" } });
     const mission = b.missions.create({ requestId: randomUUID(), title: "Commissioned sandbox dossier", objective: "Collect two source fixtures and survive interrupted settlement.", criteria: "Two authenticated source captures and one finalized specialist payout.", sources: ["https://docs.near.org/", "https://docs.0g.ai/"] }, { ...scope, publicKey: view.ownerKey, generation: view.generation, keyEpoch: view.keyEpoch, blockHash: view.blockHash });
     const c = await b.service.create(mission.mission.id, mission.mission.version, "10000000000000000000000", view);
     await writePrivateFile(metaPath, Buffer.from(canonical({ id: c.id, missionId: c.missionId }))); output = { state: c.state, commissionId: c.id };
@@ -109,6 +121,24 @@ try {
     } else if (input.phase === "observe-payment") {
       const b = await buyer(), c = await b.service.reconcile(meta.id); assert.equal(c.state, "paid"); assert.equal(b.missions.get(meta.missionId).mission.state, "completed");
       output = { state: c.state, reviewed: c.reviewed, payoutAttempt: c.receipt.payoutAttempt, artifactDigest: c.artifactDigest, sourceCount: c.artifact!.sources.length, uploadCalls: (await readdir(path("upload-calls"))).length };
+    } else if (input.phase === "prepare-kit") {
+      const b = await buyer(), record = b.journal.get(meta.id), c = recoveryCommission(record);
+      assert.ok(c);
+      const keys = decodePrivateKeyring(await readPrivateFile(path("buyer/keys/memory-keyring.json")), memoryBinding);
+      const recipient = await validateRecipientKeys(JSON.parse(Buffer.from(await readPrivateFile(path("buyer/keys/recipient.key"))).toString()));
+      const current = await new RecoveryAuthorityReader(config, scope).observe();
+      const prepared = await createRecoveryKit({ scope, ownerKey: current.ownerKey, binding: memoryBinding, checkpoint: current.head, keys, recipient, commissions: [c], now: Number(BigInt(current.timestampNs) / 1_000_000n) });
+      await writePrivateFile(path("recovery/owner.kit"), prepared.bundle);
+      await writePrivateFile(path("recovery/kit.secret"), Buffer.from(prepared.secret));
+      await writePrivateFile(path("recovery/kit.digest"), Buffer.from(prepared.digest));
+      output = { prepared: true, memoryVersion: current.head?.version, deliveryCount: 1 };
+    } else if (input.phase === "recover-kit") {
+      const kit = await openRecoveryKit(await readPrivateFile(path("recovery/owner.kit"), 1_000_000), Buffer.from(await readPrivateFile(path("recovery/kit.secret"))).toString(), Buffer.from(await readPrivateFile(path("recovery/kit.digest"))).toString());
+      const authority = new RecoveryAuthorityReader(config, scope);
+      const result = await recoverKit(kit, { observe: () => authority.observe(), job: id => chain.job(id), blobs: { get: ref => store.get(ref) } });
+      assert.equal(result.snapshot.records.length, 2); assert.equal(result.snapshot.head?.version, 2); assert.equal(result.deliveries.length, 1); assert.equal(result.deliveries[0]!.status, "paid");
+      assert.deepEqual(result.snapshot.records.map(r => r.source.reference).sort(), ["fixture:delivery-preference", "fixture:owner-preference"]);
+      output = { recovered: true, memoryCount: result.snapshot.records.length, deliveryCount: result.deliveries.length, artifactDigest: result.deliveries[0]!.digest, payoutAttempt: result.deliveries[0]!.payoutAttempt, originalBuyerStateAbsent: true, physicalOffDeviceVerified: false };
     } else if (input.phase === "recover-delivery") {
       const task = JSON.parse(Buffer.from(await readPrivateFile(path("worker/job/task.json"), 64_000)).toString());
       const signed = JSON.parse(Buffer.from(await readPrivateFile(path("worker/job/delivery.json"))).toString());

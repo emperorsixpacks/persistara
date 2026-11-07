@@ -16,6 +16,8 @@ NEAR clients now wire memory checkpoints and job reservation/acceptance through 
 
 Owner recovery now includes encrypted backup bundles, historical keyrings, authenticated snapshot restoration and a private full-text recall cache with source/revision metadata. A separate-process drill restores after deleting the original runtime state. See [recovery commands and boundaries](docs/RECOVERY.md).
 
+A portable encrypted owner recovery kit now covers both historical memory keys and the separate buyer delivery-recipient key, with immutable signed commission descriptors. Its verify/recover CLI requires an independently checked fingerprint, never loads the original `.env` during restore, and uses public reads only. Physical off-device custody remains unverified until a real separate-device drill is observed. See [kit export, transfer and restore commands](docs/RECOVERY-KIT.md).
+
 Durable memory writes now journal encrypted intents, ciphertext roots and exact checkpoint attempts before external effects. Interrupted uploads are probed without re-uploading; interrupted checkpoints reconcile through the same signer journal. Leases fence stale processes. See [write, resume and reconciliation commands](docs/MEMORY-WRITES.md), including the cases that remain unknown and must not be retried.
 
 Owner-controlled runtime/memory-key rotation now prepares verified replacement backups, drains and holds the original journals, atomically revokes/advances authority, and verifies restricted account-key replacement. Owner signing stays outside the runtime through reviewable unsigned requests. A new sandbox flow writes under the new epoch and recovers historical memory after both runtimes are removed. See [owner rotation and signing boundaries](docs/OWNER-ROTATION.md).
@@ -32,7 +34,7 @@ The redesigned mission desk now persists zero-spend source-collection briefs, ca
 
 Signed specialist commissioning now links one curated worker to a mission through domain-bound NEP-413 quotes and delivery receipts. Separate JWE recipient keys protect briefs/dossiers on 0G; exact owner review precedes bounded NEAR acceptance, and finalized payout callbacks determine payment completion. The separate worker CLI keeps wallet signing in the official external keychain. Fixed upload/job intents and canonical signer journals survive interruption without replacement effects. Public testnet acceptance completed a real two-source encrypted delivery and paid 0.01 NEAR once, retained across a host restart; a fresh process decrypted the result using a copied recipient key without runtime/uploader credentials. See [sanitized live commissioning evidence](docs/evidence/specialist-commission-2026-11-07.json) and [setup, signed-file exchange and recovery limits](docs/COMMISSIONS.md).
 
-**Not implemented yet:** embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
+**Not implemented yet:** a unified interactive Sofer-style terminal (operational CLI subcommands already exist), embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
 
 ## Development
 
@@ -45,7 +47,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **199 TypeScript tests in 30 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **207 TypeScript tests in 31 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
@@ -77,6 +79,7 @@ Run `pnpm missions:recover:fixture` for a clearly labeled three-process source-d
 - [NEAR authority, accounting and settlement](docs/CONTRACTS.md)
 - [NEAR client setup and transaction recovery](docs/NEAR-CLIENTS.md)
 - [Owner backups, recovery and private recall](docs/RECOVERY.md)
+- [Portable encrypted owner recovery kit](docs/RECOVERY-KIT.md)
 - [Durable memory writes and interrupted-operation reconciliation](docs/MEMORY-WRITES.md)
 - [Owner-controlled runtime and memory-key rotation](docs/OWNER-ROTATION.md)
 - [Local owner wallet connection and controls](docs/OWNER-CONSOLE.md)

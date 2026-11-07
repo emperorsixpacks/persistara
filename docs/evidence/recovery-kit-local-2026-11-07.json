@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "kind": "real_provider_portable_recovery_kit_local_drill",
+  "fixture": false,
+  "kitSha256": "56db559265206d0050078b78989d39333b695834535a43f057413c44ac5f7aaa",
+  "kitId": "d757d068-de3f-4d67-8c4e-c860b8ceed74",
+  "offlineVerification": {
+    "status": "recovery_kit_authenticated_offline",
+    "kitSha256": "56db559265206d0050078b78989d39333b695834535a43f057413c44ac5f7aaa",
+    "kitId": "d757d068-de3f-4d67-8c4e-c860b8ceed74",
+    "agentId": "persistara-owner.testnet:research",
+    "activeEpoch": 1,
+    "memoryEpochs": [
+      1
+    ],
+    "deliveryRecipientIncluded": true,
+    "deliveryCount": 1,
+    "offDeviceVerified": false,
+    "networkUsed": false,
+    "originalEnvironmentLoaded": false
+  },
+  "publicReadRecovery": {
+    "schemaVersion": 1,
+    "status": "recovery_kit_live_reads_verified",
+    "kitSha256": "56db559265206d0050078b78989d39333b695834535a43f057413c44ac5f7aaa",
+    "kitId": "d757d068-de3f-4d67-8c4e-c860b8ceed74",
+    "agentId": "persistara-owner.testnet:research",
+    "activeEpoch": 1,
+    "memoryEpochs": [
+      1
+    ],
+    "deliveryRecipientIncluded": true,
+    "deliveryCount": 1,
+    "offDeviceVerified": false,
+    "memory": {
+      "checkpointVersion": 1,
+      "recordCount": 1,
+      "currentFacts": 1,
+      "head": {
+        "version": 1,
+        "keyEpoch": 1,
+        "manifest": {
+          "provider": "0g",
+          "network": "0g:16602:turbo",
+          "objectId": "0x9c433220baa00dd42619681e66dbb14aefb6537a30e96879e7390b7d0611c029",
+          "ciphertextSha256": "5516e9459c15ea15762d893807828ad024cddd9e67edaa9f01714b06cba1f78d",
+          "byteLength": 931
+        }
+      }
+    },
+    "deliveries": [
+      {
+        "id": "commission:58840546-9dc5-4305-8b21-8f50a00b5293",
+        "digest": "93e884c9d6fa7b0ed6951ee11bedaa22c05e8b3a2d9237c9226b22b2f7b0a482",
+        "status": "paid",
+        "payoutAttempt": "1"
+      }
+    ],
+    "finalizedBlockHash": "3K2ZfbmecqgjjP73KQA9PBTps5KXj14YoGCzZaXbg9eV",
+    "physicalRecovery": "requires-independent-device-observation",
+    "originalEnvironmentLoaded": false,
+    "ownerOrWorkerWalletKeyLoaded": false,
+    "runtimeOrUploaderKeyLoaded": false,
+    "pendingEffectsReplayed": false,
+    "nearAiUsed": false,
+    "uploadOrTransactionSubmitted": false,
+    "verifiedAt": "2026-11-07T22:52:14.218Z"
+  },
+  "restoredMemoryKeysMatchOriginal": true,
+  "restoredBuyerRecipientMatchesOriginal": true,
+  "privateRestoredFilePermissionsVerified": true,
+  "transferDirectoryContainsNoSecretFile": true,
+  "processEnvironment": "empty",
+  "originalLiveFilesRemoved": false,
+  "physicalOffDeviceVerified": false,
+  "browserWalletProviderApprovalObserved": false,
+  "limitations": [
+    "Local same-machine preparation only; no external recovery device was provided",
+    "No connected browser or operator wallet approval was observed",
+    "One existing live memory and one paid artifact recovered; broader memory/revision live acceptance remains pending"
+  ]
+}

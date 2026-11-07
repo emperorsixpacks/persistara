@@ -28,6 +28,7 @@
     "owner:rotation:next": "pnpm build && node dist/scripts/owner-rotation.js next",
     "owner:rotation:verify": "pnpm build && node dist/scripts/owner-rotation.js verify",
     "owner:rotation:abort": "pnpm build && node dist/scripts/owner-rotation.js abort",
+    "recovery:kit": "pnpm build && node dist/scripts/recovery-kit.js",
     "memory:keys": "pnpm build && node dist/scripts/memory.js keys",
     "memory:backup": "pnpm build && node dist/scripts/memory.js backup",
     "memory:backup:verify": "pnpm build && node dist/scripts/memory.js verify-backup",

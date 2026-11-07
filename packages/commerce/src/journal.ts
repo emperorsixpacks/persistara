@@ -40,6 +40,8 @@ export class CommissionJournal {
   close() { this.db.close(); }
   private atomic<T>(fn: () => T): T { this.db.exec("BEGIN IMMEDIATE"); try { const r = fn(); this.db.exec("COMMIT"); return r; } catch (e) { this.db.exec("ROLLBACK"); throw e; } }
   count() { return Number(this.db.prepare("SELECT count(*) AS n FROM commissions").get()?.n); }
+  /** Private operator export only; HTTP callers must use view(), never these records. */
+  records(): CommissionRecord[] { return this.db.prepare("SELECT id FROM commissions ORDER BY id").all().map(row => this.get(String(row.id))); }
   findMission(id: string): CommissionRecord | null { const row = this.db.prepare("SELECT id FROM commissions WHERE mission_id=?").get(id); return row ? this.get(String(row.id)) : null; }
   get(id: string): CommissionRecord {
     if (!commissionId(id)) throw new ProviderError("INVALID_INPUT", "Invalid commission ID");

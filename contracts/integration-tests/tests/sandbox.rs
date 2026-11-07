@@ -582,7 +582,7 @@ async fn signed_specialist_commission_recovers_and_pays_once_without_wallet_keys
         let paid = run_node_fixture("commerce-sandbox", &input)?;
         assert_eq!(paid["state"], "paid");
         assert_eq!(paid["payoutAttempt"], "1");
-        assert_eq!(paid["uploadCalls"], 2);
+        assert_eq!(paid["uploadCalls"], 6);
         assert_eq!(paid["sourceCount"], 2);
         std::fs::remove_file(directory.join("buyer/runtime.key"))?;
         assert_eq!(
@@ -601,6 +601,10 @@ async fn signed_specialist_commission_recovers_and_pays_once_without_wallet_keys
         std::fs::DirBuilder::new()
             .mode(0o700)
             .create(directory.join("recovery"))?;
+        input["phase"] = json!("prepare-kit");
+        let kit = run_node_fixture("commerce-sandbox", &input)?;
+        assert_eq!(kit["memoryVersion"], 2);
+        assert_eq!(kit["deliveryCount"], 1);
         std::fs::copy(
             directory.join("buyer/keys/recipient.key"),
             directory.join("recovery/recipient.key"),
@@ -616,6 +620,12 @@ async fn signed_specialist_commission_recovers_and_pays_once_without_wallet_keys
         let recovered = run_node_fixture("commerce-sandbox", &input)?;
         assert_eq!(recovered["recovered"], true);
         assert_eq!(recovered["artifactDigest"], paid["artifactDigest"]);
+        input["phase"] = json!("recover-kit");
+        let kit_recovered = run_node_fixture("commerce-sandbox", &input)?;
+        assert_eq!(kit_recovered["memoryCount"], 2);
+        assert_eq!(kit_recovered["deliveryCount"], 1);
+        assert_eq!(kit_recovered["payoutAttempt"], "1");
+        assert_eq!(kit_recovered["artifactDigest"], paid["artifactDigest"]);
         Ok(())
     }
     .await;

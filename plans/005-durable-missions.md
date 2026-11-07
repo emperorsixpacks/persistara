@@ -10,6 +10,10 @@ Design update: use Tender's local interface as a visual reference for its applic
 
 The source-only mission journal/worker and owner-authenticated local API are now implemented. The signed specialist-commerce milestone is now implemented; the model-driven runner remains unimplemented. Sofer's original `brain/loop.ts` and tests are behavioral references only: provider types, history and in-process concurrency are unsuitable as the durable mission state. Build `packages/runtime`, `apps/worker`, `apps/api`, and signed task envelopes. Preserve `packages/protocol/src/tools.ts` provenance while upgrading validation/outcomes.
 
+## Terminal experience
+
+The unified interactive terminal is a first-class product requirement alongside the console. Existing memory, specialist and diagnostic scripts are operational subcommands, not a replacement for Sofer's interactive CLI. A unified Persistara CLI must create/inspect/resume missions, recall sourced memory, review specialist quotes/artifacts, reconcile payments and run recovery through the same durable services and policy boundaries as the browser. Model conversation/reasoning remains deferred until inference access is available; terminal mission/recovery commands must work without it. Do not introduce a second in-memory execution engine or load wallet keys to imitate the old loop.
+
 ## Required model
 
 Active commissioning milestone: attach one curated self-operated source specialist to an immutable mission. Use domain-bound NEP-413 profile/quote/delivery messages and standard JWE `RSA-OAEP-256` / `A256GCM` recipient encryption. A separate specialist CLI retains its wallet in the official NEAR CLI keychain and its recipient key in its private state directory. Owner wallet keys never enter the host. Offline blob preparation precedes quote review; owner acknowledgement precedes brief upload/reservation and exact-delivery acknowledgement precedes settlement. Existing contract WASM and canonical runtime signer journal remain unchanged.

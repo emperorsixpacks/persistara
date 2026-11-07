@@ -18,6 +18,8 @@ This milestone deliberately keeps plan 004 IN PROGRESS. The first real sourced m
 
 ## Scope
 
+Active acceptance work (2026-11-07): prepare a portable encrypted owner recovery kit containing the authenticated memory keyring and the separate buyer delivery-recipient key with immutable signed commission recovery descriptors. A new random kit secret stays in a separate private file. The kit contains no owner/worker wallet key, runtime signer/uploader credential, pending-effect journal or plaintext recall database. A read-only recovery command uses only the kit, its separate secret, an independently checked ciphertext fingerprint and public NEAR/0G identifiers; it rebuilds memory and authenticates recorded deliveries without sending effects. Local verification is never labeled physical off-device recovery. A real external drive or second machine and an available browser/wallet remain operator-provided acceptance inputs.
+
 Extend `packages/memory/src`, add index and recovery/keyring modules and `memory:recover` verification scripts. Wire live 0G and NEAR adapters without changing their trust boundaries. Do not add shared public indexes or cross-owner agent transfer. Existing application encryption, operation deduplication, read-before-checkpoint, and CAS tests remain required.
 
 ## Steps
@@ -42,3 +44,8 @@ Recovery works in a separate process/state directory and does not require origin
 ## Stop conditions
 
 Recovery relies on a secret stored only on the original machine; plaintext/vector data crosses a provider boundary without an explicit policy; key rotation strands historical memories; manifest growth exceeds the measured cap. Resolve these before advertising portable memory.
+
+
+## Portable-kit checkpoint
+
+Implemented authenticated encrypted kit preparation, offline verification and public-read recovery of memory plus buyer-encrypted specialist deliveries. Verification passes 207 TypeScript tests, 11 browser regressions, 34 Rust tests and six sandbox scenarios. The expanded sandbox removes original buyer state and recovers two sourced memories plus a paid artifact in a fresh process. A real local empty-environment drill recovered the existing public checkpoint and paid delivery, with exact key comparisons and private file permissions verified; no upload, transaction or AI call occurred. Physical off-device custody and live browser-provider approval remain unobserved because no external device/connected browser or operator approval was supplied. See `docs/RECOVERY-KIT.md` and `docs/evidence/recovery-kit-local-2026-11-07.json`. This checkpoint does not complete plan 004's larger live revision/rotation/measurement gates.

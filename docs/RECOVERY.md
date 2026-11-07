@@ -12,6 +12,10 @@ The owner must keep **both the encrypted bundle and its recovery secret**. Copy 
 
 Keyrings support up to 64 retained epochs. The in-memory keyring copies key bytes, hides its key map behind JavaScript private fields, and redacts generic JSON serialization. The explicit private export is plaintext key material for a protected owner/runtime file or the encrypted bundle; it must never enter model tools or receipts. Files require private permissions and directories mode 0700. File creation is exclusive, so existing material is not overwritten. This policy is tested on macOS and Linux; Windows file-permission behavior is not a supported recovery target yet.
 
+## Portable memory and delivery recovery
+
+The memory-only bundle intentionally contains no specialist delivery-recipient key. Use the [portable encrypted owner kit](RECOVERY-KIT.md) to back up both distinct kinds of recovery material plus signed delivery descriptors. `pnpm recovery:kit verify` works offline; `recover` performs public reads without the original `.env`, keys or journals. Physical off-device verification remains a separate observed gate.
+
 ## Owner commands
 
 Set the public `NEAR_AGENT_ID`, `NEAR_AUTHORITY_CONTRACT` and chosen `ZG_STORAGE_MODE` in the ignored environment file. These fields bind the backup. Offline key/backup commands validate their structure; they do not prove the account/contract exists or submit a transaction.
