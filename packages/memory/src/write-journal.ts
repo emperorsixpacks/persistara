@@ -46,9 +46,11 @@ export class MemoryWriteJournal {
     try {
       if (info.size && this.#db.prepare("PRAGMA application_id").get()?.application_id !== APP_ID) throw new MemoryError("INVALID_INPUT", "File is not a memory write journal");
       const version = this.#db.prepare("PRAGMA user_version").get()?.user_version;
-      if (version !== 0 && version !== 1) throw new MemoryError("INVALID_INPUT", "Unsupported memory journal schema");
+      if (version !== 0 && version !== 1 && version !== 2) throw new MemoryError("INVALID_INPUT", "Unsupported memory journal schema");
       this.#db.exec(`PRAGMA application_id=${APP_ID}; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=1000; PRAGMA trusted_schema=OFF;
         CREATE TABLE IF NOT EXISTS write_meta (id INTEGER PRIMARY KEY CHECK(id=1), binding TEXT NOT NULL, owner TEXT, expires INTEGER NOT NULL, fence INTEGER NOT NULL) STRICT;
+        CREATE TABLE IF NOT EXISTS write_controls (id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL, held_by TEXT, minimum_epoch INTEGER NOT NULL, last_rotation TEXT) STRICT;
+        CREATE TABLE IF NOT EXISTS write_rotation_requests (rotation_id TEXT NOT NULL, stage TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(rotation_id,stage)) STRICT;
         CREATE TABLE IF NOT EXISTS write_operations (id TEXT PRIMARY KEY, digest TEXT NOT NULL, record_id TEXT NOT NULL, key_epoch INTEGER NOT NULL,
           status TEXT NOT NULL CHECK(status IN ('pending','committed','conflict','failed','canceled')), result_record_id TEXT, result_version INTEGER) STRICT;
         CREATE UNIQUE INDEX IF NOT EXISTS one_pending_write ON write_operations(status) WHERE status='pending';
@@ -58,14 +60,63 @@ export class MemoryWriteJournal {
           state TEXT NOT NULL CHECK(state IN ('building','prepared','dispatched','accepted','rejected','failed')), PRIMARY KEY(operation_id,number)) STRICT;`);
       this.atomic(() => {
         this.#db.prepare("INSERT OR IGNORE INTO write_meta VALUES(1,?,NULL,0,0)").run(bindingText(this.#binding));
+        this.#db.prepare("INSERT OR IGNORE INTO write_controls VALUES(1,?,NULL,1,NULL)").run(randomUUID());
         if (this.#db.prepare("SELECT binding FROM write_meta WHERE id=1").get()?.binding !== bindingText(this.#binding)) throw new MemoryError("AUTHENTICATION_FAILED", "Memory journal belongs to another agent or network");
-        this.#db.exec("PRAGMA user_version=1");
+        this.#db.exec("PRAGMA user_version=2");
       });
     } catch (error) { this.#db.close(); throw error; }
   }
   close(): void { this.#db.close(); }
   assertScope(binding: MemoryBinding): void {
     if (bindingText(binding) !== bindingText(this.#binding)) throw new MemoryError("AUTHENTICATION_FAILED", "Memory writer and journal scopes differ");
+  }
+  controls(): { identity: string; heldBy: string | null; minimumEpoch: number; lastRotation: string | null } {
+    const row = this.#db.prepare("SELECT * FROM write_controls WHERE id=1").get();
+    if (!row || typeof row.identity !== "string" || !/^[a-f0-9-]{36}$/.test(row.identity) || !Number.isSafeInteger(row.minimum_epoch) || Number(row.minimum_epoch) < 1 ||
+        (row.held_by !== null && !isIdentifier(row.held_by)) || (row.last_rotation !== null && !isIdentifier(row.last_rotation))) return corrupt();
+    return { identity: row.identity, heldBy: row.held_by as string | null, minimumEpoch: Number(row.minimum_epoch), lastRotation: row.last_rotation as string | null };
+  }
+  holdForRotation(lease: WriteLease, id: string): void {
+    if (!isIdentifier(id) || id.length > 64) throw new MemoryError("INVALID_INPUT", "Invalid rotation ID");
+    this.mutate(lease, () => {
+      const control = this.controls();
+      if ((control.heldBy && control.heldBy !== id) || control.lastRotation === id) throw new MemoryError("WRITE_BUSY", "Another or completed rotation owns this journal");
+      if (this.#db.prepare("SELECT id FROM write_operations WHERE status='pending' LIMIT 1").get()) throw new MemoryError("WRITE_PENDING", "Reconcile or cancel pending memory work before planned rotation");
+      this.#db.prepare("UPDATE write_controls SET held_by=? WHERE id=1").run(id);
+    });
+  }
+  releaseRotation(lease: WriteLease, id: string, activateEpoch?: number): void {
+    this.mutate(lease, () => {
+      const control = this.controls();
+      if (activateEpoch !== undefined && (!Number.isSafeInteger(activateEpoch) || activateEpoch < control.minimumEpoch)) throw new MemoryError("KEY_EPOCH_MISMATCH", "Rotation cannot lower the local memory epoch");
+      if (control.heldBy !== id) {
+        if (control.heldBy === null && control.lastRotation === id && (activateEpoch === undefined || activateEpoch === control.minimumEpoch)) return;
+        throw new MemoryError("WRITE_BUSY", "Rotation does not own the journal barrier");
+      }
+      this.#db.prepare("UPDATE write_controls SET held_by=NULL,minimum_epoch=?,last_rotation=? WHERE id=1").run(activateEpoch ?? control.minimumEpoch, id);
+    });
+  }
+  issueRotationRequest(lease: WriteLease, id: string, stage: string, digest: string): void {
+    if (!isIdentifier(id) || id.length > 64 || !["begin", "remove-old-key", "install-new-key", "finish"].includes(stage) || !/^[a-f0-9]{64}$/.test(digest)) throw new MemoryError("INVALID_INPUT", "Invalid owner request identity");
+    this.mutate(lease, () => {
+      if (this.controls().heldBy !== id) throw new MemoryError("WRITE_BUSY", "Owner request lost its rotation barrier");
+      this.#db.prepare("INSERT OR IGNORE INTO write_rotation_requests VALUES(?,?,?)").run(id, stage, digest);
+      if (this.#db.prepare("SELECT digest FROM write_rotation_requests WHERE rotation_id=? AND stage=?").get(id, stage)?.digest !== digest) throw new MemoryError("OPERATION_CONFLICT", "Owner request identity already binds another payload");
+    });
+  }
+  abortRotation(lease: WriteLease, id: string): void {
+    if (!isIdentifier(id) || id.length > 64) throw new MemoryError("INVALID_INPUT", "Invalid rotation identity");
+    this.mutate(lease, () => {
+      if (this.#db.prepare("SELECT stage FROM write_rotation_requests WHERE rotation_id=? LIMIT 1").get(id)) throw new MemoryError("WRITE_PENDING", "An owner request was issued; reconcile it before changing barriers");
+      const control = this.controls();
+      if (control.heldBy !== null && control.heldBy !== id) throw new MemoryError("WRITE_BUSY", "Another owner rotation holds the journal");
+      this.#db.prepare("UPDATE write_controls SET held_by=NULL,last_rotation=? WHERE id=1").run(id);
+    });
+  }
+  private writable(epoch: number): void {
+    const control = this.controls();
+    if (control.heldBy) throw new MemoryError("WRITE_BUSY", "Memory writes are held for owner rotation");
+    if (epoch < control.minimumEpoch) throw new MemoryError("KEY_EPOCH_MISMATCH", "This memory key epoch was retired locally");
   }
   private atomic<T>(action: () => T): T {
     try { this.#db.exec("BEGIN IMMEDIATE"); }
@@ -110,6 +161,7 @@ export class MemoryWriteJournal {
         if (prior.digest !== input.digest) throw new MemoryError("OPERATION_CONFLICT", "Memory operation ID already binds another payload");
         return prior;
       }
+      this.writable(input.keyEpoch);
       if (this.#db.prepare("SELECT id FROM write_operations WHERE status='pending'").get()) throw new MemoryError("WRITE_BUSY", "Resolve the pending memory write before creating another");
       if (Number(this.#db.prepare("SELECT count(*) AS n FROM write_operations").get()?.n) >= 1000) throw new MemoryError("MEMORY_LIMIT", "Memory write journal capacity reached");
       this.#db.prepare("INSERT INTO write_operations VALUES(?,?,?,?,'pending',NULL,NULL)").run(input.id, input.digest, input.recordId, input.keyEpoch);
@@ -141,6 +193,7 @@ export class MemoryWriteJournal {
     this.mutate(lease, () => {
       const row = this.blob(id);
       if (!row.ref || row.state !== "ready") return corrupt();
+      this.writable(this.operation(row.operationId)!.keyEpoch);
       this.#db.prepare("UPDATE write_blobs SET state='dispatched' WHERE id=?").run(id);
     });
   }
@@ -195,6 +248,7 @@ export class MemoryWriteJournal {
     this.mutate(lease, () => {
       const row = this.attempt(id);
       if (!row || (state === "dispatched" ? row.state !== "prepared" : !["building", "prepared", "dispatched"].includes(row.state))) return corrupt();
+      if (state === "dispatched") this.writable(this.operation(id)!.keyEpoch);
       if ((state === "accepted" || state === "failed") && row.state !== "dispatched") return corrupt();
       this.#db.prepare("UPDATE write_attempts SET state=? WHERE operation_id=? AND number=?").run(state, id, row.number);
     });

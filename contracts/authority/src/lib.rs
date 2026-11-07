@@ -1,4 +1,5 @@
 mod registry;
+mod rotation;
 mod treasury;
 pub mod types;
 
@@ -11,6 +12,7 @@ pub struct Authority {
     agents: LookupMap<String, Agent>,
     jobs: LookupMap<String, Job>,
     withdrawals: LookupMap<String, Withdrawal>,
+    rotations: LookupMap<String, RuntimeRotation>,
     storage_credits_total: u128,
     pending_outgoing: u128,
 }
@@ -23,6 +25,7 @@ impl Authority {
             agents: LookupMap::new(b"a"),
             jobs: LookupMap::new(b"j"),
             withdrawals: LookupMap::new(b"w"),
+            rotations: LookupMap::new(b"r"),
             storage_credits_total: 0,
             pending_outgoing: 0,
         }
@@ -106,6 +109,7 @@ impl Authority {
         let id = agent.id.clone();
         self.jobs.flush();
         self.withdrawals.flush();
+        self.rotations.flush();
         self.agents.insert(id.clone(), agent.clone());
         self.agents.flush();
         let after = env::storage_usage();

@@ -39,6 +39,7 @@ Never persist decrypted content or private keys to receipts/logs. API secrets ar
 - Runtime crashes during payment: reconcile existing reservation/payout; do not create a new job for the same operation.
 - NEAR signer interruption: its private SQLite journal binds exact arguments, nonce and signed transaction before broadcast. A submitted/unknown row fences new signing until reconciled; use one dedicated key and journal per agent. A dropped/unseen transaction can remain unknown because expiry proofs and nonce replacement are not implemented. See [client recovery limits](NEAR-CLIENTS.md).
 - Paused/revoked runtime: stop new effects and checkpoint writes; handle already submitted transactions according to observed finality.
+- Planned key replacement: retain verified historical-key backups, drain pending work and hold both journals. Atomic owner-only begin/finish calls prevent repeated epoch changes; the owner wallet remains external. Observe old-key removal and restricted replacement at one finalized block. Do not release the memory barrier until authority completes; do not claim recovery verified until a new-epoch checkpoint and unchanged history are authenticated. Emergency revocation remains available without a graceful drain. See [owner rotation](OWNER-ROTATION.md).
 
 ## Production boundary
 

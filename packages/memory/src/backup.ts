@@ -46,13 +46,19 @@ function context(binding: MemoryBinding, backupId: string, epoch: number) {
   return { agentId: binding.agentId, recordId: `backup:${backupId}:${bindingDigest(binding)}`, keyEpoch: epoch, purpose: "recovery" as const };
 }
 export function createOwnerBackup(binding: MemoryBinding, keys: MemoryKeyring): { bundle: Uint8Array; recoverySecret: string } {
+  const recoverySecret = `${SECRET_PREFIX}${randomBytes(32).toString("base64url")}`;
+  return { bundle: wrapOwnerBackup(binding, keys, recoverySecret), recoverySecret };
+}
+/** Owner preparation can resume a partial file export using its already generated random secret. */
+export function wrapOwnerBackup(binding: MemoryBinding, keys: MemoryKeyring, recoverySecret: string): Uint8Array {
   assertBinding(binding);
-  const secret = randomBytes(32);
+  if (!recoverySecret.startsWith(SECRET_PREFIX)) throw new MemoryError("INVALID_BACKUP", "Unsupported recovery secret");
+  const secret = decodeKey(recoverySecret.slice(SECRET_PREFIX.length));
   const backupId = randomUUID();
   const wrapped = seal(encodePrivateKeyring(binding, keys), secret, context(binding, backupId, keys.activeEpoch));
   const bundle = Buffer.from(JSON.stringify({ schemaVersion: 1, format: "persistara-owner-backup", binding: structuredClone(binding), backupId,
     activeEpoch: keys.activeEpoch, wrapped: Buffer.from(wrapped).toString("base64url") }));
-  return { bundle, recoverySecret: `${SECRET_PREFIX}${secret.toString("base64url")}` };
+  return bundle;
 }
 export function restoreOwnerBackup(bundle: Uint8Array, recoverySecret: string, expected: MemoryBinding): MemoryKeyring {
   assertBinding(expected);

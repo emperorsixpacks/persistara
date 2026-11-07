@@ -515,3 +515,128 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
     assert_eq!(agent(&contract, &id).await?["head"]["version"], "3");
     Ok(())
 }
+
+async fn wait_for_finalized_keys(owner: &Account) -> Result<()> {
+    let expected = format!("{:?}", owner.view_access_keys().await?);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    while format!(
+        "{:?}",
+        owner
+            .view_access_keys()
+            .finality(near_workspaces::types::Finality::Final)
+            .await?
+    ) != expected
+    {
+        anyhow::ensure!(
+            std::time::Instant::now() < deadline,
+            "account keys did not finalize"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn owner_rotates_runtime_and_memory_then_recovers_without_either_runtime() -> Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    let (worker, contract, owner, specialist, id) = fixture(NearToken::from_near(1)).await?;
+    let old_key = SecretKey::from_seed(KeyType::ED25519, "persistara-rotation-old-runtime-fixture");
+    owner
+        .batch(owner.id())
+        .add_key(
+            old_key.public_key(),
+            AccessKey::function_call_access(
+                contract.id(),
+                &["checkpoint_memory", "create_job", "accept_job"],
+                Some(NearToken::from_near(5)),
+            ),
+        )
+        .transact()
+        .await?
+        .into_result()?;
+    let now = worker.view_block().await?.timestamp();
+    owner.call(contract.id(), "set_delegate").args_json(json!({"agent_id":id,"delegate":{"publicKey":old_key.public_key().to_string(),"expiresAtNs":(now+24*HOUR).to_string(),"canCheckpoint":true,"canSpend":true}})).max_gas().transact().await?.into_result()?;
+    wait_for_finalized_setup(&contract, &id).await?;
+    let directory = std::env::temp_dir().join(format!(
+        "persistara-owner-rotation-{}-{now}",
+        std::process::id()
+    ));
+    std::fs::DirBuilder::new().mode(0o700).create(&directory)?;
+    let mut input = json!({"phase":"write","directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"publicKey":old_key.public_key().to_string(),"runtimeSecretKey":old_key.to_string(),"workerId":specialist.id(),"nowNs":now.to_string()});
+    let result: Result<()> = async {
+        assert_eq!(run_application_fixture(&input)?["version"], 1);
+        input.as_object_mut().unwrap().remove("runtimeSecretKey");
+        input["phase"] = json!("resume-memory"); assert_eq!(run_application_fixture(&input)?["version"], 3);
+        let before = agent(&contract, &id).await?;
+        input["phase"] = json!("rotation-prepare");
+        let prepared = run_application_fixture(&input)?;
+        assert_eq!(prepared["nextEpoch"], 2);
+        let next_public_key: near_workspaces::types::PublicKey = prepared["nextPublicKey"].as_str().unwrap().parse()?;
+        for stage in ["begin", "remove-old-key", "install-new-key", "finish"] {
+            input["phase"] = json!("rotation-next");
+            let next = run_application_fixture(&input)?;
+            assert_eq!(next["status"], "awaiting-owner-wallet"); assert_eq!(next["stage"], stage);
+            let wallet = &next["request"];
+            assert_eq!(wallet["signerId"], owner.id().as_str());
+            assert_eq!(wallet["ownerPublicKey"], owner.secret_key().public_key().to_string());
+            assert_eq!(wallet["actions"].as_array().unwrap().len(), 1);
+            let params = &wallet["actions"][0]["params"];
+            match stage {
+                "begin" | "finish" => {
+                    let method = if stage == "begin" { "begin_runtime_rotation" } else { "finish_runtime_rotation" };
+                    assert_eq!(wallet["receiverId"], contract.id().as_str()); assert_eq!(params["methodName"], method); assert_eq!(params["deposit"], "0");
+                    // Only the external owner harness signs. No owner secret is sent to the application.
+                    owner.call(contract.id(), method).args_json(params["args"].clone()).max_gas().transact().await?.into_result()?;
+                    let generation = agent(&contract, &id).await?["generation"].clone();
+                    owner.call(contract.id(), method).args_json(params["args"].clone()).max_gas().transact().await?.into_result()?;
+                    assert_eq!(agent(&contract, &id).await?["generation"], generation, "owner retry must be idempotent");
+                    wait_for_finalized_setup(&contract, &id).await?;
+                    if stage == "begin" {
+                        let a = agent(&contract, &id).await?; assert_eq!(a["paused"], true); assert_eq!(a["keyEpoch"], "2");
+                        assert!(!a["delegates"].as_array().unwrap().iter().any(|d| d["publicKey"] == old_key.public_key().to_string()));
+                        let runtime = Account::from_secret_key(owner.id().clone(), old_key.clone(), &worker);
+                        let rejected = runtime.call(contract.id(), "checkpoint_memory").args_json(json!({"agent_id":id,"generation":a["generation"],"expected_version":"3","next":{"version":"4","keyEpoch":"2","manifest":blob("e")}})).max_gas().transact().await?.into_result();
+                        assert!(format!("{:?}", rejected.unwrap_err()).contains("ERR_AGENT_PAUSED"));
+                    }
+                }
+                "remove-old-key" => {
+                    assert_eq!(wallet["receiverId"], owner.id().as_str()); assert_eq!(params["publicKey"], old_key.public_key().to_string());
+                    owner.batch(owner.id()).delete_key(old_key.public_key()).transact().await?.into_result()?;
+                    wait_for_finalized_keys(&owner).await?;
+                }
+                "install-new-key" => {
+                    assert_eq!(wallet["receiverId"], owner.id().as_str()); assert_eq!(params["publicKey"], prepared["nextPublicKey"]);
+                    assert_eq!(params["accessKey"]["permission"]["receiverId"], contract.id().as_str());
+                    assert_eq!(params["accessKey"]["permission"]["methodNames"], json!(["checkpoint_memory","create_job","accept_job"]));
+                    assert_eq!(params["accessKey"]["permission"]["allowance"], NEAR.to_string());
+                    owner.batch(owner.id()).add_key(next_public_key.clone(), AccessKey::function_call_access(contract.id(), &["checkpoint_memory","create_job","accept_job"], Some(NearToken::from_near(1)))).transact().await?.into_result()?;
+                    wait_for_finalized_keys(&owner).await?;
+                }
+                _ => unreachable!(),
+            }
+        }
+        // Even reinstalling the old access key cannot restore its revoked contract grant.
+        owner.batch(owner.id()).add_key(old_key.public_key(), AccessKey::function_call_access(contract.id(), &["checkpoint_memory","create_job","accept_job"], Some(NearToken::from_near(5)))).transact().await?.into_result()?;
+        let stale = Account::from_secret_key(owner.id().clone(), old_key.clone(), &worker);
+        let a = agent(&contract, &id).await?;
+        let checkpoint = stale.call(contract.id(), "checkpoint_memory").args_json(json!({"agent_id":id,"generation":a["generation"],"expected_version":"3","next":{"version":"4","keyEpoch":"2","manifest":blob("e")}})).max_gas().transact().await?.into_result();
+        assert!(format!("{:?}", checkpoint.unwrap_err()).contains("ERR_UNAUTHORIZED_KEY"));
+        let spend = stale.call(contract.id(), "create_job").args_json(json!({"request":request(&id,"revoked",&specialist,NEAR,&a["generation"],now)})).max_gas().transact().await?.into_result();
+        assert!(format!("{:?}", spend.unwrap_err()).contains("ERR_UNAUTHORIZED_KEY"));
+        assert!(job(&contract,&id,"revoked").await?.is_null());
+        owner.batch(owner.id()).delete_key(old_key.public_key()).transact().await?.into_result()?; wait_for_finalized_keys(&owner).await?;
+        input["phase"] = json!("rotation-write-verify");
+        let verified = run_application_fixture(&input)?; assert_eq!(verified["status"], "verified"); assert_eq!(verified["version"], 4);
+        assert_eq!(verified["historicalRecords"], 3); assert_eq!(verified["recoveredRecords"], 4);
+        std::fs::remove_file(directory.join("runtime.key"))?;
+        for name in ["original-runtime", "owner-rotation", "journal"] { std::fs::remove_dir_all(directory.join(name))?; }
+        input["phase"] = json!("rotation-clean-recover");
+        let recovered = run_application_fixture(&input)?;
+        assert_eq!(recovered["recovered"], 4); assert_eq!(recovered["recoveredEpochs"], json!([1,2])); assert_eq!(recovered["originalRuntimeAvailable"], false);
+        let after = agent(&contract, &id).await?; assert_eq!(after["keyEpoch"], "2"); assert_eq!(after["head"]["version"], "4");
+        assert_eq!(after["available"], before["available"]); assert_eq!(after["deposited"], before["deposited"]); assert_conservation(&after);
+        Ok(())
+    }.await;
+    std::fs::remove_dir_all(directory)?;
+    result
+}

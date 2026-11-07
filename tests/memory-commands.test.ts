@@ -20,6 +20,11 @@ describe("owner memory write commands and real process-exit drills", () => {
     try {
       await assert.rejects(run(process.execPath, [script, "reconcile"], { cwd: directory, env: {}, timeout: 10_000 }), (error: unknown) =>
         isObject(error) && error.code === 2 && String(error.stderr).includes("NOT_CONFIGURED"));
+      const rotation = fileURLToPath(new URL("../scripts/owner-rotation.js", import.meta.url));
+      await assert.rejects(run(process.execPath, [rotation, "next", "--state-dir", join(directory, "rotation")], { cwd: directory, env: {}, timeout: 10_000 }), (error: unknown) =>
+        isObject(error) && error.code === 2 && String(error.stderr).includes("NOT_CONFIGURED"));
+      await assert.rejects(run(process.execPath, [rotation, "prepare", "--owner-key", "/never-read-owner-key"], { cwd: directory, env: {}, timeout: 10_000 }), (error: unknown) =>
+        isObject(error) && error.code === 1 && String(error.stderr).includes("INVALID_INPUT"));
       const binding = { agentId: "owner.testnet:research", authorityNetwork: "near:testnet" as const, chainId: "testnet", contractId: "authority.testnet", storageNetwork: "0g:16602:turbo" as const };
       const keys = MemoryKeyring.create(); const keyFile = join(directory, "keys", "memory.json"); const inputFile = join(directory, "input", "fact.json");
       await writePrivateFile(keyFile, encodePrivateKeyring(binding, keys));

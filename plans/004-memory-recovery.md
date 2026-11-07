@@ -12,7 +12,9 @@ Owner backup/keyring modules, schema-1-compatible schema 2 manifests, authentica
 
 Durable memory-upload intents and interrupted-operation reconciliation are now implemented with encrypted write-ahead data, fixed roots, exact checkpoint plans, signer-journal identity binding and fenced leases. Read-only reconciliation is separate from an explicit resume. The abrupt-process-exit drill and deployed-WASM sandbox verify these paths; see `docs/MEMORY-WRITES.md`.
 
-This milestone deliberately keeps plan 004 IN PROGRESS. The full owner revocation/epoch activation workflow, embeddings, real 0G/public-testnet recovery, live measurements and safe resolution of indefinitely unknown outcomes remain unexecuted. Keyring epoch preparation alone is not a completed on-chain rotation. No live write path may bypass those gates merely because local recovery passes.
+The owner revocation/epoch activation workflow is now implemented with verified replacement backups, persistent journal barriers, idempotent owner-only contract operations and finalized account-key checks. Unsigned owner requests keep wallet signing outside the runtime. A deployed-WASM scenario rejects the old runtime, writes under the new epoch and restores four records from a new backup after removing both runtimes. See `docs/OWNER-ROTATION.md` for owner commands, interruption/abort behavior and limits.
+
+This milestone deliberately keeps plan 004 IN PROGRESS. Embeddings, public NEAR/real 0G recovery/rotation acceptance, wallet integration, live measurements and safe resolution of indefinitely unknown outcomes remain unexecuted. No live write path may bypass those gates merely because local/sandbox recovery passes.
 
 ## Scope
 

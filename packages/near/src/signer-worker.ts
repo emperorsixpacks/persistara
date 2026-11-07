@@ -23,13 +23,18 @@ async function loadRuntimeKey(path: string): Promise<KeyPairSigner> {
 process.once("message", async (request: unknown) => {
   let journal: NearJournal | undefined;
   try {
-    if (!isObject(request) || !isObject(request.config) || typeof request.id !== "string" || !["submit", "reconcile", "identify"].includes(String(request.operation))) throw new ProviderError("INVALID_INPUT", "Invalid signer worker command");
+    if (!isObject(request) || !isObject(request.config) || typeof request.id !== "string" || !["submit", "reconcile", "identify", "rotation-hold", "rotation-release"].includes(String(request.operation))) throw new ProviderError("INVALID_INPUT", "Invalid signer worker command");
     const config = request.config as unknown as NearSignerConfig;
     validateNetwork(config); validateIdentity(config);
     if (typeof config.journalFile !== "string" || typeof config.runtimeKeyFile !== "string") throw new ProviderError("NOT_CONFIGURED", "Missing signer paths");
     journal = new NearJournal(config.journalFile, config, (request.operation === "submit" && request.expectedJournalIdentity === undefined) || (request.operation === "identify" && request.create === true));
     if (request.operation === "identify") { const identity = journal.identity(); journal.close(); journal = undefined; reply(identity); return; }
     if (request.expectedJournalIdentity !== undefined && request.expectedJournalIdentity !== journal.identity()) throw new ProviderError("INTEGRITY_FAILED", "Signer journal was replaced; submission is fenced");
+    if (request.operation === "rotation-hold" || request.operation === "rotation-release") {
+      if (typeof request.expectedJournalIdentity !== "string") throw new ProviderError("INVALID_INPUT", "A signer identity is required for rotation barriers");
+      if (request.operation === "rotation-hold") journal.holdForRotation(request.id); else journal.releaseRotation(request.id);
+      const identity = journal.identity(); journal.close(); journal = undefined; reply(identity); return;
+    }
     const rpc = new NearRpc(config);
     const existing = journal.get(request.id);
     const needsKey = request.operation === "submit" && (!existing || existing.state === "allocated" || existing.state === "prepared");

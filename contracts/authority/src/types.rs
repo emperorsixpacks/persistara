@@ -75,13 +75,38 @@ pub struct MemoryHead {
 }
 
 #[near(serializers = [borsh, json])]
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Delegate {
     pub public_key: PublicKey,
     pub expires_at_ns: U64,
     pub can_checkpoint: bool,
     pub can_spend: bool,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeRotationRequest {
+    pub agent_id: String,
+    pub operation_id: String,
+    pub expected_generation: U64,
+    pub expected_epoch: U64,
+    pub expected_version: U64,
+    pub old_public_key: PublicKey,
+    pub replacement: Delegate,
+    pub recovery_commitment: String,
+    pub resume: bool,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeRotation {
+    pub request: RuntimeRotationRequest,
+    pub next_epoch: U64,
+    pub begin_generation: U64,
+    pub completed: bool,
 }
 
 #[near(serializers = [borsh, json])]

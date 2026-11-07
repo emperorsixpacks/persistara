@@ -27,6 +27,7 @@ export class NearJournal {
       this.db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=1000; PRAGMA trusted_schema=OFF;");
       this.db.exec(`CREATE TABLE IF NOT EXISTS near_binding (id INTEGER PRIMARY KEY CHECK(id=1), binding TEXT NOT NULL) STRICT;
         CREATE TABLE IF NOT EXISTS near_instance (id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL) STRICT;
+        CREATE TABLE IF NOT EXISTS near_controls (id INTEGER PRIMARY KEY CHECK(id=1), held_by TEXT) STRICT;
         CREATE TABLE IF NOT EXISTS near_operations (
           id TEXT PRIMARY KEY, digest TEXT NOT NULL, call_json TEXT NOT NULL, nonce TEXT NOT NULL UNIQUE, block_hash TEXT NOT NULL,
           state TEXT NOT NULL CHECK(state IN ('allocated','prepared','submitted','unknown','confirmed','failed')),
@@ -37,6 +38,7 @@ export class NearJournal {
         signerId: config.signerId, publicKey: config.publicKey, agentId: config.agentId });
       this.atomic(() => {
         this.db.prepare("INSERT OR IGNORE INTO near_instance VALUES(1,?)").run(randomUUID());
+        this.db.exec("INSERT OR IGNORE INTO near_controls VALUES(1,NULL)");
         this.db.prepare("INSERT OR IGNORE INTO near_binding VALUES (1, ?)").run(binding);
         if (this.db.prepare("SELECT binding FROM near_binding WHERE id=1").get()?.binding !== binding) {
           throw new ProviderError("NETWORK_MISMATCH", "Journal belongs to another chain, contract, agent or key");
@@ -49,6 +51,22 @@ export class NearJournal {
     const value = this.db.prepare("SELECT identity FROM near_instance WHERE id=1").get()?.identity;
     if (typeof value !== "string" || !/^[a-f0-9-]{36}$/.test(value)) throw new ProviderError("INTEGRITY_FAILED", "Signer journal identity is invalid");
     return value;
+  }
+  holdForRotation(id: string): void {
+    if (!operationId(id) || id.length > 64) throw new ProviderError("INVALID_INPUT", "Invalid rotation ID");
+    this.atomic(() => {
+      const held = this.db.prepare("SELECT held_by FROM near_controls WHERE id=1").get()?.held_by;
+      if (held !== null && held !== id) throw new ProviderError("SIGNER_BUSY", "Signer is held by another owner operation");
+      if (this.db.prepare("SELECT id FROM near_operations WHERE state NOT IN ('confirmed','failed') LIMIT 1").get()) throw new ProviderError("SIGNER_BUSY", "Reconcile unfinished signer operations before planned rotation");
+      this.db.prepare("UPDATE near_controls SET held_by=? WHERE id=1").run(id);
+    });
+  }
+  releaseRotation(id: string): void {
+    this.atomic(() => {
+      const row = this.db.prepare("SELECT held_by FROM near_controls WHERE id=1").get();
+      if (!row || (row.held_by !== id && row.held_by !== null)) throw new ProviderError("SIGNER_BUSY", "Rotation does not own this signer barrier");
+      this.db.exec("UPDATE near_controls SET held_by=NULL WHERE id=1");
+    });
   }
   private atomic<T>(action: () => T): T {
     this.db.exec("BEGIN IMMEDIATE");
@@ -70,6 +88,7 @@ export class NearJournal {
     return this.atomic(() => {
       const prior = this.get(id);
       if (prior) { this.assertPayload(prior, call); return prior; }
+      if (this.db.prepare("SELECT held_by FROM near_controls WHERE id=1").get()?.held_by !== null) throw new ProviderError("SIGNER_BUSY", "Signer is held for owner rotation");
       if (this.db.prepare("SELECT id FROM near_operations WHERE state NOT IN ('confirmed','failed') LIMIT 1").get()) {
         throw new ProviderError("SIGNER_BUSY", "Reconcile the existing transaction before signing another operation");
       }

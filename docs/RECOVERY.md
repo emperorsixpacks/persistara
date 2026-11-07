@@ -1,6 +1,6 @@
 # Owner recovery and private recall
 
-This milestone implements encrypted owner backups, historical memory keyrings, authenticated snapshot recovery and a private full-text recall cache. [Durable encrypted write intents and reconciliation](MEMORY-WRITES.md) are also implemented. No AI credits are required. Public NEAR/0G recovery acceptance, embeddings and the complete owner rotation workflow remain release gates; plan 004 is in progress.
+This milestone implements encrypted owner backups, historical memory keyrings, authenticated snapshot recovery and a private full-text recall cache. [Durable writes](MEMORY-WRITES.md) and the [owner-controlled rotation workflow](OWNER-ROTATION.md) are also implemented and sandbox-tested. No AI credits are required. Public NEAR/0G recovery/rotation acceptance and embeddings remain release gates; plan 004 is in progress.
 
 ## What the backup recovers
 
@@ -70,7 +70,7 @@ Release caps: 1,000 manifest entries, 16 MiB recovered plaintext, 64 retained ke
 
 New manifests use schema 2 and record each entry's encryption epoch. Schema 1 manifests remain readable: their entries inherit the manifest epoch. An append creates a new v2 manifest without rewriting old ciphertext. Recovery returns each record's epoch and verifies all required keys exist before proceeding. Older software that understands only schema 1 must be upgraded before new writes.
 
-`MemoryKeyring.nextEpoch()` prepares a new key and preserves historical keys. It does not mutate the old keyring, activate a chain epoch, revoke a runtime, or automatically update an existing backup. Before a future live rotation: prepare and verify the new backup, preserve all historical keys, revoke the old runtime grant/access key, activate the next owner-authorized chain epoch, provision a separate runtime key, and verify the next committed checkpoint and recovery. The orchestration and failure drill for that full live sequence are still pending.
+`MemoryKeyring.nextEpoch()` prepares a new key and preserves historical keys. It does not mutate the old keyring or itself activate authority. The owner coordinator verifies a new backup, drains and holds the original journals, and prepares external owner-wallet requests. Its atomic contract begin pauses/revokes/advances the epoch before old account-key removal and restricted replacement installation. Completion follows finalized checks and the explicit resume policy; a new-epoch write and historical recovery establish the final verification receipt. The complete sequence passes the disposable sandbox with synthetic storage; public NEAR/real 0G acceptance is still pending.
 
 A stale backup cannot decrypt newer-epoch memory. Revocation cannot make an old runtime forget keys or plaintext it already obtained. New keys protect future envelopes; they do not physically erase historical ciphertext or caches.
 
@@ -86,6 +86,6 @@ The explicitly labeled local recovery drill creates random memory keys, an encry
 
 The deployed-WASM sandbox scenario uses actual NEAR restricted keys/checkpoints and native settlement with explicitly synthetic blob storage. It now backs up random memory keys, commits three records including a revision, settles a job once, removes original runtime keys/journal/index, and restores sourced recall from the backup in a fresh process. This is separate from the real 0G/public-testnet acceptance gate.
 
-Before the full release, complete owner rotation orchestration, real-provider clean-machine recovery, cost/latency measurements, mission integration and independent review. Durable writes use a separate private journal; the generic foundation writer is not the durable live mission service. Owner backup recovery restores committed memory, while unfinished local writes additionally require their original write/signer journals. Neither recovery nor a missing root authorizes retrying an uncertain paid upload.
+Before the full release, complete real-provider clean-machine recovery/rotation acceptance, wallet integration, cost/latency measurements, mission integration and independent review. Durable writes use a separate private journal; the generic foundation writer is not the durable live mission service. Owner backup recovery restores committed memory, while unfinished local writes additionally require their original write/signer journals. Neither recovery nor a missing root authorizes retrying an uncertain paid upload.
 
 Primary references: [Node authenticated encryption](https://nodejs.org/api/crypto.html), [SQLite atomic transactions](https://www.sqlite.org/atomiccommit.html), [FTS5](https://www.sqlite.org/fts5.html). Implementation uses the pinned project runtime and has no new cryptographic dependency.

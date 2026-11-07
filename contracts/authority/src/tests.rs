@@ -92,6 +92,265 @@ fn head(version: u64) -> MemoryHead {
         manifest: blob(),
     }
 }
+fn rotation_request(c: &Authority) -> RuntimeRotationRequest {
+    let agent = c.get_agent(AGENT.into()).unwrap();
+    RuntimeRotationRequest {
+        agent_id: AGENT.into(),
+        operation_id: "rotation:one".into(),
+        expected_generation: agent.generation,
+        expected_epoch: agent.key_epoch,
+        expected_version: U64(agent.head.as_ref().map_or(0, |h| h.version.0)),
+        old_public_key: pk(2),
+        replacement: Delegate {
+            public_key: pk(3),
+            expires_at_ns: U64(NOW + DAY_NS),
+            can_checkpoint: true,
+            can_spend: true,
+        },
+        recovery_commitment: "a".repeat(64),
+        resume: true,
+    }
+}
+
+#[test]
+fn runtime_rotation_atomically_pauses_revokes_and_advances_one_epoch() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let request = rotation_request(&c);
+    let before = c.get_agent(AGENT.into()).unwrap();
+    owner();
+    let r = c.begin_runtime_rotation(request.clone());
+    let after = c.get_agent(AGENT.into()).unwrap();
+    assert!(after.paused);
+    assert_eq!(after.key_epoch.0, 2);
+    assert_eq!(after.generation.0, before.generation.0 + 1);
+    assert_eq!(after.delegates, vec![request.replacement]);
+    assert!(!r.completed);
+    assert!(after.storage_credit.0 < before.storage_credit.0);
+    assert_eq!(after.available, before.available);
+    assert_eq!(after.deposited, before.deposited);
+    call(OWNER, 2, NOW, 0);
+    assert!(
+        catch_unwind(AssertUnwindSafe(|| c.checkpoint_memory(
+            AGENT.into(),
+            generation(&c),
+            U64(0),
+            head(1)
+        )))
+        .is_err()
+    );
+    owner();
+    c.finish_runtime_rotation(AGENT.into(), "rotation:one".into());
+    assert!(!c.get_agent(AGENT.into()).unwrap().paused);
+    call(OWNER, 2, NOW, 0);
+    assert!(
+        catch_unwind(AssertUnwindSafe(|| c.checkpoint_memory(
+            AGENT.into(),
+            generation(&c),
+            U64(0),
+            head(1)
+        )))
+        .is_err()
+    );
+    call(OWNER, 3, NOW, 0);
+    let mut next = head(1);
+    next.key_epoch = U64(2);
+    assert!(c.checkpoint_memory(AGENT.into(), generation(&c), U64(0), next));
+}
+
+#[test]
+fn rotation_replays_do_not_repeat_epoch_changes_or_reopen_a_paused_agent() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let request = rotation_request(&c);
+    owner();
+    c.begin_runtime_rotation(request.clone());
+    let started = generation(&c);
+    c.begin_runtime_rotation(request.clone());
+    assert_eq!(generation(&c), started);
+    let mut changed = request;
+    changed.recovery_commitment = "b".repeat(64);
+    assert!(catch_unwind(AssertUnwindSafe(|| c.begin_runtime_rotation(changed))).is_err());
+    c.finish_runtime_rotation(AGENT.into(), "rotation:one".into());
+    let finished = generation(&c);
+    c.finish_runtime_rotation(AGENT.into(), "rotation:one".into());
+    assert_eq!(generation(&c), finished);
+    c.set_paused(AGENT.into(), true);
+    let paused = generation(&c);
+    assert!(
+        c.finish_runtime_rotation(AGENT.into(), "rotation:one".into())
+            .completed
+    );
+    assert!(c.get_agent(AGENT.into()).unwrap().paused);
+    assert_eq!(generation(&c), paused);
+}
+
+#[test]
+fn rotation_requires_the_registration_owner_key_for_begin_and_finish() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let request = rotation_request(&c);
+    call(OWNER, 2, NOW, 0);
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || c.begin_runtime_rotation(request.clone())
+        ))
+        .is_err()
+    );
+    owner();
+    c.begin_runtime_rotation(request);
+    call(OWNER, 3, NOW, 0);
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || c.finish_runtime_rotation(AGENT.into(), "rotation:one".into())
+        ))
+        .is_err()
+    );
+}
+
+#[test]
+fn rotation_rejects_stale_generation_epoch_and_checkpoint_without_mutation() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let request = rotation_request(&c);
+    owner();
+    for field in 0..3 {
+        let mut bad = request.clone();
+        match field {
+            0 => bad.expected_generation = U64(0),
+            1 => bad.expected_epoch = U64(2),
+            _ => bad.expected_version = U64(1),
+        }
+        assert!(catch_unwind(AssertUnwindSafe(|| c.begin_runtime_rotation(bad))).is_err());
+        assert_eq!(c.get_agent(AGENT.into()).unwrap().key_epoch.0, 1);
+        assert!(
+            c.get_runtime_rotation(AGENT.into(), "rotation:one".into())
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn rotation_never_discards_other_grants_or_reuses_owner_and_old_keys() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let request = rotation_request(&c);
+    owner();
+    for key in [pk(1), pk(2)] {
+        let mut bad = request.clone();
+        bad.replacement.public_key = key;
+        assert!(catch_unwind(AssertUnwindSafe(|| c.begin_runtime_rotation(bad))).is_err());
+    }
+    c.set_delegate(
+        AGENT.into(),
+        Delegate {
+            public_key: pk(4),
+            expires_at_ns: U64(NOW + DAY_NS),
+            can_checkpoint: true,
+            can_spend: false,
+        },
+    );
+    let mut bad = rotation_request(&c);
+    bad.expected_generation = generation(&c);
+    assert!(catch_unwind(AssertUnwindSafe(|| c.begin_runtime_rotation(bad))).is_err());
+    assert_eq!(c.get_agent(AGENT.into()).unwrap().delegates.len(), 2);
+}
+
+#[test]
+fn rotation_rejects_expired_unbounded_or_expanded_replacement_permissions() {
+    let mut c = setup();
+    delegate(&mut c, true, false);
+    let request = rotation_request(&c);
+    owner();
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || c.begin_runtime_rotation(request.clone())
+        ))
+        .is_err()
+    );
+    for expiry in [NOW, NOW + 31 * DAY_NS] {
+        let mut bad = request.clone();
+        bad.replacement.can_spend = false;
+        bad.replacement.expires_at_ns = U64(expiry);
+        assert!(catch_unwind(AssertUnwindSafe(|| c.begin_runtime_rotation(bad))).is_err());
+    }
+    let mut bad = request;
+    bad.replacement.can_spend = false;
+    bad.replacement.can_checkpoint = false;
+    assert!(catch_unwind(AssertUnwindSafe(|| c.begin_runtime_rotation(bad))).is_err());
+}
+
+#[test]
+fn rotation_preserves_the_old_head_until_the_new_runtime_commits() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    call(OWNER, 2, NOW, 0);
+    assert!(c.checkpoint_memory(AGENT.into(), generation(&c), U64(0), head(1)));
+    owner();
+    let request = rotation_request(&c);
+    c.begin_runtime_rotation(request);
+    assert_eq!(c.get_memory_head(AGENT.into()).unwrap().version.0, 1);
+    c.finish_runtime_rotation(AGENT.into(), "rotation:one".into());
+    assert_eq!(c.get_memory_head(AGENT.into()).unwrap().key_epoch.0, 1);
+    call(OWNER, 3, NOW, 0);
+    let mut next = head(2);
+    next.key_epoch = U64(2);
+    assert!(c.checkpoint_memory(AGENT.into(), generation(&c), U64(1), next));
+}
+
+#[test]
+fn rotation_completion_respects_expiry_intervening_owner_actions_and_pause_intent() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let mut request = rotation_request(&c);
+    request.resume = false;
+    owner();
+    c.begin_runtime_rotation(request);
+    c.finish_runtime_rotation(AGENT.into(), "rotation:one".into());
+    assert!(c.get_agent(AGENT.into()).unwrap().paused);
+    let mut next = rotation_request(&c);
+    next.operation_id = "rotation:two".into();
+    next.old_public_key = pk(3);
+    next.replacement.public_key = pk(4);
+    c.begin_runtime_rotation(next);
+    c.set_paused(AGENT.into(), true);
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || c.finish_runtime_rotation(AGENT.into(), "rotation:two".into())
+        ))
+        .is_err()
+    );
+    assert!(c.get_agent(AGENT.into()).unwrap().paused);
+}
+
+#[test]
+fn expired_or_superseded_rotation_cannot_finish_or_rollback_a_newer_epoch() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    let request = rotation_request(&c);
+    owner();
+    c.begin_runtime_rotation(request);
+    call(OWNER, 1, NOW + 2 * DAY_NS, 0);
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || c.finish_runtime_rotation(AGENT.into(), "rotation:one".into())
+        ))
+        .is_err()
+    );
+    owner();
+    let mut next = rotation_request(&c);
+    next.operation_id = "rotation:two".into();
+    next.old_public_key = pk(3);
+    next.replacement.public_key = pk(4);
+    c.begin_runtime_rotation(next);
+    assert!(
+        catch_unwind(AssertUnwindSafe(
+            || c.finish_runtime_rotation(AGENT.into(), "rotation:one".into())
+        ))
+        .is_err()
+    );
+    assert_eq!(c.get_agent(AGENT.into()).unwrap().key_epoch.0, 3);
+}
 fn delegate(c: &mut Authority, checkpoint: bool, spend: bool) {
     owner();
     c.set_delegate(

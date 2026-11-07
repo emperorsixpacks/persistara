@@ -18,7 +18,9 @@ Owner recovery now includes encrypted backup bundles, historical keyrings, authe
 
 Durable memory writes now journal encrypted intents, ciphertext roots and exact checkpoint attempts before external effects. Interrupted uploads are probed without re-uploading; interrupted checkpoints reconcile through the same signer journal. Leases fence stale processes. See [write, resume and reconciliation commands](docs/MEMORY-WRITES.md), including the cases that remain unknown and must not be retried.
 
-**Not implemented yet:** full owner epoch-rotation orchestration, embeddings, durable mission worker, authenticated API, or product console. Public NEAR testnet deployment, real 0G write/recovery acceptance and measured costs remain pending. The 0G uploader was verified with 0.5 testnet 0G on November 6; NEAR AI credentials/credits are deferred. No real upload transaction or paid inference has been performed. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
+Owner-controlled runtime/memory-key rotation now prepares verified replacement backups, drains and holds the original journals, atomically revokes/advances authority, and verifies restricted account-key replacement. Owner signing stays outside the runtime through reviewable unsigned requests. A new sandbox flow writes under the new epoch and recovers historical memory after both runtimes are removed. See [owner rotation and signing boundaries](docs/OWNER-ROTATION.md).
+
+**Not implemented yet:** embeddings, durable mission worker, authenticated API, product console or browser owner-wallet signing integration. Public NEAR testnet deployment, real 0G write/recovery acceptance and measured costs remain pending. The 0G uploader was verified with 0.5 testnet 0G on November 6; NEAR AI credentials/credits are deferred. No real upload transaction or paid inference has been performed. Local fixtures and the disposable NEAR sandbox are separate from public-chain acceptance evidence.
 
 ## Development
 
@@ -31,7 +33,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **109 TypeScript tests in 16 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
+`pnpm check` typechecks, builds, and runs **126 TypeScript tests in 18 suites**. No credentials, faucet, or network is needed to execute those tests after installation.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
@@ -45,7 +47,7 @@ Run `pnpm memory:writes:fixture` for an explicitly local process-exit drill at u
 pnpm contract:check
 ```
 
-Contract checks pass **25 Rust unit tests and three sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. The application scenario commits memory, settles a native payment, prevents duplicate acceptance, and recovers memory in a fresh process without its signer key or journal. It uses explicitly synthetic local storage. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md) and [client setup/recovery limits](docs/NEAR-CLIENTS.md) before public funding.
+Contract checks pass **34 Rust unit tests and four sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. Application scenarios commit memory, settle once, reconcile interruptions, rotate runtime/memory keys, reject revoked keys, and recover in a fresh process after removing runtime keys/journals. They use explicitly synthetic local storage. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md), the pre-public-deployment state-layout change, and [client recovery limits](docs/NEAR-CLIENTS.md) before public funding.
 
 ## Build specification
 
@@ -60,6 +62,7 @@ Contract checks pass **25 Rust unit tests and three sandbox scenarios**, plus fo
 - [NEAR client setup and transaction recovery](docs/NEAR-CLIENTS.md)
 - [Owner backups, recovery and private recall](docs/RECOVERY.md)
 - [Durable memory writes and interrupted-operation reconciliation](docs/MEMORY-WRITES.md)
+- [Owner-controlled runtime and memory-key rotation](docs/OWNER-ROTATION.md)
 
 ## License and provenance
 

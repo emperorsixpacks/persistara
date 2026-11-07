@@ -20,6 +20,11 @@ export class IsolatedNearSigner implements NearSigner {
     if (typeof value !== "string" || !/^[a-f0-9-]{36}$/.test(value)) throw new ProviderError("PROTOCOL_ERROR", "Invalid signer journal identity");
     return value;
   }
+  async rotationBarrier(id: string, identity: string, release = false): Promise<void> {
+    if (!operationId(id) || id.length > 64 || !/^[a-f0-9-]{36}$/.test(identity)) throw new ProviderError("INVALID_INPUT", "Invalid signer rotation barrier");
+    const value = await this.execute(new URL("./signer-worker.js", import.meta.url), { operation: release ? "rotation-release" : "rotation-hold", id, config: this.config, expectedJournalIdentity: identity }, { effect: "read" });
+    if (value !== identity) throw new ProviderError("INTEGRITY_FAILED", "Signer barrier belongs to another journal");
+  }
   async reconcile(id: string, options: CallOptions & { journalIdentity?: string } = {}): Promise<NearOutcome> {
     if (!operationId(id)) throw new ProviderError("INVALID_INPUT", "Invalid NEAR operation ID");
     return this.run({ operation: "reconcile", id, ...(options.journalIdentity ? { expectedJournalIdentity: options.journalIdentity } : {}) }, options, "read");

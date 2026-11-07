@@ -27,6 +27,8 @@ The owner pre-funds native NEAR balances in the treasury. Function-call keys can
 
 Pausing invalidates new economic authorizations and checkpoint writes. Existing payout obligations follow the job state machine; the pause button must not be advertised as canceling already committed transfers. Revocation is contract-first and removes the access key afterward; old sessions are fenced by a generation number.
 
+The [owner rotation coordinator](OWNER-ROTATION.md) prepares verified replacement backups, holds the canonical journals and emits immutable unsigned requests for an external owner wallet. Idempotent contract operations atomically pause/revoke/advance an epoch and later apply the explicit resume policy. Finalized account-key checks precede completion; a new-epoch write and historical recovery precede the verification receipt. Owner signing keys never enter the runtime. Planned rotation does not delay emergency pause/revocation.
+
 ## Memory protocol
 
 `BlobRef` carries provider and network, provider-native object identifier (0G Merkle root in the live adapter), ciphertext SHA-256, and byte length. A SHA-256 digest is not the same identifier as a 0G Merkle root. Preserve both.

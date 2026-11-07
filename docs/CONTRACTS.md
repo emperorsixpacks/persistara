@@ -19,7 +19,9 @@ pnpm contract:check
 
 The build outputs `target/near/persistara_authority/persistara_authority.wasm`. It uses cargo-near's WASM optimization. The command explicitly says `non-reproducible-wasm`: a local binary checksum is evidence of that artifact, not a reproducible build claim.
 
-Local evidence (2026-11-06): `pnpm contract:check` exits zero. 25 Rust unit tests and three deployed-WASM sandbox scenarios pass, including real function-call key restrictions, revoked-key rejection, stale checkpoint CAS, budget and storage rollback, exact native payouts, duplicate payment prevention, a failed transfer and successful retry, owner withdrawal, and the application client's settlement/fresh-process recovery flow. The optimized macOS build is 267,149 bytes, SHA-256 `e93a0b04a3b441feb6f87e4aa0dfd9347cfc0caf56f12f511f583350af5a1944`. This checksum is local build evidence; no public deployment hash or transaction is claimed.
+Local evidence (2026-11-07): `pnpm contract:check` exits zero. 34 Rust unit tests and four deployed-WASM sandbox scenarios pass, including real function-call key restrictions, revoked-key rejection, stale checkpoint CAS, budget/storage rollback, native payouts, duplicate payment prevention, failed-transfer retry, owner withdrawal, and application settlement/recovery. The new owner-rotation flow verifies idempotent atomic authority changes, account-key replacement, rejected stale spending/checkpoints, new-epoch memory and recovery after removing both runtimes. The optimized macOS build is 288,692 bytes, SHA-256 `e1ca18486c58e92b46cb6920ef66a3517cd4a2132355e91dc6c6168f4e138375`. This checksum is local build evidence; no public deployment hash or transaction is claimed.
+
+This pre-public-deployment revision adds a rotation-record map to the authority root state. Deploy a fresh contract for acceptance. An in-place migration from earlier authority state is not implemented; replacing WASM on a funded existing deployment is not a supported upgrade procedure.
 
 ## Authority and keys
 
@@ -42,7 +44,10 @@ Top-level method arguments use Rust `snake_case`; nested structs and views use `
 | `new` | One-time initialization; deployment must initialize immediately |
 | `register_agent(name)` | Direct owner key; attached deposit funds storage credit, minimum 0.1 NEAR |
 | `set_delegate`, `revoke_delegate`, `set_paused` | Registration owner key; update authority generation |
-| `rotate_memory_epoch(agent_id, key_epoch)` | Owner key; next epoch only, does not itself rotate encryption keys |
+| `rotate_memory_epoch(agent_id, next_epoch)` | Legacy owner control; next epoch only, does not itself rotate encryption keys |
+| `begin_runtime_rotation(request)` | Owner key; immutable operation ID and generation/epoch/head guards; atomically pause, revoke old single-runtime grant, install replacement grant and advance one epoch |
+| `finish_runtime_rotation(agent_id, operation_id)` | Owner key; idempotent, verifies pending authority/generation/expiry and applies the explicit resume policy |
+| `get_runtime_rotation(agent_id, operation_id)` | Public immutable request and completion-state evidence |
 | `configure_policy(agent_id, policy)` | Owner key; per-job cap, UTC daily cap, 1–16 distinct approved workers |
 | `add_storage_credit`, `fund` | Owner key; payable, separate storage credit and purchasing balance |
 | `checkpoint_memory(agent_id, generation, expected_version, next)` | Authorized checkpoint key; returns false only for a stale current version |

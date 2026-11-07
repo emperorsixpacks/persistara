@@ -38,6 +38,8 @@ Key and journal files require private permissions. Journal directories require m
 
 The journal now records a persistent random instance identity. Durable memory checkpoint plans bind that identity with chain/contract/account/key/agent scope. A replacement or missing journal blocks those plans; the RPC URL is not part of the binding, permitting endpoint failover. The isolated worker checks the expected identity before submission and can replay submitted/terminal outcomes without loading a key. [Durable memory commands](MEMORY-WRITES.md) retain the exact generation/request instead of recalculating a new attempt when an outcome is unknown.
 
+Owner rotation adds an idempotent local signer barrier. It requires all allocated/prepared/submitted/unknown operations to be reconciled first and blocks new nonce allocation afterward. Existing terminal outcomes remain readable. The coordinator uses only key-free journal identity/barrier methods; owner contract/account actions are unsigned review requests for an external wallet. The replacement receives a new dedicated journal. See [rotation controls and limits](OWNER-ROTATION.md).
+
 ```sh
 pnpm near:doctor
 pnpm near:reconcile 'checkpoint:YOUR_RECORDED_OPERATION_HASH'
@@ -77,7 +79,7 @@ Create matching clients in the trusted host with `createNearClients(config)`. Pa
 
 The application sandbox scenario runs the TypeScript client in separate processes and uses the real compiled authority WASM and real restricted access keys. The durable memory writer commits a checkpoint with an injected lost response and leaves its local intent pending. A new process reconciles that intent through the existing signer journal before appending two more records. It then reserves a job, delivers through the worker account, settles exactly one native payment, repeats acceptance without another payment, reconciles after removing the signing key, then removes the original keyring, journals and index. A fresh process restores three sourced records, including a revision, from an encrypted owner backup and rebuilds recall. Balance checks allow gas refund receipts to settle first.
 
-Storage in this scenario is explicitly **synthetic local ciphertext storage**, with placeholder 0G-shaped roots. Memory keys and the separate backup secret are random. The scenario is not 0G availability evidence, public testnet deployment or live provider acceptance. [Owner backup and recall modules](RECOVERY.md) and durable write intents are implemented; plan 004 remains in progress for live rotation, embeddings and real-provider recovery.
+Storage in this scenario is explicitly **synthetic local ciphertext storage**, with placeholder 0G-shaped roots. Memory keys and the separate backup secret are random. The scenario is not 0G availability evidence, public testnet deployment or live provider acceptance. A fourth sandbox scenario executes the owner rotation workflow, rejects a reinstalled revoked key, commits under epoch 2, then recovers four records after removing both runtimes. Plan 004 remains in progress for public/live-provider rotation/recovery acceptance and embeddings.
 
 The client milestone passed 58 TypeScript tests, 25 contract unit tests and three deployed-WASM scenarios; the current recovery milestone extends that inventory in `plans/README.md`. The absent-deployment `near:doctor` path exits 2 with `NOT_CONFIGURED`.
 

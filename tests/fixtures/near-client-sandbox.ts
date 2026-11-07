@@ -7,6 +7,8 @@ import { MemoryKeyring } from "../../packages/memory/src/keyring.js";
 import { createOwnerBackup, decodePrivateKeyring, encodePrivateKeyring, verifyOwnerBackup } from "../../packages/memory/src/backup.js";
 import { MemoryWriteJournal } from "../../packages/memory/src/write-journal.js";
 import { DurableMemoryWriter } from "../../packages/memory/src/writer.js";
+import { OwnerMemoryRotation } from "../../packages/memory/src/rotation.js";
+import { NearRotationReader } from "../../packages/near/src/rotation.js";
 import { readPrivateFile, writePrivateFile } from "../../packages/memory/src/files.js";
 import { MemoryRecallIndex } from "../../packages/memory/src/index.js";
 import { rebuildFromOwnerBackup, recallCommitted } from "../../packages/memory/src/recovery.js";
@@ -118,6 +120,42 @@ async function main(): Promise<void> {
     const a = await reader.agent(config.agentId);
     assert.equal(a.head?.version, 3);
     console.log(JSON.stringify({ phase: "resume-memory", evidence: "local-sandbox-synthetic-storage", version: 3, memoryWriteStatus: "committed" }));
+  } else if (input.phase === "rotation-prepare" || input.phase === "rotation-next" || input.phase === "rotation-write-verify") {
+    fixtureStage = input.phase;
+    const rotation = new OwnerMemoryRotation(config, binding, new NearRotationReader(new NearRpc(config), config), signer, blobs);
+    const ownerState = join(input.directory, "owner-rotation");
+    if (input.phase === "rotation-prepare") {
+      const plan = await rotation.prepare({ operationId: "rotation:sandbox", stateDir: ownerState, memoryStateDir: join(input.directory, "original-runtime"), oldKeyringFile: join(input.directory, "original-runtime", "memory-keyring.json"),
+        bundleFile: join(input.directory, "rotated-backup", "memory.bundle"), secretFile: join(input.directory, "rotated-secret", "recovery.key"), resume: true, gasAllowance: "1000000000000000000000000" });
+      console.log(JSON.stringify({ phase: input.phase, status: "prepared", nextEpoch: 2, nextPublicKey: plan.request.replacement.publicKey }));
+    } else if (input.phase === "rotation-next") {
+      console.log(JSON.stringify(await rotation.next(ownerState)));
+    } else {
+      assert.equal((await rotation.next(ownerState)).status, "authority-complete");
+      const plan = await rotation.load(ownerState); const nextConfig = rotation.nextRuntimeConfig(plan);
+      const keys = decodePrivateKeyring(await readPrivateFile(plan.intent.nextKeyringFile), binding);
+      const nextHeads = new NearMemoryHeadStore(reader, nextConfig, new IsolatedNearSigner(nextConfig));
+      const journal = new MemoryWriteJournal(join(input.directory, "original-runtime", "writes.sqlite"), binding, Date.now, false);
+      try {
+        const writer = new DurableMemoryWriter(binding, keys, blobs, nextHeads, journal);
+        const written = await writer.remember({ operationId: "memory:rotation-proof", text: "After rotation, reports retain historical sources and state uncertainty.", source: { kind: "owner", reference: "sandbox:rotation-proof" } });
+        assert.equal(written.status, "committed"); assert.equal(written.version, 4);
+      } finally { journal.close(); }
+      const result = await rotation.verify(ownerState);
+      assert.equal(result.status, "verified"); assert.equal(result.historicalRecords, 3); assert.equal(result.recoveredRecords, 4);
+      console.log(JSON.stringify({ phase: input.phase, evidence: "local-sandbox-synthetic-storage", ...result }));
+    }
+  } else if (input.phase === "rotation-clean-recover") {
+    fixtureStage = "rotation-recover-with-only-owner-backup";
+    for (const path of [join(input.directory, "original-runtime"), join(input.directory, "owner-rotation"), join(input.directory, "journal"), config.runtimeKeyFile]) await assert.rejects(stat(path), { code: "ENOENT" });
+    const index = new MemoryRecallIndex(join(input.directory, "recovered-rotation", "recall.sqlite"), binding);
+    try {
+      const result = await rebuildFromOwnerBackup({ binding, bundle: await readPrivateFile(join(input.directory, "rotated-backup", "memory.bundle")), recoverySecret: Buffer.from(await readPrivateFile(join(input.directory, "rotated-secret", "recovery.key"))).toString().trim(),
+        blobs: { get: (ref: BlobRef) => blobs.get(ref), put: async (): Promise<never> => { throw new Error("Recovery cannot upload"); } }, heads: { get: async (id: string) => (await reader.agent(id)).head }, index });
+      assert.equal(result.recordCount, 4); assert.equal(result.currentCount, 3); assert.deepEqual(result.recoveredEpochs, [1, 2]);
+      assert.equal(index.search("rotation", result.head).matches[0]?.source.reference, "sandbox:rotation-proof");
+      console.log(JSON.stringify({ phase: input.phase, evidence: "local-sandbox-synthetic-storage", version: result.version, recovered: 4, recoveredEpochs: result.recoveredEpochs, originalRuntimeAvailable: false }));
+    } finally { index.close(); }
   } else if (input.phase === "reconcile") {
     fixtureStage = "reconcile-without-key";
     await assert.rejects(readFile(config.runtimeKeyFile));
