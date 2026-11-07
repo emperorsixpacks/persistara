@@ -1,8 +1,8 @@
 # Local owner connection and controls
 
-The console connects an external NEAR wallet to the **existing configured agent**, verifies its original registered owner key, displays finalized authority/runtime/treasury state and local backup readiness, and supports reviewed pause/resume transactions. It requires no AI credits. The server never loads a wallet owner key, signs a transaction or broadcasts one. The wallet keeps those capabilities.
+The console connects an external NEAR wallet to the **existing configured agent**, verifies its original registered owner key, displays finalized authority/runtime/treasury state and local backup readiness, and supports reviewed pause/resume transactions. It requires no AI credits. Owner-control transactions stay in the external wallet; the server never loads its owner key. The separately scoped commission service uses the existing isolated restricted runtime signer for bounded reservation/acceptance.
 
-The host now includes the redesigned [source mission desk](MISSIONS.md), alongside these owner controls. Model-driven research, specialist commerce and new-agent enrollment remain pending. Browser registration, key installation/grants, funding and execution of prepared rotation requests remain follow-up work. Their CLI/contract implementations remain separate. Public hosting and multi-tenant API authentication are outside this local host's trust boundary.
+The host now includes the redesigned [source mission desk](MISSIONS.md), alongside these owner controls. [Signed specialist commerce](COMMISSIONS.md) now adds quote review, encrypted delivery and finalized payment. Model-driven research and new-agent enrollment remain pending. Browser registration, key installation/grants, funding and execution of prepared rotation requests remain follow-up work. Their CLI/contract implementations remain separate. Public hosting and multi-tenant API authentication are outside this local host's trust boundary.
 
 ## Run
 
@@ -21,6 +21,7 @@ Default owner-local paths:
 | Argument | Default |
 | --- | --- |
 | `--state-dir` | `.persistara/owner-console` |
+| `--commerce-state-dir` | `.persistara/commerce/research` |
 | `--mission-state-dir` | `.persistara/missions/research` |
 | `--memory-state-dir` | `.persistara/runtime/research` |
 | `--keyring` | `.persistara/keys/memory-keyring.json` |
@@ -71,6 +72,6 @@ At the first owner-console milestone, **167 TypeScript tests in 24 suites** pass
 
 The real original owner also signed an origin-bound NEP-413 challenge through the external official NEAR CLI keychain. The local console authenticated it, read finalized authority and locally authenticated backup readiness, then logged out. [Sanitized live evidence](evidence/owner-wallet-login-2026-11-07.json) contains no signature, nonce, cookie, CSRF token, recovery secret or private key. No public transaction or AI call was made in that check. The environment had no connected real browser/wallet surface, so **actual browser-provider approval remains unverified**; neither the external CLI proof nor the fixture browser tests are mislabeled as that gate.
 
-The host trusts the operator's machine, pinned dependencies, selected external wallet and configured RPC. It is not a light client, general untrusted-code sandbox or protection against another process with the owner's filesystem/OS access. Wallet executors use the connector's sandboxed iframes and dynamic manifest. The page applies nonce-based script CSP and blocks framing; provider network access remains necessary. Public hosting, new-agent enrollment, rotation UI, physical off-device recovery, model-driven research/commerce and independent review remain release work. The current mission milestone passes 179 TypeScript tests and eight Chromium tests; its real public-source captures remain separate from live browser-wallet approval.
+The host trusts the operator's machine, pinned dependencies, selected external wallet and configured RPC. It is not a light client, general untrusted-code sandbox or protection against another process with the owner's filesystem/OS access. Wallet executors use the connector's sandboxed iframes and dynamic manifest. The page applies nonce-based script CSP and blocks framing; provider network access remains necessary. Public hosting, new-agent enrollment, rotation UI, physical off-device recovery, model-driven research and independent review remain release work. The current commissioning milestone passes 199 TypeScript tests and 11 Chromium tests; its real public-source captures remain separate from live browser-wallet approval.
 
 Primary references: [NEAR wallet login](https://docs.near.org/web3-apps/tutorials/wallet-login), [NEP-413 authentication](https://docs.near.org/web3-apps/backend/backend), [connector source](https://github.com/azbang/near-connect), [pinned SDK NEP-413 implementation](https://github.com/near/near-api-js).

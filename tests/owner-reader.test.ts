@@ -19,7 +19,7 @@ describe("owner readiness from pinned finalized chain observations", () => {
     try {
       const raw = { id: f.view.agentId, owner: f.view.owner, ownerKey: f.view.ownerKey, paused: false, generation: "3", keyEpoch: "1", head: null,
         delegates: [{ publicKey: f.config.publicKey, expiresAtNs: "1794750000000000000", canCheckpoint: true, canSpend: true }],
-        deposited: "100", available: "90", reserved: "0", pending: "0", paid: "10", withdrawn: "0", policy: { maxJobAmount: "20", dailyLimit: "50" } };
+        deposited: "100", available: "90", reserved: "0", pending: "0", paid: "10", withdrawn: "0", policyVersion: "1", policy: { maxJobAmount: "20", dailyLimit: "50", approvedWorkers: ["worker.testnet"] } };
       const permission = { FunctionCall: { receiver_id: f.config.contractId, method_names: ["checkpoint_memory", "create_job", "accept_job"], allowance: "250000000000000000000000" } };
       let codeHash = f.codeHash, ownerPermission: unknown = "FullAccess", backup: "verified" | "unavailable" = "verified", held: boolean | null = false;
       let keyBlock = f.view.blockHash, lastKey: string | null = null, duplicateKey = false;

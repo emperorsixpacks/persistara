@@ -29,7 +29,7 @@ function authority(value: unknown, scope: MissionScope): asserts value is Missio
     typeof value.publicKey !== "string" || !/^ed25519:[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value.publicKey) || typeof value.generation !== "string" || !/^[1-9]\d{0,19}$/.test(value.generation) ||
     !Number.isSafeInteger(value.keyEpoch) || Number(value.keyEpoch) < 1 || typeof value.blockHash !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value.blockHash)) throw fail();
 }
-function validateCapture(value: unknown, url: string): asserts value is SourceCapture {
+export function validateCapture(value: unknown, url: string): asserts value is SourceCapture {
   if (!isObject(value) || Object.keys(value).sort().join(",") !== "byteLength,capturedAt,contentSha256,contentType,excerpt,title,truncated,untrusted,url" ||
     value.url !== url || !bounded(value.title, 240) || !bounded(value.excerpt, 6000) || typeof value.contentSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.contentSha256) ||
     !Number.isSafeInteger(value.byteLength) || Number(value.byteLength) < 1 || Number(value.byteLength) > 1_000_000 || !Number.isSafeInteger(value.capturedAt) || Number(value.capturedAt) < 1 ||
@@ -52,7 +52,7 @@ export class MissionJournal {
       this.db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=1000;");
       this.atomic(() => {
         const version = Number(this.db.prepare("PRAGMA user_version").get()?.user_version);
-        if (version !== 0 && version !== 1) throw fail();
+        if (![0, 1, 2].includes(version)) throw fail();
         if (version === 0) this.db.exec(`
           CREATE TABLE mission_scope (id INTEGER PRIMARY KEY CHECK(id=1), binding TEXT NOT NULL) STRICT;
           CREATE TABLE missions (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, brief TEXT NOT NULL, digest TEXT NOT NULL,
@@ -67,6 +67,7 @@ export class MissionJournal {
           CREATE TABLE mission_artifacts (mission_id TEXT PRIMARY KEY REFERENCES missions(id), value TEXT NOT NULL, digest TEXT NOT NULL) STRICT;
           PRAGMA user_version=1;
         `);
+        if (version < 2) this.db.exec(`CREATE TABLE mission_commissions (mission_id TEXT PRIMARY KEY REFERENCES missions(id), commission_id TEXT UNIQUE NOT NULL, artifact_digest TEXT) STRICT; PRAGMA user_version=2;`);
         const binding = canonical(scope);
         this.db.prepare("INSERT OR IGNORE INTO mission_scope VALUES(1,?)").run(binding);
         if (this.db.prepare("SELECT binding FROM mission_scope WHERE id=1").get()?.binding !== binding) throw fail();
@@ -101,7 +102,7 @@ export class MissionJournal {
     const counts = this.db.prepare("SELECT count(*) AS total, sum(state='captured') AS captured FROM mission_sources WHERE mission_id=?").get(id)!;
     if (Number(counts.total) !== brief.sources.length) throw fail();
     return { id, brief, authority: auth, state: row.state as MissionState, version: Number(row.version), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at), failureCode: row.failure_code as string | null,
-      budget: { network: "near:testnet", asset: "NEAR", maximum: "0", spent: "0" }, sourceCount: Number(counts.total), capturedCount: Number(counts.captured) };
+      budget: { network: this.scope.chainId === "testnet" ? "near:testnet" : "near:sandbox", asset: "NEAR", maximum: "0", spent: "0" }, sourceCount: Number(counts.total), capturedCount: Number(counts.captured) };
   }
   private readSources(mission: Mission): MissionSource[] {
     return this.db.prepare("SELECT * FROM mission_sources WHERE mission_id=? ORDER BY ordinal").all(mission.id).map((row, index) => {
@@ -132,8 +133,10 @@ export class MissionJournal {
       try {
         const value = JSON.parse(String(row.value)) as MissionArtifact;
         if (digest(value) !== row.digest || value.missionId !== id || value.title !== mission.brief.title || value.objective !== mission.brief.objective || value.criteria !== mission.brief.criteria ||
-          value.kind !== "source-dossier" || value.schemaVersion !== 1 || value.inference !== "not_used" || value.storage !== "local_private_journal" || value.quality !== "owner_review_required" ||
+          value.kind !== "source-dossier" || value.schemaVersion !== 1 || value.inference !== "not_used" || !["local_private_journal", "0g_encrypted_delivery"].includes(value.storage) || value.quality !== "owner_review_required" ||
           canonical(value.sources) !== canonical(sources.map((source) => source.capture)) || sources.some((s) => s.state !== "captured")) throw fail();
+        const linked = this.linkedCommission(id);
+        if ((value.storage === "0g_encrypted_delivery") !== Boolean(linked) || (linked && linked.artifactDigest !== row.digest)) throw fail();
         artifact = { digest: String(row.digest), value };
       } catch { throw fail(); }
     }
@@ -168,6 +171,7 @@ export class MissionJournal {
     if (!uuid(holder)) throw fail();
     return this.atomic(() => {
       this.expire(id); const mission = this.readMission(id);
+      this.assertLocal(id);
       if (mission.version !== version || !["queued", "interrupted", "blocked"].includes(mission.state) || this.readSources(mission).some((s) => s.state !== "captured" && s.attempts >= 3)) throw conflict();
       if (Number(this.db.prepare("SELECT count(*) AS n FROM mission_events WHERE mission_id=?").get(id)?.n) >= 200) throw conflict();
       for (const url of mission.brief.sources) sourceUrl(url, this.origins);
@@ -226,6 +230,7 @@ export class MissionJournal {
   cancel(id: string, version: number): MissionDetail {
     return this.atomic(() => {
       this.expire(id); const mission = this.readMission(id);
+      this.assertLocal(id);
       if (mission.state === "canceled" && mission.version === version + 1) return this.detail(id);
       if (version !== mission.version || ["completed", "canceled", "awaiting_review"].includes(mission.state)) throw conflict();
       this.db.prepare("UPDATE missions SET state='canceled',version=version+1,updated_at=?,holder=NULL,lease_until=NULL,fence=fence+1 WHERE id=?").run(this.now(), id);
@@ -236,10 +241,43 @@ export class MissionJournal {
   approve(id: string, version: number, artifactDigest: string): MissionDetail {
     return this.atomic(() => {
       const detail = this.detail(id);
+      this.assertLocal(id);
       if (detail.mission.state === "completed" && detail.mission.version === version + 1 && detail.artifact?.digest === artifactDigest) return detail;
       if (detail.mission.version !== version || detail.mission.state !== "awaiting_review" || detail.artifact?.digest !== artifactDigest) throw conflict();
       this.db.prepare("UPDATE missions SET state='completed',version=version+1,updated_at=? WHERE id=?").run(this.now(), id);
       this.event(id, "owner_approved"); return this.detail(id);
+    });
+  }
+  linkedCommission(id: string): { id: string; artifactDigest: string | null } | null {
+    const row = this.db.prepare("SELECT * FROM mission_commissions WHERE mission_id=?").get(id);
+    return row ? { id: String(row.commission_id), artifactDigest: row.artifact_digest as string | null } : null;
+  }
+  private assertLocal(id: string) { if (this.linkedCommission(id)) throw new ProviderError("OPERATION_CONFLICT", "Use the specialist commission controls for this mission"); }
+  linkCommission(id: string, commission: string, version: number) {
+    return this.atomic(() => {
+      const existing = this.linkedCommission(id);
+      if (existing) { if (existing.id !== commission) throw fail(); return; }
+      const mission = this.readMission(id);
+      if (commission !== id.replace("mission:", "commission:") || mission.version !== version || mission.state !== "queued") throw conflict();
+      this.db.prepare("INSERT INTO mission_commissions VALUES(?,?,NULL)").run(id, commission);
+      this.db.prepare("UPDATE missions SET version=version+1,updated_at=? WHERE id=?").run(this.now(), id);
+      this.event(id, "specialist_commission_created");
+    });
+  }
+  completeCommission(id: string, commission: string, artifact: MissionArtifact) {
+    return this.atomic(() => {
+      const linked = this.linkedCommission(id), mission = this.readMission(id), fingerprint = digest(artifact);
+      if (linked?.id !== commission) throw fail();
+      if (linked.artifactDigest) { if (linked.artifactDigest !== fingerprint || mission.state !== "completed") throw fail(); return this.detail(id); }
+      if (mission.state !== "queued" || artifact.storage !== "0g_encrypted_delivery" || artifact.missionId !== id || artifact.title !== mission.brief.title || artifact.objective !== mission.brief.objective || artifact.criteria !== mission.brief.criteria || artifact.sources.length !== mission.sourceCount) throw fail();
+      artifact.sources.forEach((capture, index) => {
+        validateCapture(capture, mission.brief.sources[index]!);
+        this.db.prepare("UPDATE mission_sources SET state='captured',capture=?,capture_digest=?,failure_code=NULL WHERE mission_id=? AND ordinal=?").run(canonical(capture), digest(capture), id, index);
+      });
+      this.db.prepare("INSERT INTO mission_artifacts VALUES(?,?,?)").run(id, canonical(artifact), fingerprint);
+      this.db.prepare("UPDATE mission_commissions SET artifact_digest=? WHERE mission_id=?").run(fingerprint, id);
+      this.db.prepare("UPDATE missions SET state='completed',version=version+1,updated_at=? WHERE id=?").run(this.now(), id);
+      this.event(id, "specialist_settled"); return this.detail(id);
     });
   }
 }

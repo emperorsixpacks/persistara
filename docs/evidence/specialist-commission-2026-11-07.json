@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "kind": "real_signed_specialist_commission",
+  "fixture": false,
+  "observedAt": "2026-11-07T22:18:17.231Z",
+  "scope": {
+    "agentId": "persistara-owner.testnet:research",
+    "chainId": "testnet",
+    "codeHash": "GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ",
+    "contractId": "authority.persistara-owner.testnet",
+    "owner": "persistara-owner.testnet"
+  },
+  "missionId": "mission:58840546-9dc5-4305-8b21-8f50a00b5293",
+  "commissionId": "commission:58840546-9dc5-4305-8b21-8f50a00b5293",
+  "worker": {
+    "accountId": "worker.persistara-owner.testnet",
+    "signingPublicKey": "ed25519:FBuzYDddRX1EfdhfmjiTCEUrvR1cBUSKXjPWGnngKHv6",
+    "signingCustody": "external-official-near-cli-keychain"
+  },
+  "ownerAuthentication": "original-owner-external-nep413-cli-keychain",
+  "applicationOwnerOrWorkerWalletSecretLoaded": false,
+  "transport": "signed-file-exchange",
+  "price": {
+    "asset": "NEAR",
+    "network": "near:testnet",
+    "amountYoctoNear": "10000000000000000000000"
+  },
+  "quoteDigest": "eb00bbab646f0fdaeb3a9ae02591a70effcb9e08006040b5b48905bd99b93b71",
+  "artifactDigest": "93e884c9d6fa7b0ed6951ee11bedaa22c05e8b3a2d9237c9226b22b2f7b0a482",
+  "signatureVerified": true,
+  "encryptedBrief": {
+    "byteLength": 2128,
+    "ciphertextSha256": "de214dbf90175c61cd8b64d9d0c88cd674f1d95fe588295f455f7dece4c85324",
+    "network": "0g:16602:turbo",
+    "objectId": "0xc9796c059cb8af1743c7a551ba1f1e633d7683b92950370779ca995faf7d4a11",
+    "provider": "0g"
+  },
+  "encryptedDelivery": {
+    "byteLength": 8678,
+    "ciphertextSha256": "ccbbe15f94fe3bb6e0364ffc9084eb142cd11046095ec3040f70d2e799d1fd87",
+    "network": "0g:16602:turbo",
+    "objectId": "0x20be5c0f8b94c9b1063f3c4253f80054568615039b4509c9c58144aeb68bc666",
+    "provider": "0g"
+  },
+  "encryption": {
+    "format": "JWE Compact",
+    "keyManagement": "RSA-OAEP-256",
+    "contentEncryption": "A256GCM",
+    "separateBuyerAndWorkerRecipientKeys": true
+  },
+  "capturedSources": [
+    {
+      "url": "https://docs.near.org/",
+      "title": "Home - NEAR Docs",
+      "byteLength": 185419,
+      "contentSha256": "157cc298191d35e24bfdd564d9a7b3a7e8fbbef5e70f9ad096d840db8bbd39b5",
+      "capturedAt": "2026-11-07T22:14:14.645Z"
+    },
+    {
+      "url": "https://docs.0g.ai/",
+      "title": "0G Documentation",
+      "byteLength": 44231,
+      "contentSha256": "d6bb75ab8255ac6149d8744e3f9b60c80647d8c1d478b963b886dd3868b8b399",
+      "capturedAt": "2026-11-07T22:14:17.625Z"
+    }
+  ],
+  "mechanicalReview": {
+    "exactQuoteAndArtifactAcknowledged": true,
+    "sourceCount": 2,
+    "inference": "not_used",
+    "researchQualityVerified": false
+  },
+  "reservationHostRestart": {
+    "performed": true,
+    "oldHostExited": true,
+    "sameCanonicalJournals": true,
+    "fundedJobObservedAfterRestart": true
+  },
+  "receipt": {
+    "acceptanceHash": "Dun7u1XcWSfi9c7icmZ5cLRGrc3LHthVPQGmohyHRqHS",
+    "briefUploadHash": "0x42143c71e10d0aa1c762026b571dc564bd666ee6ab186e239bc8e7a7c85127d0",
+    "disputeDeadlineNs": "0",
+    "payoutAttempt": "1",
+    "reservationHash": "JTRLBXQbR6iZ7TGVw4DpvqExxXBqmDfua391VuuJaZp",
+    "reviewDeadlineNs": "1794093368760528680"
+  },
+  "nearTransactions": [
+    {
+      "transactionHash": "JTRLBXQbR6iZ7TGVw4DpvqExxXBqmDfua391VuuJaZp",
+      "signerId": "persistara-owner.testnet",
+      "publicKey": "ed25519:3GBuwvqLeuVxABYpSRngt1Ennka6jbpdKzK6GWiBLp9Y",
+      "receiverId": "authority.persistara-owner.testnet",
+      "finalExecutionStatus": "FINAL",
+      "method": "create_job",
+      "attachedYoctoNear": "0",
+      "gasBurnt": "3059660891447",
+      "tokensBurntYoctoNear": "283647832894700000000",
+      "receiptCount": 2
+    },
+    {
+      "transactionHash": "Dun7u1XcWSfi9c7icmZ5cLRGrc3LHthVPQGmohyHRqHS",
+      "signerId": "persistara-owner.testnet",
+      "publicKey": "ed25519:3GBuwvqLeuVxABYpSRngt1Ennka6jbpdKzK6GWiBLp9Y",
+      "receiverId": "authority.persistara-owner.testnet",
+      "finalExecutionStatus": "FINAL",
+      "method": "accept_job",
+      "attachedYoctoNear": "0",
+      "gasBurnt": "6592047503496",
+      "tokensBurntYoctoNear": "592249981599600000000",
+      "receiptCount": 6
+    }
+  ],
+  "storageTransactions": [
+    {
+      "transactionHash": "0x42143c71e10d0aa1c762026b571dc564bd666ee6ab186e239bc8e7a7c85127d0",
+      "blockNumber": 64415810,
+      "gasUsed": "328582",
+      "gasPrice": "4000000007",
+      "valueWei": "276602804658",
+      "totalCostWei": "1314604605104732",
+      "ceilingWei": "10000000000000000",
+      "withinCeiling": true
+    },
+    {
+      "transactionHash": "0xa014b9b940247706d3e38bc87011979335046377c08aed6d471aab24df089416",
+      "blockNumber": 64416231,
+      "gasUsed": "321506",
+      "gasPrice": "4000000007",
+      "valueWei": "1106411218632",
+      "totalCostWei": "1287130413469174",
+      "ceilingWei": "10000000000000000",
+      "withinCeiling": true
+    }
+  ],
+  "storageCostTotalWei": "2601735018573906",
+  "treasury": {
+    "before": {
+      "available": "90000000000000000000000",
+      "reserved": "0",
+      "pending": "0",
+      "paid": "10000000000000000000000"
+    },
+    "after": {
+      "available": "80000000000000000000000",
+      "reserved": "0",
+      "pending": "0",
+      "paid": "20000000000000000000000"
+    },
+    "conserved": true
+  },
+  "state": "paid",
+  "missionState": "completed",
+  "payoutAttempt": "1",
+  "repeatedReadOnlyObservationChangedPayoutAttempt": false,
+  "recovery": {
+    "status": "verified_fresh_process_delivery_recovery",
+    "commissionId": "commission:58840546-9dc5-4305-8b21-8f50a00b5293",
+    "artifactDigest": "93e884c9d6fa7b0ed6951ee11bedaa22c05e8b3a2d9237c9226b22b2f7b0a482",
+    "sourceCount": 2,
+    "paidPayoutAttempt": "1",
+    "storageProofAndDigestVerified": true,
+    "recipientBackup": "same_machine_copy",
+    "offDeviceVerified": false,
+    "originalBuyerStateRemoved": false,
+    "originalRuntimeKeyLoaded": false,
+    "uploaderKeyLoaded": false,
+    "workerPrivateKeyLoaded": false,
+    "nearAiUsed": false,
+    "verifiedAt": "2026-11-07T22:18:20.033Z"
+  },
+  "nearAiUsed": false,
+  "browserWalletTransportVerified": false,
+  "ownerSessionLoggedOut": true,
+  "unchangedAuthorityWasmSha256": "e1ca18486c58e92b46cb6920ef66a3517cd4a2132355e91dc6c6168f4e138375",
+  "limitations": [
+    "Mechanical source collection, no inference or research-quality proof",
+    "Recipient backup is a same-machine copy; physical off-device custody remains unverified",
+    "Original live buyer files were retained; removal drill is separately proven with sandbox fixtures",
+    "Signed-file exchange, no deployed specialist HTTP service",
+    "Buyer-controlled disputes, no independent arbitration",
+    "Actual browser wallet-provider approval remains unverified"
+  ]
+}

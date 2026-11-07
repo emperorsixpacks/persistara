@@ -63,13 +63,15 @@ Verified inference evidence is not proof that a tool ran correctly, a report is 
 
 ## Execution and external effects
 
-The implemented [source-dossier mission workflow](MISSIONS.md) provides a private versioned SQLite brief/source/event/artifact journal and fenced source worker, exposed through the local owner-authenticated host. It has no inference, signing, upload or payment capability. It captures approved public HTTPS text, resumes remaining reads after interruption, creates one local dossier and records digest-bound review. Mission plaintext stays local and is outside encrypted memory backups. The model loop, specialist protocol, mission-linked settlement and remote API below remain target architecture.
+The implemented [source-dossier mission workflow](MISSIONS.md) provides a private versioned SQLite brief/source/event/artifact journal and fenced source worker, exposed through the local owner-authenticated host. It has no inference, signing, upload or payment capability. It captures approved public HTTPS text, resumes remaining reads after interruption, creates one local dossier and records digest-bound review. Mission plaintext stays local and is outside encrypted memory backups. The model loop and remote API remain target architecture. A linked commission follows the separate service below instead of running the local zero-spend worker.
 
 An action has a stable operation ID, canonical request digest, policy version, authorization generation, attempt count, and external reference. Persist intent before an external effect, then persist its observed outcome. States distinguish `queued`, `authorized`, `submitted`, `unknown`, `confirmed`, `failed`, and `canceled`. Unknown transactions are reconciled using their recorded transaction hash/nonce before retrying. Do not claim exactly-once external execution; implement deduplication and reconciliation.
 
 The mission journal is SQLite with explicit migrations for a single operator deployment. One process owns writes; background workers use leases plus fencing tokens and stop on lease loss. Persist event cursor before acknowledging it. API/UI projections rebuild from journal records. A separate signer service holds runtime signing keys; no owner key or uploader key is available to model-visible tools.
 
 ## Commerce
+
+The implemented [commission service](COMMISSIONS.md) uses a private scope-bound SQLite journal, separate buyer/specialist RSA recipient keys and standard JWE (`RSA-OAEP-256`, `A256GCM`). A curated specialist signs profile, quote and delivery envelopes through the external NEAR CLI keychain. Signed-file exchange is explicit; the application has no remote worker endpoint. Uploaded ciphertext, fixed reservation arguments, canonical signer-journal identity and exact acceptance calls are durable before dispatch. Delivery verification checks signature, scope, finalized immutable result, 0G proof, authenticated decryption and original source/brief bindings. Digest-bound review plus finalized paid state projects into mission completion. Read-only reconciliation never signs or uploads.
 
 Use one native asset and a curated specialist for v1. Quotes bind buyer, agent, worker, artifact criteria hash, amount, asset/network, expiry, and operation ID. Worker envelopes are signed and include sequence, recipient, and expiry. Shared keys are not derived by concatenating private and public keys.
 
@@ -80,9 +82,7 @@ For daily limits, count each reservation against its UTC window. Refunds return 
 ## Repository layout
 
 ```text
-apps/console/                 local owner console (plan 007); full dashboard pending
-apps/api/                     authenticated API (plan 005)
-apps/worker/                  mission runner (plan 005)
+apps/console/                 local mission desk, commissioning and owner controls
 packages/protocol/            schemas, ports, structured errors
 packages/crypto/              authenticated envelopes
 packages/memory/              manifests, recall, recovery
@@ -90,7 +90,8 @@ packages/storage/             local development and live 0G adapters
 packages/near/                registry/treasury clients and event reconciliation
 packages/owner/               owner proof, loopback host and wallet handoff journal
 packages/inference/           NEAR AI adapters and evidence verification
-packages/runtime/             journal, leases, action execution
+packages/runtime/             mission journal, leases, bounded source collection
+packages/commerce/            signed commission protocol, JWE, journal, specialist executor
 contracts/authority/          Rust NEAR registry and treasury modules
 contracts/integration-tests/  deployed-WASM NEAR sandbox scenarios
 tests/                        cross-boundary invariant tests

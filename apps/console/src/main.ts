@@ -31,6 +31,8 @@ const messages: Record<string, string> = {
   NETWORK_MISMATCH: "The configured RPC is not NEAR testnet. Restore the expected testnet endpoint before continuing.",
   PROTOCOL_ERROR: "The chain response could not be verified. Controls stay unavailable until a valid finalized read.",
   MISSION_BLOCKED: "Mission execution is held. Check that your agent is active and its local rotation hold is clear, then refresh.",
+  VERIFICATION_FAILED: "The signed specialist file or encrypted delivery did not verify. Check the original request, signing key and exact artifact before continuing.",
+  NOT_CONFIGURED: "This local integration is not configured. Complete its setup before continuing.",
 };
 class ApiError extends Error { constructor(readonly code: string) { super(messages[code] ?? "The request could not be completed. Refresh the recorded state."); } }
 async function api<T>(path: string, body?: unknown): Promise<T> {
@@ -191,6 +193,6 @@ void work(async () => {
   text("expected-owner", info.owner); text("expected-agent", info.agentId); show("fixture-banner", info.fixture);
   try {
     const session = await api<{ csrf: string }>("session"); csrf = session.csrf;
-    await refresh(); text("session-status", "Session restored"); status("Owner session restored. Reconnect your wallet before signing another action.");
+    await refresh(); text("session-status", "Session restored"); button("connect").textContent = "Reconnect wallet ↗"; show("disconnect", true); status("Owner session restored. Reconnect your wallet before signing another action.");
   } catch { status("Connect the registered owner wallet to verify authority and local readiness."); }
 });

@@ -22,6 +22,9 @@ importers:
       ethers:
         specifier: 6.13.1
         version: 6.13.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      jose:
+        specifier: 6.2.15
+        version: 6.2.15
       near-api-js:
         specifier: 7.4.0
         version: 7.4.0
@@ -558,6 +561,9 @@ packages:
 
   jose@6.2.13:
     resolution: {integrity: sha512-7TIg10ZE1x82YediN+lcrPNvGMKge9yFHQD+Qho/b8y2adfugU3AsvvHfxV0fzyFllT6l9xCjf4RWY9g/Z9PJQ==}
+
+  jose@6.2.15:
+    resolution: {integrity: sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA==}
 
   js-sha3@0.8.0:
     resolution: {integrity: sha512-gF1cRrHhIzNfToc802P800N8PpXS+evLLXfsVpowqmAFR9uwbi89WvXg2QspOmXL8QL86J4T1EpFu+yUkwJY3Q==}
@@ -1651,6 +1657,8 @@ snapshots:
   isarray@2.0.5: {}
 
   jose@6.2.13: {}
+
+  jose@6.2.15: {}
 
   js-sha3@0.8.0: {}
 

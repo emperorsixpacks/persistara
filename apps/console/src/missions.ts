@@ -1,13 +1,15 @@
 import type { Mission, MissionCapabilities, MissionDetail, MissionEvent, MissionSource, MissionState } from "../../../packages/runtime/src/types.js";
 import { icons } from "./shell.js";
+import { CommissionUI, commissionLabels, near, type CommissionCapabilities } from "./commissions.js";
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const escape = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const date = (at: number) => new Date(at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 const labels: Record<MissionState, string> = { queued: "Ready to run", running: "Collecting sources", interrupted: "Interrupted", blocked: "Needs attention", awaiting_review: "Ready for review", completed: "Reviewed", canceled: "Canceled" };
-const events: Record<string, string> = { mission_created: "Brief saved", worker_started: "Source collection started", worker_resumed: "Execution resumed", source_fetch_started: "Source retrieval started", source_captured: "Source captured", worker_interrupted: "Worker interrupted", worker_blocked: "Execution needs attention", artifact_ready: "Dossier ready for review", owner_approved: "Owner marked dossier reviewed", mission_canceled: "Mission canceled" };
-const chip = (state: MissionState) => `<span class="pill state-${state}">${labels[state]}</span>`;
-const inProgress = (m: Mission) => ["queued", "running", "interrupted", "blocked"].includes(m.state);
+const events: Record<string, string> = { mission_created: "Brief saved", worker_started: "Source collection started", worker_resumed: "Execution resumed", source_fetch_started: "Source retrieval started", source_captured: "Source captured", worker_interrupted: "Worker interrupted", worker_blocked: "Execution needs attention", artifact_ready: "Dossier ready for review", owner_approved: "Owner marked dossier reviewed", mission_canceled: "Mission canceled", specialist_commission_created: "Specialist request created", specialist_settled: "Specialist delivery reviewed and paid" };
+const chip = (state: MissionState, c?: Mission["commission"]) => `<span class="pill state-${c?.state ?? state}">${c ? c.state === "paid" && c.reviewed ? "Settled & reviewed" : commissionLabels[c.state] : labels[state]}</span>`;
+const needsReview = (m: Mission) => m.commission ? m.commission.deliveryVerified && !m.commission.reviewed : m.state === "awaiting_review";
+const inProgress = (m: Mission) => m.commission ? !["paid", "refunded", "canceled", "failed"].includes(m.commission.state) : ["queued", "running", "interrupted", "blocked"].includes(m.state);
 interface DeskOptions {
   api: <T>(path: string, body?: unknown) => Promise<T>;
   work: (action: () => Promise<void>) => Promise<void>;
@@ -18,6 +20,8 @@ interface DeskOptions {
 export class MissionDesk {
   private missions: Mission[] = [];
   private capabilities: MissionCapabilities | null = null;
+  private commissioning: CommissionCapabilities = { configured: false };
+  private readonly commerce: CommissionUI;
   private detail: MissionDetail | null = null;
   private selected = "";
   private filter = "all";
@@ -29,6 +33,7 @@ export class MissionDesk {
   private readonly approval = el<HTMLDialogElement>("mission-approval");
   private readonly timer: ReturnType<typeof setInterval>;
   constructor(private readonly options: DeskOptions) {
+    this.commerce = new CommissionUI({ api: options.api, perform: fn => this.perform(fn), refresh: async () => { await this.refreshDetail(); await this.refreshList(); }, notice: options.notice });
     const open = () => { el("compose-error").textContent = options.authenticated() ? "" : "Connect your owner wallet using the button in the top bar before creating a mission."; this.sync(); this.compose.showModal(); };
     el("new-mission").onclick = open; el("empty-new-mission").onclick = open;
     el("close-compose").onclick = () => this.compose.close();
@@ -76,9 +81,9 @@ export class MissionDesk {
     for (const link of document.querySelectorAll<HTMLAnchorElement>("#sidebar a")) link.addEventListener("click", () => { closeMenu(); el("main").focus(); });
     window.addEventListener("hashchange", () => this.route()); this.route();
     this.timer = setInterval(() => {
-      if (!this.polling && !this.pending && !document.hidden && options.authenticated() && this.selected && this.detail?.mission.state === "running") {
+      if (!this.polling && !this.pending && !document.hidden && options.authenticated() && this.selected && (this.detail?.mission.state === "running" || Boolean(this.detail?.commission && ["uploading_brief", "reserving", "settling", "payout_pending"].includes(this.detail.commission.state)))) {
         this.polling = true;
-        void this.refreshDetail().catch(() => options.notice("Mission status could not be refreshed. Reconnect or refresh before another action.", true)).finally(() => { this.polling = false; });
+        void (async () => { if (this.detail?.commission) await options.api(`commissions/${this.detail.commission.id}/reconcile`, {}); await this.refreshDetail(); })().catch(() => options.notice("Mission status could not be refreshed. Reconnect or refresh before another action.", true)).finally(() => { this.polling = false; });
       }
     }, 3000);
     window.addEventListener("pagehide", () => clearInterval(this.timer), { once: true });
@@ -122,26 +127,27 @@ export class MissionDesk {
     if (location.hash === "#activity") await this.renderActivity();
   }
   disconnected() {
-    this.missions = []; this.capabilities = null; this.detail = null; this.approval.close(); this.renderList(); this.sync();
+    this.missions = []; this.capabilities = null; this.detail = null; this.commerce.close(); this.commissioning = { configured: false }; this.approval.close(); this.renderList(); this.sync();
     el("mission-detail").innerHTML = '<div class="panel"><h2>Owner connection required.</h2><p class="muted">Connect your owner wallet to open this mission.</p></div>';
     el("activity-list").innerHTML = '<p class="muted">Connect your owner wallet to view mission activity.</p>';
   }
   private async refreshList() {
     if (!this.options.authenticated()) return;
-    const result = await this.options.api<{ missions: Mission[]; capabilities: MissionCapabilities }>("missions");
+    const result = await this.options.api<{ missions: Mission[]; capabilities: MissionCapabilities; commissioning?: CommissionCapabilities }>("missions");
     if (!this.options.authenticated()) return;
-    this.missions = result.missions; this.capabilities = result.capabilities;
+    this.missions = result.missions; this.capabilities = result.capabilities; this.commissioning = result.commissioning ?? { configured: false };
     el("allowed-origins").textContent = `Approved origins: ${result.capabilities.allowedOrigins.join(", ")}. URLs must have no query, fragment, credentials or custom port.`;
     this.renderList();
   }
   private renderList() {
     const all = this.missions;
     el("mission-count").textContent = String(all.length); el("stat-total").textContent = String(all.length);
-    el("stat-running").textContent = String(all.filter(inProgress).length); el("stat-review").textContent = String(all.filter((m) => m.state === "awaiting_review").length);
+    el("stat-running").textContent = String(all.filter(inProgress).length); el("stat-review").textContent = String(all.filter(needsReview).length);
+    el("mission-spend-total").textContent = near(String(all.reduce((sum, m) => sum + BigInt(m.budget.spent), 0n)));
     const search = el<HTMLInputElement>("mission-search").value.trim().toLowerCase();
-    const filtered = all.filter((m) => (this.filter === "all" || (this.filter === "progress" && inProgress(m)) || (this.filter === "review" && m.state === "awaiting_review") || (this.filter === "completed" && m.state === "completed")) && `${m.brief.title} ${m.brief.objective}`.toLowerCase().includes(search));
-    const featured = filtered.find((m) => m.state === "awaiting_review")?.id;
-    el("mission-grid").innerHTML = filtered.map((m) => `<article class="mission-card ${m.id === featured ? "featured" : ""}"><div class="card-top">${chip(m.state)}<span class="card-number">${m.id.slice(-6).toUpperCase()}</span></div><h2><a href="#mission/${m.id}">${escape(m.brief.title)}</a></h2><p>${escape(m.brief.objective)}</p><div class="card-progress" aria-label="${m.capturedCount} of ${m.sourceCount} sources captured">${m.brief.sources.map((_, i) => `<i class="${i < m.capturedCount ? "done" : ""}"></i>`).join("")}</div><div class="card-bottom"><span>${m.capturedCount}/${m.sourceCount} sources</span><span>${date(m.updatedAt)} ↗</span></div></article>`).join("");
+    const filtered = all.filter((m) => (this.filter === "all" || (this.filter === "progress" && inProgress(m)) || (this.filter === "review" && needsReview(m)) || (this.filter === "completed" && m.state === "completed")) && `${m.brief.title} ${m.brief.objective}`.toLowerCase().includes(search));
+    const featured = filtered.find(needsReview)?.id;
+    el("mission-grid").innerHTML = filtered.map((m) => `<article class="mission-card ${m.id === featured ? "featured" : ""}"><div class="card-top">${chip(m.state, m.commission)}<span class="card-number">${m.id.slice(-6).toUpperCase()}</span></div><h2><a href="#mission/${m.id}">${escape(m.brief.title)}</a></h2><p>${escape(m.brief.objective)}</p><div class="card-progress" aria-label="${m.capturedCount} of ${m.sourceCount} sources captured">${m.brief.sources.map((_, i) => `<i class="${i < m.capturedCount ? "done" : ""}"></i>`).join("")}</div><div class="card-bottom"><span>${m.capturedCount}/${m.sourceCount} sources</span><span>${date(m.updatedAt)} ↗</span></div></article>`).join("");
     el("mission-empty").hidden = filtered.length > 0;
     el("mission-empty-copy").innerHTML = all.length ? "No missions match these filters.<br>Try another search or start a new brief." : this.options.authenticated() ? "Start with a question and a few primary sources.<br>Save the brief. Run when you’re ready." : "Connect your owner wallet to start a mission.<br>Your work belongs to your workspace.";
   }
@@ -162,10 +168,13 @@ export class MissionDesk {
   private renderDetail() {
     const detail = this.detail; if (!detail || detail.mission.id !== this.selected) return;
     const m = detail.mission;
-    const canRun = ["queued", "blocked", "interrupted"].includes(m.state) && detail.sources.every((s) => s.state === "captured" || s.attempts < 3);
-    const canCancel = ["queued", "running", "blocked", "interrupted"].includes(m.state);
+    const artifact = detail.artifact ?? (detail.commission?.artifact && detail.commission.artifactDigest ? { digest: detail.commission.artifactDigest, value: detail.commission.artifact } : null);
+    const sources: MissionSource[] = detail.commission?.artifact ? detail.sources.map((source, index) => ({ ...source, state: "captured", capture: detail.commission!.artifact!.sources[index]! })) : detail.sources;
+    const canRun = !detail.commission && ["queued", "blocked", "interrupted"].includes(m.state) && detail.sources.every((s) => s.state === "captured" || s.attempts < 3);
+    const canCancel = !detail.commission && ["queued", "running", "blocked", "interrupted"].includes(m.state);
     const interrupted = ["blocked", "interrupted"].includes(m.state);
-    el("mission-detail").innerHTML = `<a class="back-link" href="#missions">← All missions</a><header class="page-heading detail-heading"><div><p class="eyebrow">MISSION / ${m.id.slice(-8).toUpperCase()} ${chip(m.state)}</p><h1>${escape(m.brief.title)}</h1><p>${escape(m.brief.objective)}</p></div></header><div class="detail-layout"><div><section class="panel"><div class="panel-heading"><div><p class="eyebrow">THE DELIVERABLE</p><h2>${detail.artifact ? "Your source dossier." : "One source at a time."}</h2></div>${detail.artifact ? '<button id="download-dossier" class="quiet">Download JSON ↗</button>' : ""}</div><div class="dossier-boundary"><span>Source collection</span><span>No inference used</span><span>Local artifact</span></div>${interrupted ? `<div class="detail-notice">Execution ${m.state === "interrupted" ? "was interrupted" : "needs attention"}${m.failureCode ? ` (${escape(m.failureCode)})` : ""}. Captured sources are saved. ${canRun ? "Resume to continue the remaining public reads with the same operation IDs." : "The bounded retry limit was reached. Review the sources and create a new brief if needed."}</div>` : ""}${detail.sources.map((s) => this.source(s)).join("")}</section><section class="panel"><p class="eyebrow">YOUR REVIEW CRITERIA</p><p class="criteria">${escape(m.brief.criteria)}</p><p class="footnote">Captured material is untrusted source content. Collection and your review do not establish research correctness.</p></section>${detail.artifact ? `<section class="panel"><p class="eyebrow">ARTIFACT FINGERPRINT</p><p class="mono">${detail.artifact.digest}</p><p class="tiny">This dossier is stored in your private local mission journal. It has not been uploaded to 0G or checkpointed to NEAR.</p></section>` : ""}</div><aside class="detail-side"><section class="panel"><p class="eyebrow">EXECUTION</p><h2>${m.state === "completed" ? "Review recorded." : m.state === "awaiting_review" ? "Ready for your review." : m.state === "running" ? "Work is in progress." : "Pick up from here."}</h2><p class="muted">${m.capturedCount} of ${m.sourceCount} sources captured</p><div class="metrics"><div><span>Maximum spend</span><strong>0 NEAR</strong></div><div><span>Inference</span><strong>Not used</strong></div></div><div class="button-row">${canRun ? `<button id="mission-run" data-mission-action class="primary">${m.state === "queued" ? "Run mission" : "Resume mission"} ${icons.arrow}</button>` : ""}${m.state === "awaiting_review" ? '<button id="review-dossier" data-mission-action class="primary">Review dossier ↗</button>' : ""}${canCancel ? '<button id="mission-cancel" data-mission-action class="quiet">Cancel mission</button>' : ""}<button id="detail-refresh" class="secondary">Refresh status ↻</button></div><p class="tiny">${m.state === "running" ? "Safe to reload. The local worker continues while this host is running." : "A restart retains the brief, captured sources and event history."}</p></section><section class="panel"><p class="eyebrow">MISSION TIMELINE</p><ol class="timeline">${detail.events.slice(-12).reverse().map((event) => `<li>${escape(events[event.kind] ?? "Execution event")}<time datetime="${new Date(event.at).toISOString()}">${date(event.at)}</time></li>`).join("")}</ol></section></aside></div>`;
+    el("mission-detail").innerHTML = `<a class="back-link" href="#missions">← All missions</a><header class="page-heading detail-heading"><div><p class="eyebrow">MISSION / ${m.id.slice(-8).toUpperCase()} ${chip(m.state, m.commission)}</p><h1>${escape(m.brief.title)}</h1><p>${escape(m.brief.objective)}</p></div></header>${this.commerce.render(detail, this.commissioning)}<div class="detail-layout"><div><section class="panel"><div class="panel-heading"><div><p class="eyebrow">THE DELIVERABLE</p><h2>${artifact ? "Your source dossier." : "One source at a time."}</h2></div>${artifact ? '<button id="download-dossier" class="quiet">Download JSON ↗</button>' : ""}</div><div class="dossier-boundary"><span>Source collection</span><span>No inference used</span><span>${detail.commission ? "Encrypted 0G delivery" : "Local artifact"}</span></div>${interrupted ? `<div class="detail-notice">Execution ${m.state === "interrupted" ? "was interrupted" : "needs attention"}${m.failureCode ? ` (${escape(m.failureCode)})` : ""}. Captured sources are saved. ${canRun ? "Resume to continue the remaining public reads with the same operation IDs." : "The bounded retry limit was reached. Review the sources and create a new brief if needed."}</div>` : ""}${sources.map((s) => this.source(s)).join("")}</section><section class="panel"><p class="eyebrow">YOUR REVIEW CRITERIA</p><p class="criteria">${escape(m.brief.criteria)}</p><p class="footnote">Captured material is untrusted source content. Collection and your review do not establish research correctness.</p></section>${artifact ? `<section class="panel"><p class="eyebrow">ARTIFACT FINGERPRINT</p><p class="mono">${artifact.digest}</p><p class="tiny">${detail.commission ? "This dossier was decrypted from the signed specialist’s 0G result. Its fixed NEAR job and payment status are shown in the commission panel." : "This dossier is stored in your private local mission journal. It has not been uploaded to 0G or checkpointed to NEAR."}</p></section>` : ""}</div><aside class="detail-side"><section class="panel"><p class="eyebrow">EXECUTION</p><h2>${m.state === "completed" ? "Review recorded." : m.state === "awaiting_review" ? "Ready for your review." : m.state === "running" ? "Work is in progress." : "Pick up from here."}</h2><p class="muted">${m.capturedCount} of ${m.sourceCount} sources captured</p><div class="metrics"><div><span>Maximum spend</span><strong>${near(m.budget.maximum)}</strong></div><div><span>Inference</span><strong>Not used</strong></div></div><div class="button-row">${canRun ? `<button id="mission-run" data-mission-action class="primary">${m.state === "queued" ? "Run mission" : "Resume mission"} ${icons.arrow}</button>` : ""}${!detail.commission && m.state === "awaiting_review" ? '<button id="review-dossier" data-mission-action class="primary">Review dossier ↗</button>' : ""}${canCancel ? '<button id="mission-cancel" data-mission-action class="quiet">Cancel mission</button>' : ""}<button id="detail-refresh" class="secondary">Refresh status ↻</button></div><p class="tiny">${m.state === "running" ? "Safe to reload. The local worker continues while this host is running." : "A restart retains the brief, captured sources and event history."}</p></section><section class="panel"><p class="eyebrow">MISSION TIMELINE</p><ol class="timeline">${detail.events.slice(-12).reverse().map((event) => `<li>${escape(events[event.kind] ?? "Execution event")}<time datetime="${new Date(event.at).toISOString()}">${date(event.at)}</time></li>`).join("")}</ol></section></aside></div>`;
+    this.commerce.bind(this.commissioning);
     el("detail-refresh").onclick = () => void this.perform(() => this.refreshDetail());
     const run = document.getElementById("mission-run"); if (run) run.onclick = () => void this.perform(async () => {
       this.detail = await this.options.api<MissionDetail>(`missions/${m.id}/run`, { version: m.version }); this.renderDetail(); await this.refreshList(); this.options.notice("Execution started. Captured sources and progress are saved in the local journal.");
@@ -177,7 +186,7 @@ export class MissionDesk {
       el("artifact-review-digest").textContent = detail.artifact!.digest; el<HTMLInputElement>("artifact-ack").checked = false; this.sync(); this.approval.showModal();
     };
     const download = document.getElementById("download-dossier"); if (download) download.onclick = () => {
-      const url = URL.createObjectURL(new Blob([JSON.stringify(detail.artifact, null, 2)], { type: "application/json" }));
+      const url = URL.createObjectURL(new Blob([JSON.stringify(artifact, null, 2)], { type: "application/json" }));
       const anchor = document.createElement("a"); anchor.href = url; anchor.download = `persistara-${m.id.slice(-8)}.json`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
     this.sync();

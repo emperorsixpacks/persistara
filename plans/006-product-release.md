@@ -35,3 +35,8 @@ Primary navigation: Missions, Memory, Controls, Evidence. The first screen helps
 ## Stop conditions and production follow-up
 
 Do not release if P0 money/recovery invariants fail, a mock is labeled live, evidence is fabricated, or a private key is in tracked files/browser bundles. Defer secondary animations/features before weakening those gates. Mainnet, third-party contract review, multi-tenant isolation, key-management operations, and availability/cost monitoring are subsequent production work.
+
+
+## Commissioning console checkpoint
+
+The mission detail now supports signed task export, quote import/exact-cost review, encrypted delivery import/preview, digest-bound settlement and read-only reconciliation with pending/failed/paid callback distinctions. Existing graphite/copper design and mobile/keyboard behavior are preserved. Eleven browser-fixture tests pass; quote, desktop-delivery and phone-settlement captures in `docs/images` were visually inspected. Current total: 199 TypeScript tests, 34 Rust tests and six sandbox scenarios. This is a local owner-host milestone; public hosting, actual browser-wallet approval, model-driven golden demo, off-device custody, benchmarks and submission artifacts remain release gates.

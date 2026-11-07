@@ -1,11 +1,13 @@
 /** Public, key-free mission projections shared with the console. */
+import type { CommissionSummary, CommissionView } from "../../commerce/src/types.js";
 export type MissionState = "queued" | "running" | "interrupted" | "blocked" | "awaiting_review" | "completed" | "canceled";
 export interface MissionBrief { requestId: string; title: string; objective: string; criteria: string; sources: string[] }
 export interface MissionScope { owner: string; agentId: string; contractId: string; chainId: string; codeHash: string }
 export interface MissionAuthority extends MissionScope { publicKey: string; generation: string; keyEpoch: number; blockHash: string }
 export interface Mission {
   id: string; brief: MissionBrief; state: MissionState; version: number; createdAt: number; updatedAt: number;
-  authority: MissionAuthority; budget: { network: "near:testnet"; asset: "NEAR"; maximum: "0"; spent: "0" };
+  authority: MissionAuthority; budget: { network: "near:testnet" | "near:sandbox"; asset: "NEAR"; maximum: string; spent: string };
+  commission?: CommissionSummary;
   sourceCount: number; capturedCount: number; failureCode: string | null;
 }
 export interface SourceCapture {
@@ -20,8 +22,8 @@ export interface MissionSource {
 export interface MissionEvent { cursor: number; missionId: string; at: number; kind: string; operationId: string | null }
 export interface MissionArtifact {
   schemaVersion: 1; kind: "source-dossier"; missionId: string; title: string; objective: string; criteria: string;
-  createdAt: number; sources: SourceCapture[]; inference: "not_used"; storage: "local_private_journal"; quality: "owner_review_required";
+  createdAt: number; sources: SourceCapture[]; inference: "not_used"; storage: "local_private_journal" | "0g_encrypted_delivery"; quality: "owner_review_required";
 }
-export interface MissionDetail { mission: Mission; sources: MissionSource[]; events: MissionEvent[]; artifact: { digest: string; value: MissionArtifact } | null }
+export interface MissionDetail { mission: Mission; sources: MissionSource[]; events: MissionEvent[]; artifact: { digest: string; value: MissionArtifact } | null; commission?: CommissionView | null }
 export interface MissionCapabilities { mode: "source-dossier"; inference: false; maximumSources: 6; allowedOrigins: string[]; spendingEnabled: false }
 export interface MissionLease { missionId: string; holder: string; fence: number }

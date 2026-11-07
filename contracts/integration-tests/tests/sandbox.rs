@@ -432,12 +432,195 @@ fn run_node_fixture(name: &str, input: &Value) -> Result<Value> {
         .write_all(&serde_json::to_vec(input)?)?;
     let output = child.wait_with_output()?;
     // The fixture prints only sanitized status; never include its input/key material.
+    let expected_exit = input
+        .get("expectedExit")
+        .and_then(Value::as_i64)
+        .unwrap_or(0) as i32;
     anyhow::ensure!(
-        output.status.success(),
+        output.status.code() == Some(expected_exit),
         "application fixture failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    if expected_exit != 0 {
+        return Ok(json!({"exitCode": expected_exit}));
+    }
     Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+// NEP-413's specified Borsh payload, hashed and signed entirely by the external Rust wallet.
+// Neither owner nor specialist wallet secrets enter the Node application process.
+fn specialist_message_signature(account: &Account, request: &Value) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    let message = request["message"].as_str().unwrap();
+    let recipient = request["envelope"]["recipient"].as_str().unwrap();
+    anyhow::ensure!(recipient.starts_with("persistara-specialist:v1:"));
+    let nonce = request["nonceBytes"].as_array().unwrap();
+    anyhow::ensure!(nonce.len() == 32);
+    let mut bytes = 2_147_484_061u32.to_le_bytes().to_vec();
+    bytes.extend_from_slice(&(message.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(message.as_bytes());
+    for value in nonce {
+        bytes.push(value.as_u64().unwrap() as u8);
+    }
+    bytes.extend_from_slice(&(recipient.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(recipient.as_bytes());
+    bytes.push(0); // callback_url: None
+    let key: near_crypto::SecretKey = account.secret_key().to_string().parse()?;
+    Ok(key.sign(&Sha256::digest(bytes)).to_string())
+}
+
+#[tokio::test]
+async fn signed_specialist_commission_recovers_and_pays_once_without_wallet_keys() -> Result<()> {
+    use near_workspaces::types::Gas;
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    let (worker, contract, owner, specialist, id) = fixture(NearToken::from_near(1)).await?;
+    let key = SecretKey::from_seed(KeyType::ED25519, "commission-runtime-fixture");
+    owner
+        .batch(owner.id())
+        .add_key(
+            key.public_key(),
+            AccessKey::function_call_access(
+                contract.id(),
+                &["checkpoint_memory", "create_job", "accept_job"],
+                Some(NearToken::from_yoctonear(NEAR / 4)),
+            ),
+        )
+        .transact()
+        .await?
+        .into_result()?;
+    let now = worker.view_block().await?.timestamp();
+    owner.call(contract.id(), "set_delegate").args_json(json!({"agent_id":id,"delegate":{"publicKey":key.public_key().to_string(),"expiresAtNs":(now+24*HOUR).to_string(),"canCheckpoint":true,"canSpend":true}})).max_gas().transact().await?.into_result()?;
+    wait_for_finalized_setup(&contract, &id).await?;
+    let directory = std::env::temp_dir().join(format!(
+        "persistara-commission-{}-{now}",
+        std::process::id()
+    ));
+    std::fs::DirBuilder::new().mode(0o700).create(&directory)?;
+    let mut input = json!({"directory":directory,"phase":"profile","rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"publicKey":key.public_key().to_string(),"workerId":specialist.id(),"workerPublicKey":specialist.secret_key().public_key().to_string()});
+    let result: Result<()> = async {
+        let profile = run_node_fixture("commerce-sandbox", &input)?;
+        input["signature"] = json!(specialist_message_signature(&specialist, &profile)?);
+        input["phase"] = json!("initialize");
+        input["runtimeSecretKey"] = json!(key.to_string());
+        let created = run_node_fixture("commerce-sandbox", &input)?;
+        let commission = created["commissionId"].as_str().unwrap().to_owned();
+        input.as_object_mut().unwrap().remove("runtimeSecretKey");
+        input.as_object_mut().unwrap().remove("signature");
+        input["phase"] = json!("quote");
+        let quote = run_node_fixture("commerce-sandbox", &input)?;
+        input["signature"] = json!(specialist_message_signature(&specialist, &quote)?);
+        assert_eq!(
+            run_node_fixture("commerce-sandbox", &input)?["state"],
+            "quoted"
+        );
+        input.as_object_mut().unwrap().remove("signature");
+        input["phase"] = json!("reserve-crash");
+        input["expectedExit"] = json!(74);
+        assert_eq!(
+            run_node_fixture("commerce-sandbox", &input)?["exitCode"],
+            74
+        );
+        input.as_object_mut().unwrap().remove("expectedExit");
+        input["phase"] = json!("observe-reservation");
+        assert_eq!(
+            run_node_fixture("commerce-sandbox", &input)?["state"],
+            "funded"
+        );
+        input["phase"] = json!("fulfill");
+        run_node_fixture("commerce-sandbox", &input)?;
+        input["phase"] = json!("prepare-delivery");
+        let request = run_node_fixture("commerce-sandbox", &input)?["walletRequest"].clone();
+        assert_eq!(request["worker"], specialist.id().as_str());
+        assert_eq!(request["contractId"], contract.id().as_str());
+        assert_eq!(request["method"], "deliver");
+        specialist
+            .call(contract.id(), "deliver")
+            .args_json(request["args"].clone())
+            .gas(Gas::from_tgas(100))
+            .transact()
+            .await?
+            .into_result()?;
+        let expected_delivery = request["args"]["result"].clone();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        loop {
+            let current: Value = contract
+                .view("get_job")
+                .args_json(json!({"agent_id":id,"operation_id":commission}))
+                .finality(near_workspaces::types::Finality::Final)
+                .await?
+                .json()?;
+            if current["result"] == expected_delivery {
+                break;
+            }
+            anyhow::ensure!(
+                std::time::Instant::now() < deadline,
+                "specialist delivery did not finalize"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        input["phase"] = json!("receipt");
+        let receipt = run_node_fixture("commerce-sandbox", &input)?;
+        input["signature"] = json!(specialist_message_signature(&specialist, &receipt)?);
+        assert_eq!(
+            run_node_fixture("commerce-sandbox", &input)?["delivered"],
+            true
+        );
+        input.as_object_mut().unwrap().remove("signature");
+        input["phase"] = json!("inspect");
+        let inspected = run_node_fixture("commerce-sandbox", &input)?;
+        assert_eq!(inspected["deliveryVerified"], true);
+        settle_gas_refunds(&worker).await?;
+        let balance = specialist.view_account().await?.balance.as_yoctonear();
+        input["phase"] = json!("settle-crash");
+        input["expectedExit"] = json!(75);
+        assert_eq!(
+            run_node_fixture("commerce-sandbox", &input)?["exitCode"],
+            75
+        );
+        input.as_object_mut().unwrap().remove("expectedExit");
+        input["phase"] = json!("observe-payment");
+        let paid = run_node_fixture("commerce-sandbox", &input)?;
+        assert_eq!(paid["state"], "paid");
+        assert_eq!(paid["payoutAttempt"], "1");
+        assert_eq!(paid["uploadCalls"], 2);
+        assert_eq!(paid["sourceCount"], 2);
+        std::fs::remove_file(directory.join("buyer/runtime.key"))?;
+        assert_eq!(
+            run_node_fixture("commerce-sandbox", &input)?["artifactDigest"],
+            paid["artifactDigest"]
+        );
+        settle_gas_refunds(&worker).await?;
+        assert_eq!(
+            specialist.view_account().await?.balance.as_yoctonear(),
+            balance + NEAR / 100
+        );
+        let final_job = job(&contract, &id, &commission).await?;
+        assert_eq!(final_job["status"], "paid");
+        assert_eq!(final_job["payoutAttempt"], "1");
+        assert_conservation(&agent(&contract, &id).await?);
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(directory.join("recovery"))?;
+        std::fs::copy(
+            directory.join("buyer/keys/recipient.key"),
+            directory.join("recovery/recipient.key"),
+        )?;
+        std::fs::set_permissions(
+            directory.join("recovery/recipient.key"),
+            std::fs::Permissions::from_mode(0o600),
+        )?;
+        std::fs::remove_dir_all(directory.join("buyer"))?;
+        std::fs::remove_file(directory.join("worker/recipient.key"))?;
+        std::fs::remove_dir_all(directory.join("worker/job/sources"))?;
+        input["phase"] = json!("recover-delivery");
+        let recovered = run_node_fixture("commerce-sandbox", &input)?;
+        assert_eq!(recovered["recovered"], true);
+        assert_eq!(recovered["artifactDigest"], paid["artifactDigest"]);
+        Ok(())
+    }
+    .await;
+    std::fs::remove_dir_all(directory)?;
+    result
 }
 
 #[tokio::test]

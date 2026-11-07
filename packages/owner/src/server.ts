@@ -8,8 +8,10 @@ import { OwnerAuth } from "./auth.js";
 import { OwnerService } from "./service.js";
 import { missionId } from "../../runtime/src/journal.js";
 import type { MissionService } from "../../runtime/src/service.js";
+import type { CommissionService } from "../../commerce/src/service.js";
+import { commissionId } from "../../commerce/src/protocol.js";
 
-export interface OwnerServerOptions { port: number; staticDirectory: string; service: OwnerService; missions?: MissionService; fixture?: boolean; now?: () => number }
+export interface OwnerServerOptions { port: number; staticDirectory: string; service: OwnerService; missions?: MissionService; commerce?: CommissionService; fixture?: boolean; now?: () => number }
 const cookieValue = (request: IncomingMessage, name: string) => {
   const parts = (request.headers.cookie ?? "").split(";").map((part) => part.trim()).filter((part) => part.startsWith(`${name}=`));
   if (parts.length !== 1) return undefined;
@@ -45,13 +47,14 @@ export function createOwnerServer(options: OwnerServerOptions) {
   const send = (response: ServerResponse, value: unknown, status = 200) => {
     response.writeHead(status, { "content-type": "application/json; charset=utf-8" }); response.end(JSON.stringify(value));
   };
+  const requests = new Set<Promise<unknown>>();
   const server = createServer((request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("X-Frame-Options", "DENY");
     response.setHeader("Referrer-Policy", "no-referrer");
     response.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-    void (async () => {
+    const task = (async () => {
       if (request.headers.host !== authority) return send(response, { status: "failed", code: "INVALID_HOST" }, 421);
       const url = new URL(request.url ?? "/", origin);
       if (url.origin !== origin || url.search || url.hash) throw new ProviderError("INVALID_INPUT", "Unexpected console URL");
@@ -92,12 +95,38 @@ export function createOwnerServer(options: OwnerServerOptions) {
         }
         const view = await service.read();
         authorize(view);
+        if (url.pathname.startsWith("/api/commissions/")) {
+          const commerce = options.commerce; if (!commerce) throw new ProviderError("NOT_CONFIGURED", "Specialist commissioning is not configured");
+          const parts = url.pathname.slice("/api/commissions/".length).split("/"), id = parts[0];
+          if (!commissionId(id) || parts.length > 2) throw new ProviderError("INVALID_INPUT", "Invalid commission route");
+          if (request.method === "GET" && parts.length === 1) return send(response, commerce.options.journal.view(id));
+          if (request.method === "GET" && parts[1] === "request") return send(response, commerce.request(id));
+          if (request.method === "GET" && parts[1] === "recovery-request") return send(response, await commerce.recoveryRequest(id));
+          if (request.method !== "POST" || parts.length !== 2) return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
+          const input = await body(request); authorize(view);
+          if (["quote", "delivery"].includes(parts[1]!)) {
+            exact(input, ["signed"]); return send(response, parts[1] === "quote" ? await commerce.importQuote(id, input.signed, authorize) : await commerce.importDelivery(id, input.signed, authorize));
+          }
+          if (parts[1] === "reconcile") { exact(input, []); return send(response, await commerce.reconcile(id)); }
+          if (parts[1] === "reserve") {
+            exact(input, ["version", "quoteDigest", "acknowledgeStorage"]);
+            if (!Number.isSafeInteger(input.version) || typeof input.quoteDigest !== "string" || input.acknowledgeStorage !== true) throw new ProviderError("INVALID_INPUT", "Acknowledge the exact quote and testnet upload cost before reservation");
+            return send(response, await commerce.reserve(id, Number(input.version), input.quoteDigest, authorize));
+          }
+          if (parts[1] === "settle") {
+            exact(input, ["version", "artifactDigest", "quoteDigest", "acknowledged"]);
+            if (!Number.isSafeInteger(input.version) || typeof input.artifactDigest !== "string" || typeof input.quoteDigest !== "string" || input.acknowledged !== true) throw new ProviderError("INVALID_INPUT", "Acknowledge the exact delivery and quote before settlement");
+            return send(response, await commerce.settle(id, Number(input.version), input.artifactDigest, input.quoteDigest, authorize));
+          }
+          if (parts[1] === "cancel") { exact(input, ["version"]); return send(response, commerce.cancel(id, Number(input.version))); }
+          return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
+        }
         if (url.pathname === "/api/missions" || url.pathname.startsWith("/api/missions/")) {
           const missions = options.missions;
           if (!missions) throw new ProviderError("NOT_CONFIGURED", "Mission journal is not configured");
           if (url.pathname === "/api/missions/activity" && request.method === "GET") return send(response, { events: missions.journal.activity() });
           if (url.pathname === "/api/missions") {
-            if (request.method === "GET") return send(response, { missions: missions.journal.list(), capabilities: missions.capabilities() });
+            if (request.method === "GET") return send(response, { missions: missions.journal.list().map((m) => options.commerce?.project(m) ?? m), capabilities: missions.capabilities(), commissioning: options.commerce?.capabilities() ?? { configured: false } });
             const input = await body(request);
             // Body parsing can await; recheck the session before each local mutation too.
             authorize(view);
@@ -106,9 +135,15 @@ export function createOwnerServer(options: OwnerServerOptions) {
           const parts = url.pathname.slice("/api/missions/".length).split("/");
           const id = parts[0];
           if (!missionId(id) || parts.length > 2) throw new ProviderError("INVALID_INPUT", "Invalid mission route");
-          if (request.method === "GET" && parts.length === 1) return send(response, missions.journal.get(id));
+          if (request.method === "GET" && parts.length === 1) { const detail = missions.journal.get(id); return send(response, options.commerce?.detail(detail) ?? detail); }
           if (request.method !== "POST" || parts.length !== 2) return send(response, { status: "failed", code: "NOT_FOUND" }, 404);
           const input = await body(request); authorize(view);
+          if (parts[1] === "commission") {
+            exact(input, ["version", "maximumYoctoNear"]);
+            if (!options.commerce) throw new ProviderError("NOT_CONFIGURED", "Specialist commissioning is not configured");
+            if (!Number.isSafeInteger(input.version) || typeof input.maximumYoctoNear !== "string") throw new ProviderError("INVALID_INPUT", "Choose the reviewed commission budget");
+            return send(response, await options.commerce.create(id, Number(input.version), input.maximumYoctoNear, view, authorize));
+          }
           if (parts[1] === "events") { exact(input, ["after"]); return send(response, { events: missions.journal.events(id, input.after as number) }); }
           exact(input, parts[1] === "approve" ? ["version", "artifactDigest"] : ["version"]);
           if (!Number.isSafeInteger(input.version) || Number(input.version) < 1) throw new ProviderError("INVALID_INPUT", "Invalid mission version");
@@ -153,8 +188,9 @@ export function createOwnerServer(options: OwnerServerOptions) {
       const code = error instanceof ProviderError ? error.code : "UPSTREAM_ERROR";
       if (!response.headersSent) send(response, { status: "failed", code }, code === "AUTHORIZATION_FAILED" ? 403 : code === "INVALID_INPUT" ? 400 : ["OPERATION_CONFLICT", "OUTCOME_UNKNOWN", "INTEGRITY_FAILED", "MISSION_BLOCKED"].includes(code) ? 409 : 503);
       else response.end();
-    });
+    }).finally(() => { requests.delete(task); });
+    requests.add(task);
   });
   server.headersTimeout = 10_000; server.requestTimeout = 15_000; server.keepAliveTimeout = 2_000; server.maxRequestsPerSocket = 50;
-  return { server, origin, auth };
+  return { server, origin, auth, drain: async () => { await Promise.allSettled([...requests]); } };
 }

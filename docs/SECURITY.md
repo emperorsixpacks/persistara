@@ -4,7 +4,7 @@
 
 Protected: owner authority, treasury balance, memory plaintext, recovery material, specialist deliverables, and the integrity of mission/receipt history. Trust the owner's execution machine and explicitly configured signer service in the first release. The application is not protected against a fully compromised owner machine. 0G holds ciphertext. NEAR state and transactions are public.
 
-Use separate owner, NEAR runtime, 0G uploader, and memory keys. Encrypting a storage wallet to itself does not implement NEAR ownership authorization. The model process receives tool capabilities, not raw keys. Do not grant it filesystem access to key stores or a general shell escape.
+Use separate owner, specialist wallet, NEAR runtime, 0G uploader, memory and commission recipient keys. Encrypting a storage wallet to itself does not implement NEAR ownership authorization. The model process receives tool capabilities, not raw keys. Do not grant it filesystem access to key stores or a general shell escape.
 
 ## Required controls
 
@@ -21,7 +21,7 @@ Use separate owner, NEAR runtime, 0G uploader, and memory keys. Encrypting a sto
 
 ## Crypto choices
 
-Use application-owned AES-256-GCM envelopes with authenticated context and bounded canonical encodings. Random 32-byte memory keys are never derived from addresses, passwords alone, or wallet signatures without a reviewed scheme. A later key-wrapping implementation must use a standard library and documented recipient/recovery model; do not invent DH or a threshold network.
+Use application-owned AES-256-GCM envelopes with authenticated context and bounded canonical encodings. Random 32-byte memory keys are never derived from addresses, passwords alone, or wallet signatures without a reviewed scheme. Commission briefs/deliveries use standard JWE RSA-OAEP-256 / A256GCM through pinned jose with distinct 3072-bit recipient keys and authenticated scope/purpose context. Neither wallet signatures nor addresses derive these secrets. Memory backups do not contain commission recipient keys; recovery custody must be verified separately.
 
 0G SDK encryption exists, but current docs describe a wrong-key ciphertext fallback. The application envelope therefore remains the authenticated boundary regardless of storage adapter behavior. SDK storage proofs verify ciphertext consistency; they do not authorize readers.
 
@@ -38,6 +38,7 @@ Never persist decrypted content or private keys to receipts/logs. API secrets ar
 - Inference unavailable/unverified: show exact evidence state; never fake a verification badge.
 - Runtime crashes during payment: reconcile existing reservation/payout; do not create a new job for the same operation.
 - Source mission interruption: retain captures under immutable public-read operation IDs and fence stale/canceled workers with expiring leases. Only uncommitted unauthenticated public GETs may be repeated explicitly; no payment/upload capability exists in this worker. DNS pinning, exact HTTPS origins, public IPv4, certificate checks, byte/deadline bounds and no redirects restrict retrieval. Briefs/excerpts are plaintext in the private local mission journal, not encrypted memory backups. See [mission custody and limits](MISSIONS.md).
+- Specialist commission interruption: fixed signed-task/quote bindings, immutable roots, canonical signer identity and persisted dispatch markers fence repeat uploads/reservations/deliveries/acceptance. Unknown outcomes only observe existing effects. Payout callbacks, not acceptance receipts, establish payment. Explicit retry of a conclusively failed payout stays bound to the original recipient/amount/attempt; unknown retries are fenced. See [commerce limits and custody](COMMISSIONS.md).
 - NEAR signer interruption: its private SQLite journal binds exact arguments, nonce and signed transaction before broadcast. A submitted/unknown row fences new signing until reconciled; use one dedicated key and journal per agent. A dropped/unseen transaction can remain unknown because expiry proofs and nonce replacement are not implemented. See [client recovery limits](NEAR-CLIENTS.md).
 - Paused/revoked runtime: stop new effects and checkpoint writes; handle already submitted transactions according to observed finality.
 - Owner wallet handoff: persist the reviewed request before calling the external wallet. Cancellation, disconnection or a lost response does not prove absence of broadcast. Retain one pending operation across restart; only a matching finalized receipt resolves it. Without a recoverable hash it may remain fenced indefinitely. Loopback owner sessions bind the original registered full-access key, origin and one-time NEP-413 challenge; mutation routes also require CSRF. See [console controls and limits](OWNER-CONSOLE.md).

@@ -16,4 +16,13 @@ These screenshots are **explicit browser fixtures**, not live-wallet or source-v
 
 ![Phone mission desk](images/mission-desk-mobile.png)
 
-The source fixture banner remains visible. The original owner CLI login and real public-source mission are documented separately in `docs/evidence`. The full model/commerce research product, public hosting and live browser-wallet approval remain pending.
+The source fixture banner remains visible. The original owner CLI login and real public-source mission are documented separately in `docs/evidence`. The model-driven research product, public hosting and live browser-wallet approval remain pending.
+
+
+The commission detail adds a four-stage quote/reservation/delivery/settlement timeline, explicit price and upload-cost review, signed-file exchange, inspectable receipts and decrypted source preview. Pending callback states remain distinct from paid. Quote review exposes delivery/review deadlines and buyer-controlled dispute terms before approval. The following captures are also disposable browser fixtures:
+
+![Exact quote and cost review](images/commerce-quote-review.png)
+
+![Encrypted specialist delivery ready for review](images/commerce-delivery-desktop.png)
+
+![Paid and reviewed mission on a phone](images/commerce-settled-mobile.png)

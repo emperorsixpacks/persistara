@@ -1,6 +1,6 @@
 import { isObject } from "../../protocol/src/memory.js";
 import { ProviderError } from "../../protocol/src/providers.js";
-import { decimal, decodeHead, transactionHash, validateIdentity, publicKey, type RuntimeIdentity } from "../../near/src/protocol.js";
+import { accountId, decimal, decodeHead, transactionHash, validateIdentity, publicKey, type RuntimeIdentity } from "../../near/src/protocol.js";
 import { delegate, replacementMethods } from "../../near/src/rotation.js";
 import { NearRpc } from "../../near/src/rpc.js";
 import type { OwnerView } from "./types.js";
@@ -60,13 +60,13 @@ export class OwnerReader {
     });
     let policy: OwnerView["policy"] = null;
     if (raw.policy !== null) {
-      if (!isObject(raw.policy) || !decimal(raw.policy.maxJobAmount, 128, true) || !decimal(raw.policy.dailyLimit, 128, true)) throw new ProviderError("PROTOCOL_ERROR", "Invalid treasury policy");
-      policy = { maxJobAmount: raw.policy.maxJobAmount, dailyLimit: raw.policy.dailyLimit };
+      if (!isObject(raw.policy) || !decimal(raw.policy.maxJobAmount, 128, true) || !decimal(raw.policy.dailyLimit, 128, true) || !Array.isArray(raw.policy.approvedWorkers) || raw.policy.approvedWorkers.length < 1 || raw.policy.approvedWorkers.length > 16 || !raw.policy.approvedWorkers.every(accountId) || new Set(raw.policy.approvedWorkers).size !== raw.policy.approvedWorkers.length) throw new ProviderError("PROTOCOL_ERROR", "Invalid treasury policy");
+      policy = { maxJobAmount: raw.policy.maxJobAmount, dailyLimit: raw.policy.dailyLimit, approvedWorkers: raw.policy.approvedWorkers };
     }
     const local = await this.local(snapshot.keyEpoch);
     return { owner: snapshot.owner, ownerKey: snapshot.ownerKey, ownerNonce: owner?.nonce ?? 0, ownerKeyFullAccess: owner?.permission === "FullAccess",
       agentId: snapshot.agentId, contractId: snapshot.contractId, chainId: snapshot.chainId, blockHash: snapshot.blockHash, timestampNs: snapshot.timestampNs, codeHash: this.expectedCodeHash,
-      paused: snapshot.paused, generation: snapshot.generation, keyEpoch: snapshot.keyEpoch, checkpointVersion: snapshot.head?.version ?? 0,
+      paused: snapshot.paused, generation: snapshot.generation, policyVersion: decimal(raw.policyVersion) ? raw.policyVersion : (() => { throw new ProviderError("PROTOCOL_ERROR", "Invalid policy version"); })(), keyEpoch: snapshot.keyEpoch, checkpointVersion: snapshot.head?.version ?? 0,
       balances: { available: String(raw.available), reserved: String(raw.reserved), pending: String(raw.pending), paid: String(raw.paid) }, policy, runtimeKeys,
       ...local, canResume: local.backup.status === "verified" && local.localRotationHold === false && runtimeKeys.some((key) => key.ready) };
   }

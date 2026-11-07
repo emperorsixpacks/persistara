@@ -2,9 +2,9 @@
 export interface OwnerView {
   owner: string; ownerKey: string; ownerNonce: number; ownerKeyFullAccess: boolean;
   agentId: string; contractId: string; chainId: string; codeHash: string; blockHash: string; timestampNs: string;
-  paused: boolean; generation: string; keyEpoch: number; checkpointVersion: number;
+  paused: boolean; generation: string; policyVersion: string; keyEpoch: number; checkpointVersion: number;
   balances: { available: string; reserved: string; pending: string; paid: string };
-  policy: { maxJobAmount: string; dailyLimit: string } | null;
+  policy: { maxJobAmount: string; dailyLimit: string; approvedWorkers: string[] } | null;
   runtimeKeys: { publicKey: string; methods: string[]; allowance: string | null; expiresAtNs: string; ready: boolean }[];
   backup: { status: "verified" | "unavailable" | "epoch_mismatch"; offDeviceVerified: false };
   localRotationHold: boolean | null; canResume: boolean;

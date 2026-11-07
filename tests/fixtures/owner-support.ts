@@ -16,7 +16,7 @@ export async function ownerFixture() {
   const codeHash = baseEncode(randomBytes(32));
   const view: OwnerView = { owner: config.signerId, ownerKey: owner.getPublicKey().toString(), ownerNonce: 30, ownerKeyFullAccess: true,
     agentId: config.agentId, contractId: config.contractId, chainId: "testnet", codeHash, blockHash: baseEncode(randomBytes(32)), timestampNs: "1794050000000000000",
-    paused: false, generation: "3", keyEpoch: 1, checkpointVersion: 1, balances: { available: "90000000000000000000000", reserved: "0", pending: "0", paid: "10000000000000000000000" }, policy: { maxJobAmount: "20000000000000000000000", dailyLimit: "50000000000000000000000" },
+    paused: false, generation: "3", policyVersion: "1", keyEpoch: 1, checkpointVersion: 1, balances: { available: "90000000000000000000000", reserved: "0", pending: "0", paid: "10000000000000000000000" }, policy: { maxJobAmount: "20000000000000000000000", dailyLimit: "50000000000000000000000", approvedWorkers: ["worker.testnet"] },
     runtimeKeys: [{ publicKey: config.publicKey, methods: ["checkpoint_memory", "create_job", "accept_job"], allowance: "250000000000000000000000", expiresAtNs: "1794750000000000000", ready: true }], backup: { status: "verified", offDeviceVerified: false }, localRotationHold: false, canResume: true };
   const journalFile = join(directory, "owner.sqlite");
   let journal = new OwnerJournal(journalFile, config, codeHash);

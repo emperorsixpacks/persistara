@@ -258,7 +258,6 @@ dialog::backdrop { background: #070e14bb; backdrop-filter: blur(5px); }
   .breadcrumbs strong { font-size: 11px; }
   .top-actions { gap: 7px; }
   .top-actions button { padding: 7px 9px; font-size: 10px; }
-  #disconnect { display: none; }
   .network { padding: 7px; font-size: 8px; gap: 5px; }
   .network i { width: 4px; height: 4px; }
   main { padding-inline: 19px; }
@@ -325,3 +324,22 @@ dialog::backdrop { background: #070e14bb; backdrop-filter: blur(5px); }
 .source-excerpt { font-size: 13px; }
 .detail-side .tiny { font-size: 11px; }
 @media (max-width: 1100px) { .hero-art { display: none; } }
+/* Specialist exchange uses the same copper/slate language as the mission desk. */
+.commission-panel { border-color: #5e5144; }
+.commission-pitch { display: flex; align-items: center; justify-content: space-between; gap: 22px; border-top: 1px solid var(--line); padding-top: 20px; }
+.commission-pitch strong { display: block; font-size: 13px; font-weight: 500; }
+.commission-pitch span { display: block; font-size: 11px; line-height: 1.8; color: var(--muted); margin-top: 7px; }
+.commission-steps { list-style: none; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 22px 0; margin: 20px 0; gap: 15px; border-block: 1px solid var(--line); }
+.commission-steps li { font-size: 11px; line-height: 1.7; color: var(--dim); }
+.commission-steps li > span { display: block; font-family: ui-monospace,monospace; font-size: 9px; letter-spacing: 1px; margin-bottom: 9px; }
+.commission-steps li.current { color: var(--accent); }
+.commission-steps li.done { color: var(--ok); }
+.commission-facts { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 23px 0; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.commission-facts > span::before { content: '·'; color: var(--accent); margin-right: 7px; }
+.commission-evidence { border-top: 1px solid var(--line); padding-top: 18px; }
+.commission-evidence > p { font-size: 9px; }
+.commission-evidence a { color: var(--accent); }
+.pill.state-paid { color: #a8d1c2; border-color: #38554b; background: #263b34; }
+.pill.state-quoted,.pill.state-delivery_ready { color: #edbc9b; border-color: #70553e; background: #403329; }
+.pill.state-refunded,.pill.state-payout_failed { color: #efc495; border-color: #66543a; background: #372e22; }
+@media(max-width:720px) { .commission-steps { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 19px; } .commission-pitch { align-items: flex-start; flex-direction: column; } .commission-pitch button { width: 100%; } .commission-facts { display: grid; gap: 6px; } }
