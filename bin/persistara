@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+node_bin="$project_root/node_modules/node/bin/node"
+if [ ! -x "$node_bin" ]; then node_bin=node; fi
+if [ ! -f "$project_root/dist/scripts/cli.js" ]; then
+  printf '%s\n' 'Persistara is not built. Run pnpm install --frozen-lockfile and pnpm build in the checkout.' >&2
+  exit 2
+fi
+exec "$node_bin" "$project_root/dist/scripts/cli.js" "$@"

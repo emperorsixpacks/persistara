@@ -12,7 +12,7 @@ The source-only mission journal/worker and owner-authenticated local API are now
 
 ## Terminal experience
 
-The unified interactive terminal is a first-class product requirement alongside the console. Existing memory, specialist and diagnostic scripts are operational subcommands, not a replacement for Sofer's interactive CLI. A unified Persistara CLI must create/inspect/resume missions, recall sourced memory, review specialist quotes/artifacts, reconcile payments and run recovery through the same durable services and policy boundaries as the browser. Model conversation/reasoning remains deferred until inference access is available; terminal mission/recovery commands must work without it. Do not introduce a second in-memory execution engine or load wallet keys to imitate the old loop.
+The native interactive terminal is the primary product surface; further console styling is deferred. Plan 008 now provides create/inspect/resume/review, sourced memory recall/rebuild, specialist quote/artifact review, bounded payments and recovery commands through the same durable services and policy boundaries as the browser. It is a command workspace with external original-owner signing, not yet Sofer's conversational CLI. Model conversation/reasoning remains deferred until inference access is available; conversational sessions, enrollment and daemon lifecycle remain separate work. Do not introduce a second in-memory execution engine or load wallet keys to imitate the old loop. See [terminal setup and verification](../docs/TERMINAL.md).
 
 ## Required model
 

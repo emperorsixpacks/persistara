@@ -33,6 +33,10 @@ The first release is a complete hackathon application with a foundation intended
 8. Pause/revoke the agent and demonstrate that a stale runtime cannot reserve more money or advance the memory head.
 9. Inspect receipts that distinguish source provenance, storage integrity, contract settlement, and verified inference evidence.
 
+## Primary surface
+
+The native CLI is the primary product surface. The console is a companion interface; additional visual redesign is deferred while workflows are completed. Both use one durable engine and the same ownership, memory, spending and recovery boundaries. The implemented terminal covers the existing-agent mission/commerce/recovery workflow without inference. Sofer-style model conversation/session handling, full onboarding, daemon and Telegram remain follow-up capabilities rather than claims attached to an operational command set.
+
 ## Main product experience
 
 - **Onboarding:** connect owner account, create agent, back up recovery material, fund testnet treasury, verify integrations. Explain the recovery step before accepting a claim of portability.

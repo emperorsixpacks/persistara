@@ -12,9 +12,12 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 | 004 | Recoverable indexed memory and owner recovery workflow | 002, 003 | IN PROGRESS — first real NEAR/0G backup recovery passes; broader recovery, live rotation, wallet and measurement gates remain |
 | 005 | Durable missions, signed worker protocol, authenticated API | 003, 004 | IN PROGRESS — zero-credit source-dossier and signed specialist commission workflows/API/recovery pass; model loop, SSE and broader release gates remain |
 | 006 | Operational console, live demo, release evidence | 005 | IN PROGRESS — redesigned mission desk, signed quote/delivery/settlement review, activity, controls and evidence exist; broader golden demo/release gates remain |
+| 008 | Native terminal as primary mission/commerce workspace | 003, 004, 005 | DONE — native login, real interrupted source mission/resume/review/reopen and memory-cache recovery pass; conversational parity remains separate |
 | 007 | External owner-wallet connection and reviewed controls | 003, 004 | IN PROGRESS — existing-agent authentication/pause/resume implemented; live browser-provider approval and broader enrollment/rotation UI remain |
 
 Plans 002 and 003 are independent after 001. This is a dependency observation, not permission to spawn other agents. Keep work single-agent unless the operator authorizes delegation.
+
+Native terminal milestone (2026-11-08): **220 TypeScript tests / 33 suites**, **11 browser regressions**, **34 Rust tests / six sandbox scenarios** pass. The primary native CLI connects the original owner through the external official keychain and shares mission/commerce/recovery services with the console. Real acceptance rebuilt the committed memory cache, stopped a new source mission after its first capture, resumed in a fresh process, reviewed the exact dossier and reopened the same completed artifact. Both source capture attempts remain 1; no inference, upload or public transaction occurred. See [native acceptance evidence](../docs/evidence/native-terminal-2026-11-08.json) and [commands/limits](../docs/TERMINAL.md). AI conversation, conversational sessions, enrollment, daemon/Telegram, real browser-provider approval and physical off-device recovery remain separate work. Further UI styling is deferred by user direction.
 
 Foundation evidence: `pnpm check` completed with 20 passing tests in three suites; eight reviewed source hashes matched; tracked-file and whitespace checks passed. Initial implementation commit: `950b82c`. Remote: https://github.com/JemIIahh/persistara (private). Public live-provider and contract acceptance gates remain unexecuted.
 
@@ -36,7 +39,7 @@ Four major workstreams remain before the first-release demonstration:
 
 1. Complete wallet acceptance and enrollment: existing-agent owner connection/readiness/pause-resume is implemented; real browser-provider approval, new-agent enrollment and rotation execution remain.
 2. Complete the remaining mission capabilities: model-driven runner when credits are available, SSE, memory publication and broader intervention/recovery cases (plan 005).
-3. Operational console plus a first-class unified terminal for missions, memory, controls and precise evidence (plans 005/006).
+3. Extend the primary native terminal beyond its completed mission/commerce/recovery milestone (plan 008): enrollment, conversational sessions and daemon lifecycle remain; retain the companion console and defer visual redesign (plan 006).
 4. Release validation: two-fact/source/revision recovery, real-provider rotation and failure drills, off-device backup/cross-machine recovery, five-trial costs/latency, complete demo, public repository and submission evidence.
 
 Verified NEAR AI inference/tool calling and embeddings remain separately deferred until credits are available. Their absence must remain visible; the mechanical testnet workflow is not an AI research mission. This grouping is a work inventory, not a percentage-complete estimate.

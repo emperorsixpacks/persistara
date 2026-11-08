@@ -6,7 +6,9 @@ Planned against Sofer commit `542813f`, reviewed 2026-11-06. This document descr
 
 ```mermaid
 flowchart TD
-  Owner[Owner wallet and recovery material] --> Console[Authenticated console]
+  Owner[Owner wallet and recovery material] --> Terminal[Native terminal]
+  Owner --> Console[Authenticated console]
+  Terminal --> API
   Console --> API[API and durable mission journal]
   API --> Worker[Resumable agent worker]
   Worker --> AI[NEAR AI inference and embeddings]
@@ -63,6 +65,8 @@ NEAR AI supplies inference and embeddings through provider adapters. Use a curre
 
 Verified inference evidence is not proof that a tool ran correctly, a report is true, or a job was worth paying. Capture only the evidence actually provided and verified. Never store model chain-of-thought as an application receipt.
 
+The native [terminal](TERMINAL.md) is now the primary operator interface. `packages/operator` constructs one local workspace for both the console entry point and terminal. The CLI calls the same services directly; it requires no HTTP host/browser. Its CLI-specific NEP-413 domain and expiring in-memory session preserve original-owner authorization. Exact reviewed effects still flow through the canonical journals and isolated signers. The terminal interprets only implemented operator commands and never executes captured content as instructions or supplies fake model answers.
+
 ## Execution and external effects
 
 The implemented [source-dossier mission workflow](MISSIONS.md) provides a private versioned SQLite brief/source/event/artifact journal and fenced source worker, exposed through the local owner-authenticated host. It has no inference, signing, upload or payment capability. It captures approved public HTTPS text, resumes remaining reads after interruption, creates one local dossier and records digest-bound review. Mission plaintext stays local and is outside encrypted memory backups. The model loop and remote API remain target architecture. A linked commission follows the separate service below instead of running the local zero-spend worker.
@@ -91,6 +95,9 @@ packages/memory/              manifests, recall, recovery
 packages/storage/             local development and live 0G adapters
 packages/near/                registry/treasury clients and event reconciliation
 packages/owner/               owner proof, loopback host and wallet handoff journal
+packages/operator/            shared local workspace and memory wiring
+packages/terminal/            native terminal controller, review, output and external wallet adapter
+bin/persistara                project-local pinned-runtime CLI launcher
 packages/inference/           NEAR AI adapters and evidence verification
 packages/runtime/             mission journal, leases, bounded source collection
 packages/commerce/            signed commission protocol, JWE, journal, specialist executor

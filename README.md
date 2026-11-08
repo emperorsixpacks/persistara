@@ -2,11 +2,26 @@
 
 **Agents that carry their memory and work forward.**
 
-Persistara is a new successor to Sofer: a workspace for owner-controlled agents with recoverable encrypted memory, durable missions, bounded spending, and accountable agent-to-agent work.
+Persistara is a new successor to Sofer: a terminal-first workspace for owner-controlled agents with recoverable encrypted memory, durable missions, bounded spending, and accountable agent-to-agent work.
 
 The selected stack is **NEAR ownership and settlement + 0G encrypted storage + NEAR AI inference**. This repository starts fresh. It selectively adapts reviewed Sofer primitives; it is not a renamed copy or a claim that old work was built during the hackathon.
 
 Repository: https://github.com/JemIIahh/persistara. Development visibility: private; the hackathon release must be public by its submission deadline.
+
+## Start in the terminal
+
+The primary interface is now a native interactive CLI. In the configured project:
+
+```sh
+pnpm build
+./bin/persistara
+```
+
+Or run `pnpm cli`. Connect through the external original-owner NEAR CLI keychain, then use `/new`, `/run`, `/review`, `/missions` and `/open`. The same terminal supports signed specialist quote/delivery review, bounded reservation/settlement, receipts, source-aware memory recall and recovery. Interrupted source work resumes under the same durable mission ID. No browser or AI credits are required for this implemented workflow. See [terminal setup, commands and exact limits](docs/TERMINAL.md).
+
+Real native acceptance verified owner login, memory-cache recovery and a source mission interrupted after its first capture, resumed/reviewed/reopened in fresh CLI processes with the same artifact. No upload, transaction or inference was used. See [terminal acceptance evidence](docs/evidence/native-terminal-2026-11-08.json).
+
+**AI chat/reasoning is not enabled yet.** This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
 
 ## Current implementation
 
@@ -30,11 +45,11 @@ The local owner console now connects external NEAR wallets, verifies the origina
 
 The redesigned mission desk now persists zero-spend source-collection briefs, captures approved public HTTPS sources, saves a local dossier and records review of its exact fingerprint. Fenced worker leases retain progress across interruptions; completed source captures are not fetched again on resume. The owner-authenticated API exposes journal-backed missions, source artifacts and replayable event cursors. A real two-source NEAR/0G documentation mission completed without AI, upload or public transaction. See [mission setup and recovery limits](docs/MISSIONS.md) and [sanitized live evidence](docs/evidence/mission-source-dossier-2026-11-07.json).
 
-![Persistara mission desk — explicitly labeled browser fixture](docs/images/mission-desk-desktop.png)
+[Optional web-console design and explicitly labeled fixture captures](docs/CONSOLE-DESIGN.md).
 
 Signed specialist commissioning now links one curated worker to a mission through domain-bound NEP-413 quotes and delivery receipts. Separate JWE recipient keys protect briefs/dossiers on 0G; exact owner review precedes bounded NEAR acceptance, and finalized payout callbacks determine payment completion. The separate worker CLI keeps wallet signing in the official external keychain. Fixed upload/job intents and canonical signer journals survive interruption without replacement effects. Public testnet acceptance completed a real two-source encrypted delivery and paid 0.01 NEAR once, retained across a host restart; a fresh process decrypted the result using a copied recipient key without runtime/uploader credentials. See [sanitized live commissioning evidence](docs/evidence/specialist-commission-2026-11-07.json) and [setup, signed-file exchange and recovery limits](docs/COMMISSIONS.md).
 
-**Not implemented yet:** a unified interactive Sofer-style terminal (operational CLI subcommands already exist), embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
+**Not implemented yet:** AI conversation/reasoning and conversational session resumption, daemon/Telegram integration, embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
 
 ## Development
 
@@ -47,7 +62,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **207 TypeScript tests in 31 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **220 TypeScript tests in 33 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
@@ -69,6 +84,7 @@ Run `pnpm missions:recover:fixture` for a clearly labeled three-process source-d
 
 ## Build specification
 
+- [Native terminal setup and workflows](docs/TERMINAL.md)
 - [Product and first release](docs/PRODUCT.md)
 - [Architecture and trust boundaries](docs/ARCHITECTURE.md)
 - [Security and failure model](docs/SECURITY.md)

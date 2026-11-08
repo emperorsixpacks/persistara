@@ -48,7 +48,8 @@
     "contract:build": "cargo near build non-reproducible-wasm --manifest-path contracts/authority/Cargo.toml --locked --no-abi",
     "contract:test": "cargo test -p persistara-authority --locked",
     "contract:sandbox": "pnpm build && pnpm contract:build && cargo test -p persistara-contract-tests --features sandbox --locked -- --test-threads=1",
-    "contract:check": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets --features sandbox --locked -- -D warnings && pnpm contract:test && pnpm contract:sandbox"
+    "contract:check": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets --features sandbox --locked -- -D warnings && pnpm contract:test && pnpm contract:sandbox",
+    "cli": "pnpm build && node dist/scripts/cli.js"
   },
   "devDependencies": {
     "@playwright/test": "1.65.0",
@@ -70,5 +71,8 @@
     "ethers": "6.13.1",
     "jose": "6.2.15",
     "near-api-js": "7.4.0"
+  },
+  "bin": {
+    "persistara": "bin/persistara"
   }
 }

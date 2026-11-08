@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "kind": "real_native_terminal_source_mission_acceptance",
+  "fixture": false,
+  "missionId": "mission:18c0ae55-cfd7-458a-ab6b-c2b055410135",
+  "owner": "persistara-owner.testnet",
+  "agentId": "persistara-owner.testnet:research",
+  "contractId": "authority.persistara-owner.testnet",
+  "externalOwnerSigner": "official-near-cli-keychain-nep413",
+  "applicationOwnerWalletPrivateKeyLoaded": false,
+  "browserRequired": false,
+  "interactiveEntryUsed": true,
+  "distinctCliNep413Domain": true,
+  "ttyLoginAndSavedMissionListVerified": true,
+  "nativeMemoryCacheRecovery": {
+    "verified": true,
+    "checkpointVersion": 1,
+    "recordCount": 1,
+    "uploadOrTransactionSubmitted": false
+  },
+  "interruption": {
+    "signalRequested": "SIGTERM",
+    "processExitCode": 130,
+    "state": "interrupted",
+    "firstSourceCaptureRetained": true,
+    "at": "2026-11-08T17:16:43.351Z"
+  },
+  "completion": {
+    "state": "completed",
+    "artifactDigest": "386988bd4829485dc37f047b2c21a1c7ed2c2a10b10b565d3ae00f4d5ab64cc8",
+    "sources": [
+      {
+        "url": "https://docs.near.org/",
+        "attempts": 1,
+        "contentSha256": "157cc298191d35e24bfdd564d9a7b3a7e8fbbef5e70f9ad096d840db8bbd39b5",
+        "capturedAt": "2026-11-08T17:16:42.049Z",
+        "byteLength": 185419
+      },
+      {
+        "url": "https://docs.0g.ai/",
+        "attempts": 1,
+        "contentSha256": "d6bb75ab8255ac6149d8744e3f9b60c80647d8c1d478b963b886dd3868b8b399",
+        "capturedAt": "2026-11-08T17:21:30.477Z",
+        "byteLength": 44231
+      }
+    ],
+    "firstCommittedSourceRetained": true,
+    "freshProcessResume": true,
+    "freshProcessReopen": true,
+    "reviewDigestBound": true,
+    "spentYoctoNear": "0",
+    "at": "2026-11-08T17:21:38.605Z"
+  },
+  "nearAiUsed": false,
+  "uploadOrTransactionSubmitted": false,
+  "browserWalletProviderApprovalVerified": false,
+  "physicalOffDeviceRecoveryVerified": false,
+  "modelConversationImplemented": false,
+  "verifiedAt": "2026-11-08T17:26:03.266Z"
+}
