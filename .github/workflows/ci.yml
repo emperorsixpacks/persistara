@@ -41,8 +41,24 @@ jobs:
         run: rustup show active-toolchain
       - run: pnpm install --frozen-lockfile
       - name: Install cargo-near 0.22.0
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh -o /tmp/cargo-near-installer.sh
-          sh /tmp/cargo-near-installer.sh
+          cargo_near_dir="$RUNNER_TEMP/persistara-cargo-near"
+          mkdir -p "$cargo_near_dir"
+          for attempt in 1 2 3; do
+            if gh release download cargo-near-v0.22.0 --repo near/cargo-near \
+              --pattern cargo-near-x86_64-unknown-linux-gnu.tar.gz --dir "$cargo_near_dir" --clobber; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep "$((attempt * 2))"
+          done
+          printf '%s  %s\n' '9429064e30a427e96523f539cb255f3688d2345e5000d7d4e4873a8247247d1a' \
+            "$cargo_near_dir/cargo-near-x86_64-unknown-linux-gnu.tar.gz" | sha256sum --check --status
+          tar -xzf "$cargo_near_dir/cargo-near-x86_64-unknown-linux-gnu.tar.gz" \
+            -C "$cargo_near_dir" cargo-near-x86_64-unknown-linux-gnu/cargo-near
+          install -m 755 "$cargo_near_dir/cargo-near-x86_64-unknown-linux-gnu/cargo-near" \
+            "$(dirname "$(command -v cargo)")/cargo-near"
           cargo near --version
       - run: pnpm contract:check
