@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "kind": "real_interactive_terminal_application_acceptance",
+  "fixture": false,
+  "owner": "persistara-owner.testnet",
+  "agentId": "persistara-owner.testnet:research",
+  "contractId": "authority.persistara-owner.testnet",
+  "renderer": {
+    "ink": "8.0.0",
+    "react": "19.3.1",
+    "ttyDefault": true,
+    "plainFallback": true,
+    "structuredJsonPreserved": true
+  },
+  "live": {
+    "fixture": false,
+    "realPublicRead": true,
+    "exitCode": 0,
+    "alternateScreenRestored": true,
+    "cursorRestored": true,
+    "bracketedPasteRestored": true,
+    "uploadOrTransactionSubmitted": false,
+    "nearAiUsed": false,
+    "nativeApplicationOwnerLogin": true,
+    "externalSigner": "official-near-cli-keychain-nep413",
+    "numberedSavedMissionReopened": "mission:18c0ae55-cfd7-458a-ab6b-c2b055410135",
+    "transcriptPagingVerified": true,
+    "artifactDigest": "386988bd4829485dc37f047b2c21a1c7ed2c2a10b10b565d3ae00f4d5ab64cc8",
+    "ctrlCExitCode": 130,
+    "ctrlCTerminalRestorationObserved": true,
+    "applicationOwnerWalletPrivateKeyLoaded": false
+  },
+  "checks": {
+    "typeScriptTests": 229,
+    "typeScriptSuites": 34,
+    "browserTests": 11,
+    "rustTests": 34,
+    "sandboxScenarios": 6,
+    "fixtureRendererDimensions": [
+      [
+        110,
+        35
+      ],
+      [
+        80,
+        24
+      ],
+      [
+        48,
+        18
+      ],
+      [
+        36,
+        14
+      ]
+    ]
+  },
+  "captures": {
+    "method": "real PTY output replayed in a terminal emulator, then rasterized",
+    "columns": 110,
+    "rows": 35,
+    "home": "../images/terminal-home-2026-11-09.png",
+    "commands": "../images/terminal-commands-2026-11-09.png"
+  },
+  "claims": {
+    "inferenceUsed": false,
+    "uploadOrTransactionSubmitted": false,
+    "conversationalAgentImplemented": false,
+    "persistedChatSessions": false,
+    "newAgentEnrollment": false,
+    "browserWalletProviderApprovalVerified": false,
+    "physicalOffDeviceRecoveryVerified": false
+  },
+  "verifiedAt": "2026-11-09T07:34:34.854Z"
+}

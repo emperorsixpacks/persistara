@@ -17,7 +17,21 @@ pnpm build
 
 After the initial build, `pnpm cli` opens the same terminal immediately. Use `pnpm cli:dev` to rebuild after source changes. The executable prefers the project's pinned Node runtime. The workspace's `nodeVersion` matches its installed `devEngines.runtime`, so engine checks use the script runtime rather than the host shell's Node version ([pnpm settings](https://github.com/pnpm/pnpm.io/blob/main/versioned_docs/version-10.x/settings.md#nodeversion)). Global Node and shell configuration are unchanged. The executable is project-local; no global package installation is claimed. To use it from elsewhere, run its absolute path. Its default workspace is its own checkout, not the shell's current directory. `--project /absolute/path` explicitly selects another configured workspace. All global flags precede the command.
 
-Startup shows one compact workspace summary. `/help` lists the main actions; `/help missions`, `/help specialist`, `/help memory` and `/help controls` explain a workflow, while `/help all` retains the full reference. Tab completes command names only. Terminal colors are restrained and disabled for redirected output, `TERM=dumb` or any `NO_COLOR` value. Source content is escaped before application-owned styling.
+An interactive TTY now opens the full terminal application: a welcome/workspace view, persistent input composer, command picker, scrollable session output, last-checked status strip and elapsed working indicator. This uses pinned Ink/React over the same command/services engine; it is not a second agent runner. The application uses an alternate terminal screen and restores the original shell on exit.
+
+Type `/` to open commands. Up/Down selects a suggestion; Tab fills it; Enter runs a command or fills an argument-taking command for you to finish. Inside a form or review, the composer accepts only that response; selecting a command never approves a review. `/help`, `/help missions`, `/help specialist`, `/help memory`, `/help controls` and `/help all` retain their existing meanings.
+
+- PgUp/PgDn scroll session output, including complete dossier and review fields that do not fit in the viewport.
+- Left/Right, Home/End and Backspace/Delete edit input with Unicode grapheme boundaries. Ctrl+A/E moves to the start/end; Ctrl+U/K/W edits the draft.
+- Escape dismisses the command picker, clears a command draft, or cancels the current form/review response. Ctrl+C stops owned work and exits safely. Ctrl+D on an empty command composer closes normally.
+- Up/Down outside the command picker recalls only commands typed in this process. Form and approval responses are excluded. Ctrl+L clears the visible session, never the durable journal.
+- Paste is one bounded input value. Pasted newlines do not submit or queue commands/approvals. Input during active work is ignored rather than queued.
+
+Use `./bin/persistara --plain` for the readline interface. `TERM=dumb`, `INK_SCREEN_READER=true` and non-TTY interactive QA use the plain path automatically; structured/JSON/operator commands retain their existing output. `NO_COLOR` keeps the application with uncolored text. All untrusted content is escaped before rendering. The welcome view and in-memory command/session history disappear on exit; durable missions remain in their journal and conversational transcript recovery is not implemented.
+
+![Actual terminal home, rendered from a captured 110-column PTY](images/terminal-home-2026-11-09.png)
+
+[Command-picker capture](images/terminal-commands-2026-11-09.png). These are terminal-emulated captures of the real application against the configured public workspace, not browser-wallet or inference evidence.
 
 The existing `.env` must provide the public NEAR deployment/owner/agent/runtime identity, separate signer/uploader settings and local recovery paths documented in [integration setup](INTEGRATIONS.md). Missing settings fail without fixtures. Build the checked authority WASM with `pnpm contract:build` if absent; authority reads pin the deployed code to that artifact. Source collection uses only the configured approved public HTTPS origins.
 
@@ -25,7 +39,7 @@ The existing `.env` must provide the public NEAR deployment/owner/agent/runtime 
 
 ## Complete a source mission
 
-At the `persistara>` prompt (a leading slash is optional):
+In the command composer, or the `persistara>` prompt with `--plain` (a leading slash is optional):
 
 1. `/connect` shows the original-owner account, network, agent/contract, exact original public key and off-chain session purpose. Type `details` to inspect the complete NEP-413 message/domain/digest before deciding, then `connect` to approve the message signature or Enter to cancel. Inspecting details does not approve it. The installed official NEAR CLI uses its external keychain; no owner private key or seed phrase enters Persistara. `NEAR_CLI_BIN` selects that trusted executable, for example `/opt/homebrew/bin/near`.
 2. `/new` prompts for title, objective, review criteria and one to six approved source URLs. The immutable brief receives a durable mission ID before execution. No upload, inference or payment occurs.

@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "jsx": "react-jsx",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2023"],
@@ -16,6 +17,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["packages/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "scripts/**/*.ts", "tests/**/*.ts", "tests/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }

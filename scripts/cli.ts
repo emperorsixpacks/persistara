@@ -13,9 +13,9 @@ import { ProviderError } from "../packages/protocol/src/providers.js";
 import { assertRuntime } from "../packages/protocol/src/config.js";
 import { loadEnvironment } from "./common.js";
 
-interface Options { project: string; resume?: string; interactive: boolean; json: boolean; approveLogin: boolean; approveDigest?: string; acknowledgeCosts: boolean; args: string[] }
+interface Options { project: string; resume?: string; interactive: boolean; plain: boolean; json: boolean; approveLogin: boolean; approveDigest?: string; acknowledgeCosts: boolean; args: string[] }
 function options(argv: string[]): Options {
-  const result: Options = { project: fileURLToPath(new URL("../../", import.meta.url)), interactive: false, json: false, approveLogin: false, acknowledgeCosts: false, args: [] }, seen = new Set<string>();
+  const result: Options = { project: fileURLToPath(new URL("../../", import.meta.url)), interactive: false, plain: false, json: false, approveLogin: false, acknowledgeCosts: false, args: [] }, seen = new Set<string>();
   let i = 0;
   for (; i < argv.length; i++) {
     const flag = argv[i]!; if (!flag.startsWith("--") || flag === "--help") break;
@@ -25,6 +25,7 @@ function options(argv: string[]): Options {
       if (flag === "--project") result.project = resolve(value); else if (flag === "--resume") result.resume = value; else if (/^[a-f0-9]{64}$/.test(value)) result.approveDigest = value; else throw new ProviderError("INVALID_INPUT", "Approval requires an exact SHA-256 review digest");
     } else if (flag === "--json") result.json = true;
     else if (flag === "--interactive") result.interactive = true;
+    else if (flag === "--plain") result.plain = true;
     else if (flag === "--approve-login") result.approveLogin = true;
     else if (flag === "--acknowledge-costs") result.acknowledgeCosts = true;
     else throw new ProviderError("INVALID_INPUT", "Unknown terminal option; use --help");
@@ -101,14 +102,19 @@ async function main() {
   if (interactive && !process.stdin.isTTY && !opts.interactive) { console.log(terminalHelp); process.exitCode = 2; return; }
   loadEnvironment();
   const workspace = await createLocalWorkspace(), controller = new AbortController();
-  const { io, rl } = lineIO();
+  let application: ReturnType<(typeof import("../packages/terminal/src/application.js"))["createTerminalApplication"]> | null = null;
+  let plain: ReturnType<typeof lineIO> | null = null;
+  const stop = () => { controller.abort(); application?.closeInput(); plain?.rl.close(); void workspace.missions.close(); process.exitCode = 130; };
+  const useApplication = interactive && !opts.plain && process.stdin.isTTY && process.stdout.isTTY && process.env.TERM !== "dumb" && process.env.INK_SCREEN_READER !== "true";
+  if (useApplication) application = (await import("../packages/terminal/src/application.js")).createTerminalApplication({ agentId: workspace.config.agentId, project: opts.project, interrupt: stop });
+  else plain = lineIO();
+  const io = application?.io ?? plain!.io;
   // Machine-readable stdout contains one result; reviews/errors go to stderr.
   const reviewIO: TerminalIO = { ...io, print: (text, tone) => { if (opts.json) process.stderr.write(terminalText(text) + "\n"); else io.print(text, tone); } };
   const client = new TerminalClient(workspace, new NearCliWallet(process.env.NEAR_CLI_BIN || "near", undefined, controller.signal), reviewApproval(reviewIO, { interactive: interactive || Boolean(process.stdin.isTTY && !opts.json), approveLogin: opts.approveLogin, acknowledgeCosts: opts.acknowledgeCosts, ...(opts.approveDigest ? { approveDigest: opts.approveDigest } : {}) }));
-  const stop = () => { controller.abort(); rl.close(); void workspace.missions.close(); process.exitCode = 130; };
-  process.once("SIGINT", stop); process.once("SIGTERM", stop); rl.once("SIGINT", stop);
+  process.once("SIGINT", stop); process.once("SIGTERM", stop); plain?.rl.once("SIGINT", stop);
   try {
-    if (interactive) { const shell = new TerminalShell(client, io, terminalMemory(workspace)); shell.selected = opts.resume ?? null; await shell.loop(controller.signal); }
+    if (interactive) { const shell = new TerminalShell(client, io, terminalMemory(workspace)); shell.selected = opts.resume ?? null; if (application) await application.run(client, shell, controller.signal); else await shell.loop(controller.signal); }
     else {
       const result = await oneShot(client, opts.args, opts.json ? undefined : text => io.print(text));
       if (opts.json) process.stdout.write(terminalJson(result) + "\n");
@@ -119,6 +125,6 @@ async function main() {
       else io.print(terminalJson(result));
       if (!controller.signal.aborted) process.exitCode = commandExitCode(opts.args, result);
     }
-  } finally { rl.close(); await client.close(); process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); }
+  } finally { plain?.rl.close(); try { await client.close(); } finally { await application?.close(); process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); } }
 }
 main().catch(error => { console.error(terminalText(errorText(error))); if (process.exitCode !== 130) process.exitCode = error instanceof ProviderError && error.code === "NOT_CONFIGURED" ? 2 : 1; });

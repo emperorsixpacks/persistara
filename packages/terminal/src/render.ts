@@ -138,6 +138,7 @@ Other entry points:
   persistara doctor         storage-only provider diagnostics (no inference)
 
 Put global options before the command: --project <directory>, --resume <mission-id>, --json,
+  --plain (readline instead of the terminal application),
   --approve-login (off-chain only), --approve-digest <exact-review-digest>,
   --acknowledge-costs. Noninteractive actions refuse implicit financial approval.
 Memory write/resume and specialist fulfill/deliver/retry-payout forwarding require
@@ -151,7 +152,7 @@ const helpTopics: Record<string, string> = {
   memory: `Memory and recovery\n  /memory <query>      Recall committed records with sources\n  /memory-recover      Rebuild the cache from the existing owner backup\n\nPortable kit: ./bin/persistara recovery verify|recover ...\nUse /help all and docs/TERMINAL.md for full file-based commands.\nLocal backup verification does not prove off-device custody.`,
   controls: `Owner controls\n  /status                   Check finalized authority and readiness\n  /connect                  Sign in with the original owner\n  /disconnect               End the in-memory session\n  /pause  /resume-agent      Review a transaction; testnet gas applies\n  /owner-reconcile <id> [hash]  Check an existing wallet handoff\n  /owner-cancel <id>         Cancel before wallet handoff\n\nAn unknown wallet result must be reconciled, never sent again.`,
 };
-export const terminalHelp = `Getting started\n  /connect     Sign in with the registered owner wallet\n  /missions    Browse saved work\n  /new         Create a source mission\n  /status      Check connections, memory and budget\n\nExplore\n  /help missions     /help specialist\n  /help memory       /help controls\n  /help all          Full command reference\n\nTab completes commands. /exit closes the workspace.\nNo AI chat yet. Source collection works without AI credits.`;
+export const terminalHelp = `Getting started\n  /connect     Sign in with the registered owner wallet\n  /missions    Browse saved work\n  /new         Create a source mission\n  /status      Check connections, memory and budget\n\nExplore\n  /help missions     /help specialist\n  /help memory       /help controls\n  /help all          Full command reference\n\n/ opens commands. Tab completes. /exit closes the workspace.\nUse --plain for readline. No AI chat yet; source work needs no credits.`;
 export function terminalHelpFor(topic?: string) {
   if (!topic) return terminalHelp;
   if (topic === "all") return allHelp;

@@ -55,6 +55,8 @@
   "devDependencies": {
     "@playwright/test": "1.65.0",
     "@types/node": "22.19.0",
+    "@types/react": "19.3.0",
+    "ink-testing-library": "4.0.0",
     "typescript": "5.9.3",
     "vite": "8.3.6"
   },
@@ -70,8 +72,12 @@
     "@hot-labs/near-connect": "0.12.0",
     "@nearai/inference-sdk": "0.2.1",
     "ethers": "6.13.1",
+    "ink": "8.0.0",
     "jose": "6.2.15",
-    "near-api-js": "7.4.0"
+    "near-api-js": "7.4.0",
+    "react": "19.3.1",
+    "string-width": "8.3.0",
+    "wrap-ansi": "10.0.2"
   },
   "bin": {
     "persistara": "bin/persistara"

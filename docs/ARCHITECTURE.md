@@ -65,7 +65,7 @@ NEAR AI supplies inference and embeddings through provider adapters. Use a curre
 
 Verified inference evidence is not proof that a tool ran correctly, a report is true, or a job was worth paying. Capture only the evidence actually provided and verified. Never store model chain-of-thought as an application receipt.
 
-The native [terminal](TERMINAL.md) is now the primary operator interface. `packages/operator` constructs one local workspace for both the console entry point and terminal. The CLI calls the same services directly; it requires no HTTP host/browser. Its CLI-specific NEP-413 domain and expiring in-memory session preserve original-owner authorization. Exact reviewed effects still flow through the canonical journals and isolated signers. The terminal interprets only implemented operator commands and never executes captured content as instructions or supplies fake model answers.
+The native [terminal](TERMINAL.md) is now the primary operator interface. `packages/operator` constructs one local workspace for both the console entry point and terminal. The CLI calls the same services directly; it requires no HTTP host/browser. An Ink/React terminal application adds the persistent composer, command picker, scoped status and scrollable in-memory session over TerminalShell; plain/JSON/operator entry points remain available. Its CLI-specific NEP-413 domain and expiring in-memory session preserve original-owner authorization. Exact reviewed effects still flow through the canonical journals and isolated signers. The terminal interprets only implemented operator commands and never executes captured content as instructions or supplies fake model answers.
 
 ## Execution and external effects
 
