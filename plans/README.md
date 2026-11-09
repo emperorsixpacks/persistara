@@ -2,6 +2,8 @@
 
 Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and technical decisions. First-release target: a complete hackathon workflow with explicit production follow-up, not a demo assembled from unverified feature claims.
 
+**Taking over? Start with [HANDOFF.md](HANDOFF.md).** It records the verified `4d2bbfd` baseline, local/live state, custody boundaries, code map, setup and remaining order. The first recommended build milestone is [011 — durable conversation/session core](011-conversation-engine.md), currently TODO and designed to proceed without paid AI calls.
+
 ## Order and status
 
 | Plan | Deliverable | Depends on | Status |
@@ -15,6 +17,7 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 | 008 | Native terminal as primary mission/commerce workspace | 003, 004, 005 | DONE — native login, real interrupted source mission/resume/review/reopen and memory-cache recovery pass; conversational parity remains separate |
 | 009 | Terminal usability and bounded RPC read recovery | 008 | DONE — compact startup/topic help, readable login, completion, numbered missions and opt-in read retries verified; AI conversation remains separate |
 | 010 | Interactive terminal application | 008, 009 | DONE — persistent composer, command picker, scoped status, paging, working feedback and real PTY/owner acceptance pass; conversation/enrollment remain separate |
+| 011 | Durable conversation sessions and bounded read-only assistant loop | Implemented portions of 005, 008–010 | TODO — detailed takeover implementation plan; offline core first, live inference/streaming separately gated |
 | 007 | External owner-wallet connection and reviewed controls | 003, 004 | IN PROGRESS — existing-agent authentication/pause/resume implemented; live browser-provider approval and broader enrollment/rotation UI remain |
 
 Plans 002 and 003 are independent after 001. This is a dependency observation, not permission to spawn other agents. Keep work single-agent unless the operator authorizes delegation.
