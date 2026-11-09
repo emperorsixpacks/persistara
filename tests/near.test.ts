@@ -407,6 +407,32 @@ describe("finalized NEAR memory and treasury clients", () => {
 });
 
 describe("bounded NEAR JSON-RPC transport", () => {
+  it("retries only opted-in temporary reads and never retries a broadcast, bad envelope or exhausted connection", async () => {
+    const original = globalThis.fetch;
+    try {
+      const config = { kind: "testnet" as const, chainId: "testnet" as const, rpcUrl: "https://rpc.testnet.near.org", contractId: "authority.testnet" };
+      const rpc = new NearRpc(config, undefined, { readAttempts: 2, timeoutMs: 1000 });
+      let calls = 0;
+      globalThis.fetch = async (_url, init) => { assert.equal(init?.redirect, "error"); calls++; if (calls === 1) throw new TypeError("secret transport detail"); return Response.json({ jsonrpc: "2.0", id: "persistara", result: { ok: true } }); };
+      assert.deepEqual(await rpc.request("status", {}), { ok: true }); assert.equal(calls, 2);
+      for (const code of [429, 502, 503, 504]) {
+        calls = 0; globalThis.fetch = async () => ++calls === 1 ? new Response(null, { status: code }) : Response.json({ jsonrpc: "2.0", id: "persistara", result: { ok: true } });
+        assert.deepEqual(await rpc.request("query", { block_id: "fixed-finalized-block" }), { ok: true }); assert.equal(calls, 2);
+      }
+      for (const method of ["status", "broadcast_tx_commit", "broadcast_tx_async", "send_tx"]) {
+        calls = 0; globalThis.fetch = async () => { calls++; throw new TypeError("secret transport detail"); };
+        await assert.rejects(rpc.request(method, {}), error => error instanceof Error && !error.message.includes("secret") && (method === "status" || (error as { retryable?: boolean }).retryable === false));
+        assert.equal(calls, method === "status" ? 2 : 1);
+      }
+      for (const response of [() => new Response("malformed"), () => new Response(null, { status: 401 }), () => Response.json({ jsonrpc: "2.0", id: "wrong", result: {} }), () => Response.json({ jsonrpc: "2.0", id: "persistara", error: { message: "sensitive" } })]) {
+        calls = 0; globalThis.fetch = async () => { calls++; return response(); };
+        await assert.rejects(rpc.request("status", {})); assert.equal(calls, 1);
+      }
+      calls = 0; globalThis.fetch = async () => { calls++; throw new TypeError("unavailable"); };
+      await assert.rejects(new NearRpc(config).request("status", {})); assert.equal(calls, 1);
+      assert.throws(() => new NearRpc(config, undefined, { timeoutMs: 30_001 }));
+    } finally { globalThis.fetch = original; }
+  });
   it("uses explicit finality and rejects error envelopes, redirects and oversized replies without retrying", async () => {
     const original = globalThis.fetch;
     try {

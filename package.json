@@ -49,7 +49,8 @@
     "contract:test": "cargo test -p persistara-authority --locked",
     "contract:sandbox": "pnpm build && pnpm contract:build && cargo test -p persistara-contract-tests --features sandbox --locked -- --test-threads=1",
     "contract:check": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets --features sandbox --locked -- -D warnings && pnpm contract:test && pnpm contract:sandbox",
-    "cli": "pnpm build && node dist/scripts/cli.js"
+    "cli": "./bin/persistara",
+    "cli:dev": "pnpm build && ./bin/persistara"
   },
   "devDependencies": {
     "@playwright/test": "1.65.0",

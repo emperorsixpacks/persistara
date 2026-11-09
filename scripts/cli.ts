@@ -8,7 +8,7 @@ import { terminalMemory } from "../packages/operator/src/memory.js";
 import { TerminalClient } from "../packages/terminal/src/client.js";
 import { NearCliWallet } from "../packages/terminal/src/wallet.js";
 import { TerminalShell, errorText, inputJson, reviewApproval, type TerminalIO } from "../packages/terminal/src/shell.js";
-import { terminalHelp, terminalJson, terminalText, parseNear, statusText, missionText, missionListText, commissionText, commandExitCode } from "../packages/terminal/src/render.js";
+import { terminalHelp, terminalHelpFor, terminalJson, terminalText, terminalOutput, terminalColor, completeCommand, parseNear, statusText, missionText, missionListText, commissionText, commandExitCode } from "../packages/terminal/src/render.js";
 import { ProviderError } from "../packages/protocol/src/providers.js";
 import { assertRuntime } from "../packages/protocol/src/config.js";
 import { loadEnvironment } from "./common.js";
@@ -32,8 +32,9 @@ function options(argv: string[]): Options {
   result.args = argv.slice(i); return result;
 }
 function lineIO() {
-  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY && process.stdout.isTTY), historySize: 0 }), lines = rl[Symbol.asyncIterator]();
-  const io: TerminalIO = { print: text => { process.stdout.write(terminalText(text, 100_000) + "\n"); }, ask: async prompt => { rl.setPrompt(terminalText(prompt)); rl.prompt(); const next = await lines.next(); return next.done ? null : next.value; } };
+  const color = terminalColor(Boolean(process.stdout.isTTY), process.env);
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY && process.stdout.isTTY), historySize: 0, completer: completeCommand }), lines = rl[Symbol.asyncIterator]();
+  const io: TerminalIO = { print: (text, tone) => { process.stdout.write(terminalOutput(text, tone, color) + "\n"); }, ask: async prompt => { rl.setPrompt(terminalOutput(prompt, "brand", color)); rl.prompt(); const next = await lines.next(); return next.done ? null : next.value; } };
   return { io, rl };
 }
 const forwarded: Record<string, string> = { specialist: "specialist.js", recovery: "recovery-kit.js", doctor: "provider-doctor.js" };
@@ -56,7 +57,7 @@ async function forward(args: string[], project: string, acknowledgeCosts: boolea
 }
 async function oneShot(client: TerminalClient, args: string[], preview?: (text: string) => void) {
   const [command, action, id, ...rest] = args;
-  if (["status", "info", "init"].includes(command ?? "")) return { ...await client.status(), ...(command === "init" ? { setup: "existing-workspace-check-only", enrollmentCreated: false } : {}) };
+  if (["status", "info", "init"].includes(command ?? "")) { if (args.length !== 1) throw new ProviderError("INVALID_INPUT", "Unexpected status arguments"); return { ...await client.status(), ...(command === "init" ? { setup: "existing-workspace-check-only", enrollmentCreated: false } : {}) }; }
   if (!["missions", "activity", "mission", "commission", "owner"].includes(command ?? "")) throw new ProviderError("INVALID_INPUT", "Unknown command; use --help");
   await client.connect();
   if (command === "missions" && args.length === 1) return client.list();
@@ -91,7 +92,7 @@ async function oneShot(client: TerminalClient, args: string[], preview?: (text: 
 }
 async function main() {
   assertRuntime(); const opts = options(process.argv.slice(2));
-  if (["help", "--help", "-h"].includes(opts.args[0] ?? "")) { console.log(terminalHelp); return; }
+  if (["help", "--help", "-h"].includes(opts.args[0] ?? "")) { if (opts.args.length > 2) throw new ProviderError("INVALID_INPUT", "Choose one help topic"); console.log(terminalHelpFor(opts.args[1])); return; }
   if (opts.args[0] === "chat") throw new ProviderError("NOT_CONFIGURED", "AI conversation is not enabled in this release; use the interactive mission workspace");
   process.chdir(opts.project);
   if (await forward(opts.args, opts.project, opts.acknowledgeCosts)) return;
@@ -102,7 +103,7 @@ async function main() {
   const workspace = await createLocalWorkspace(), controller = new AbortController();
   const { io, rl } = lineIO();
   // Machine-readable stdout contains one result; reviews/errors go to stderr.
-  const reviewIO: TerminalIO = { ...io, print: text => { (opts.json ? process.stderr : process.stdout).write(terminalText(text) + "\n"); } };
+  const reviewIO: TerminalIO = { ...io, print: (text, tone) => { if (opts.json) process.stderr.write(terminalText(text) + "\n"); else io.print(text, tone); } };
   const client = new TerminalClient(workspace, new NearCliWallet(process.env.NEAR_CLI_BIN || "near", undefined, controller.signal), reviewApproval(reviewIO, { interactive: interactive || Boolean(process.stdin.isTTY && !opts.json), approveLogin: opts.approveLogin, acknowledgeCosts: opts.acknowledgeCosts, ...(opts.approveDigest ? { approveDigest: opts.approveDigest } : {}) }));
   const stop = () => { controller.abort(); rl.close(); void workspace.missions.close(); process.exitCode = 130; };
   process.once("SIGINT", stop); process.once("SIGTERM", stop); rl.once("SIGINT", stop);

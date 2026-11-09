@@ -17,7 +17,7 @@ pnpm build
 ./bin/persistara
 ```
 
-Or run `pnpm cli`. Connect through the external original-owner NEAR CLI keychain, then use `/new`, `/run`, `/review`, `/missions` and `/open`. The same terminal supports signed specialist quote/delivery review, bounded reservation/settlement, receipts, source-aware memory recall and recovery. Interrupted source work resumes under the same durable mission ID. No browser or AI credits are required for this implemented workflow. See [terminal setup, commands and exact limits](docs/TERMINAL.md).
+After building, run `pnpm cli` for normal use, or `pnpm cli:dev` to rebuild source changes. Connect through the external original-owner NEAR CLI keychain, then use `/new`, `/run`, `/review`, `/missions` and `/open 1`. `/help` starts small; topic help and Tab completion make other workflows discoverable. The same terminal supports signed specialist quote/delivery review, bounded reservation/settlement, receipts, source-aware memory recall and recovery. Interrupted source work resumes under the same durable mission ID. No browser or AI credits are required for this implemented workflow. See [terminal setup, commands and exact limits](docs/TERMINAL.md).
 
 Real native acceptance verified owner login, memory-cache recovery and a source mission interrupted after its first capture, resumed/reviewed/reopened in fresh CLI processes with the same artifact. No upload, transaction or inference was used. See [terminal acceptance evidence](docs/evidence/native-terminal-2026-11-08.json).
 
@@ -62,7 +62,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **220 TypeScript tests in 33 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **224 TypeScript tests in 33 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 

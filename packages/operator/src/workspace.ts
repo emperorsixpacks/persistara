@@ -28,7 +28,7 @@ export const workspaceDefaults = { "--commerce-state-dir": ".persistara/commerce
 export type WorkspacePaths = typeof workspaceDefaults;
 /** Shared owner-local engine for the terminal and console. Owner wallet keys never enter this context. */
 export async function createLocalWorkspace(paths: WorkspacePaths = workspaceDefaults) {
-  const config = nearConfig(process.env), binding = memoryBindingConfig(process.env), rpc = new NearRpc(config);
+  const config = nearConfig(process.env), binding = memoryBindingConfig(process.env), rpc = new NearRpc(config, undefined, { readAttempts: 2, timeoutMs: 8_000 });
   let wasm: Uint8Array;
   try { wasm = await readFile("target/near/persistara_authority/persistara_authority.wasm"); }
   catch (error) { if (isObject(error) && error.code === "ENOENT") throw new ProviderError("NOT_CONFIGURED", "Build the pinned local authority artifact with pnpm contract:build before opening this workspace"); throw error; }

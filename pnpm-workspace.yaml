@@ -1,2 +1,4 @@
 packages:
   - .
+# pnpm scripts already use this installed devEngines.runtime, not the host Node.
+nodeVersion: 24.22.2

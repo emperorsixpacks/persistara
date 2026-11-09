@@ -11,6 +11,20 @@ export function terminalText(value: unknown, maximum = 12_000): string {
   return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) + (full.length > maximum ? "\n[display truncated]" : "");
 }
 export function terminalJson(value: unknown) { return JSON.stringify(value, null, 2).replace(/[\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`); }
+export type TerminalTone = "brand" | "muted" | "success" | "warning";
+/** Only application-owned escapes are introduced, after untrusted content is escaped. */
+export function terminalOutput(text: string, tone?: TerminalTone, color = false) {
+  const safe = terminalText(text, 100_000);
+  const codes = { brand: "1;38;2;236;169;130", muted: "90", success: "38;2;143;188;174", warning: "33" };
+  return color && tone ? `\x1b[${codes[tone]}m${safe}\x1b[0m` : safe;
+}
+export function terminalColor(isTTY: boolean, env: Record<string, string | undefined>) { return isTTY && env.NO_COLOR === undefined && env.TERM !== "dumb"; }
+export const terminalCommands = ["connect", "status", "missions", "new", "open", "run", "resume", "review", "cancel", "activity", "commission", "quote", "delivery", "reserve", "settle", "reconcile", "receipt", "export-request", "export-dossier", "memory", "memory-recover", "pause", "resume-agent", "owner-reconcile", "owner-cancel", "disconnect", "help", "exit"];
+export function completeCommand(line: string): [string[], string] {
+  if (!/^\/?[a-z-]*$/.test(line)) return [[], line];
+  const prefix = line.startsWith("/") ? "/" : "", matches = terminalCommands.map(c => prefix + c).filter(c => c.startsWith(line));
+  return [matches, line];
+}
 export function nearAmount(value: string) {
   const n = BigInt(value), unit = 10n ** 24n, fraction = (n % unit).toString().padStart(24, "0").replace(/0+$/, "");
   return `${n / unit}${fraction ? "." + fraction : ""} NEAR`;
@@ -22,7 +36,7 @@ export function parseNear(value: string) {
 }
 export function statusText(result: Awaited<ReturnType<TerminalClient["status"]>>) {
   const v = result.view;
-  return ["PERSISTARA / TERMINAL", `${v.agentId}  |  NEAR testnet  |  ${v.paused ? "PAUSED" : "ACTIVE"}`,
+  return [`${v.agentId}  |  NEAR testnet  |  ${v.paused ? "PAUSED" : "ACTIVE"}`,
     `Owner ${v.owner}  |  ${result.authenticated ? "connected" : "use /connect"}`,
     `Treasury ${nearAmount(v.balances.available)} available  |  ${nearAmount(v.balances.reserved)} reserved`,
     `Memory checkpoint ${v.checkpointVersion} / epoch ${v.keyEpoch}  |  local backup ${v.backup.status}`,
@@ -30,8 +44,19 @@ export function statusText(result: Awaited<ReturnType<TerminalClient["status"]>>
     "AI conversation: unavailable in this release. Source missions use no inference.",
     ...(result.pendingOwner ? [`Owner request ${result.pendingOwner.request.id}: ${result.pendingOwner.state} — reconcile before another handoff.`] : [])].join("\n");
 }
-export function missionListText(missions: Mission[]) {
+export function homeText(result: Awaited<ReturnType<TerminalClient["status"]>>) {
+  const v = result.view;
+  return [`  Workspace   ${v.agentId}`,
+    `  NEAR        Testnet · ${v.paused ? "paused" : "active"} · ${nearAmount(v.balances.available)} available`,
+    `  Owner       ${result.authenticated ? "Connected" : "Not connected"}`,
+    `  Memory      Checkpoint ${v.checkpointVersion} · local backup ${v.backup.status}`,
+    `  Runtime     ${v.runtimeKeys.some(key => key.ready) ? "Ready" : "Needs attention"} · rotation ${v.localRotationHold === null ? "unknown" : v.localRotationHold ? "on hold" : "clear"}`,
+    ...(result.pendingOwner ? [`  Pending     ${result.pendingOwner.request.id} · ${result.pendingOwner.state}`] : [])].join("\n");
+}
+function stateText(value: string) { return ({ awaiting_review: "Needs review", queued: "Ready", running: "Collecting sources" } as Record<string, string>)[value] ?? value.replaceAll("_", " "); }
+export function missionListText(missions: Mission[], numbered = false) {
   if (!missions.length) return "No missions yet. Use /new to save your first brief.";
+  if (numbered) return ["Saved missions", ...missions.map((m, i) => `\n  ${i + 1}. ${m.brief.title}\n     ${stateText(m.commission?.state ?? m.state)} · ${m.capturedCount}/${m.sourceCount} sources · ${nearAmount(m.budget.spent)} spent`), "\nUse /open <number> to inspect a mission, then /run or /review."].join("\n");
   return missions.map(m => `${m.id}\n  ${m.commission?.state ?? m.state}  ${m.capturedCount}/${m.sourceCount} sources  ${nearAmount(m.budget.spent)} spent\n  ${m.brief.title}`).join("\n\n");
 }
 export function missionText(d: MissionDetail) {
@@ -42,7 +67,10 @@ export function missionText(d: MissionDetail) {
     ...(artifact ? [`Artifact SHA-256: ${artifact.digest}`, ...artifact.value.sources.flatMap(s => [`\n[UNTRUSTED SOURCE] ${s.title}`, s.url, `Captured ${new Date(s.capturedAt).toISOString()} / ${s.byteLength} bytes / ${s.contentSha256}`, s.excerpt.slice(0, 3000)])] : d.sources.map(s => `${s.ordinal + 1}. ${s.state} — ${s.url}`)),
     "\nCollection/signatures do not establish source truth. Inspect the dossier before review."].join("\n");
 }
-export function reviewText(review: TerminalReview) { return [review.title, ...Object.entries(review.details).map(([key, value]) => `${key}: ${value}`), `Review digest: ${review.digest}`, ...(review.costs ? ["This action may spend testnet funds or gas."] : [])].join("\n"); }
+export function reviewText(review: TerminalReview, full = false) {
+  if (review.kind === "connect" && !full) return [review.title, `  Account    ${review.details.account}`, `  Network    ${review.details.network ?? "NEAR testnet"}`, ...(review.details.agent ? [`  Agent      ${review.details.agent}`] : []), ...(review.details.contract ? [`  Contract   ${review.details.contract}`] : []), `  Owner key  ${review.details.publicKey}`, `\n${review.details.effect}`, "The official NEAR CLI signs through its external keychain."].join("\n");
+  return [review.title, ...Object.entries(review.details).map(([key, value]) => `${key}: ${value}`), `Review digest: ${review.digest}`, ...(review.costs ? ["This action may spend testnet funds or gas."] : [])].join("\n");
+}
 export function commissionText(c: CommissionView) {
   const reviews = commissionReviews(c);
   return [c.id, `${c.state}  |  ${c.worker}  |  ${nearAmount(c.amountYoctoNear)}`,
@@ -65,7 +93,7 @@ export function commandExitCode(args: readonly string[], result: unknown): numbe
   }
   return 0;
 }
-export const terminalHelp = `Persistara — owner-controlled agents on NEAR, encrypted memory on 0G
+const allHelp = `Persistara — owner-controlled agents on NEAR, encrypted memory on 0G
 
 Interactive commands (leading / is optional):
   /connect                 verify the original owner through the external NEAR CLI keychain
@@ -117,3 +145,16 @@ Memory write/resume and specialist fulfill/deliver/retry-payout forwarding requi
 
 No AI chat, model synthesis, conversational sessions, enrollment wizard, daemon or
 Telegram bridge is claimed yet. Ordinary text never receives a fake model answer.`;
+const helpTopics: Record<string, string> = {
+  missions: `Missions\n  /missions           List saved work; /open <number> selects a row\n  /new                Save a brief and approved source URLs\n  /run [id|number]    Collect remaining sources; Ctrl+C retains progress\n  /review             Inspect and approve the exact local dossier\n  /cancel             Cancel local collection before review\n  /activity           View durable events\n  /export-dossier <file>  Save a new private artifact file\n\nSource collection uses no AI, upload or payment.\nFor shell scripts and exact IDs: ./bin/persistara --help all`,
+  specialist: `Specialist work\n  /commission [id|number] <NEAR>  Prepare an encrypted request\n  /export-request <file>         Save a new private request file\n  /quote <file>                  Import a signed specialist quote\n  /reserve                       Review price before upload/reservation\n  /delivery <file>               Verify and inspect the delivery\n  /settle                        Review artifact and price before payment\n  /reconcile                     Observe the existing operation\n  /receipt                       Inspect its fingerprints and receipts\n\nFunds or gas require explicit review. Pending does not mean paid.\nUse /help all for the separate worker's operational commands.`,
+  memory: `Memory and recovery\n  /memory <query>      Recall committed records with sources\n  /memory-recover      Rebuild the cache from the existing owner backup\n\nPortable kit: ./bin/persistara recovery verify|recover ...\nUse /help all and docs/TERMINAL.md for full file-based commands.\nLocal backup verification does not prove off-device custody.`,
+  controls: `Owner controls\n  /status                   Check finalized authority and readiness\n  /connect                  Sign in with the original owner\n  /disconnect               End the in-memory session\n  /pause  /resume-agent      Review a transaction; testnet gas applies\n  /owner-reconcile <id> [hash]  Check an existing wallet handoff\n  /owner-cancel <id>         Cancel before wallet handoff\n\nAn unknown wallet result must be reconciled, never sent again.`,
+};
+export const terminalHelp = `Getting started\n  /connect     Sign in with the registered owner wallet\n  /missions    Browse saved work\n  /new         Create a source mission\n  /status      Check connections, memory and budget\n\nExplore\n  /help missions     /help specialist\n  /help memory       /help controls\n  /help all          Full command reference\n\nTab completes commands. /exit closes the workspace.\nNo AI chat yet. Source collection works without AI credits.`;
+export function terminalHelpFor(topic?: string) {
+  if (!topic) return terminalHelp;
+  if (topic === "all") return allHelp;
+  if (!Object.hasOwn(helpTopics, topic)) return "Choose /help missions, specialist, memory, controls or all.";
+  return helpTopics[topic]!;
+}

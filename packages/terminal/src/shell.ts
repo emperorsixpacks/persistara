@@ -4,9 +4,9 @@ import { readRecoveryPublicFile } from "../../recovery/src/files.js";
 import { ProviderError } from "../../protocol/src/providers.js";
 import { MemoryError } from "../../protocol/src/memory.js";
 import type { TerminalClient, TerminalReview } from "./client.js";
-import { missionListText, missionText, commissionText, parseNear, reviewText, statusText, terminalHelp, terminalJson, terminalText } from "./render.js";
+import { missionListText, missionText, commissionText, parseNear, reviewText, statusText, homeText, terminalHelpFor, terminalJson, terminalText, type TerminalTone } from "./render.js";
 
-export interface TerminalIO { print(text: string): void; ask(prompt: string): Promise<string | null> }
+export interface TerminalIO { print(text: string, tone?: TerminalTone): void; ask(prompt: string): Promise<string | null> }
 export interface TerminalMemory { recall(query: string): Promise<unknown>; recover(): Promise<unknown> }
 export function words(line: string): string[] {
   const result: string[] = []; let value = "", quote = "", started = false;
@@ -23,6 +23,7 @@ export async function inputJson(path: string) {
   catch { throw new ProviderError("INVALID_INPUT", "Choose a bounded regular UTF-8 JSON file"); }
 }
 export function errorText(error: unknown) {
+  if (error instanceof ProviderError && error.code === "UPSTREAM_ERROR") return `Connection check failed: ${error.message}. Use /status to check again; reconcile any pending action before retrying it. [UPSTREAM_ERROR]`;
   if (error instanceof ProviderError || error instanceof MemoryError) return `${error.code}: ${error.message}${error.code === "AUTHORIZATION_FAILED" ? " Use /connect to verify the original owner again." : ""}`;
   return "The local command could not complete. Check its documented arguments and the retained operation state.";
 }
@@ -30,29 +31,42 @@ export function reviewApproval(io: TerminalIO, options: { interactive: boolean; 
   return async (review: TerminalReview) => {
     if (review.kind === "connect" && options.approveLogin) return true;
     if (!options.interactive) return review.kind !== "connect" && options.approveDigest === review.digest && (!review.costs || options.acknowledgeCosts);
-    io.print(terminalText("\n" + reviewText(review)));
-    const answer = await io.ask(`Type ${review.kind} to approve, or press Enter to cancel: `);
-    return answer?.trim() === review.kind;
+    io.print(terminalText("\n" + reviewText(review)), "brand");
+    for (;;) {
+      const answer = await io.ask(`Type ${review.kind} to approve, details to inspect, or Enter to cancel: `);
+      if (answer?.trim() === "details") { io.print(terminalText(reviewText(review, true))); continue; }
+      return answer?.trim() === review.kind;
+    }
   };
 }
 export class TerminalShell {
   selected: string | null = null;
+  private missionRows: string[] = [];
   constructor(readonly client: TerminalClient, private readonly io: TerminalIO, private readonly memory: TerminalMemory, private readonly json = false) {}
   private print(value: unknown) { this.io.print(this.json ? terminalJson(value) : terminalText(typeof value === "string" ? value : terminalJson(value), 100_000)); }
-  private async connected() { if (!this.client.authenticated()) await this.client.connect(); }
-  private mission(id?: string) { const selected = id ?? this.selected; if (!selected) throw new ProviderError("INVALID_INPUT", "Select a mission with /open or /new first"); return selected; }
+  private async connect() {
+    this.io.print("Checking the registered owner on NEAR testnet…", "muted");
+    const result = await this.client.connect();
+    this.io.print(`Connected as ${result.owner}. Session lasts 10 minutes.`, "success");
+  }
+  private async connected() { if (!this.client.authenticated()) await this.connect(); }
+  private mission(id?: string) {
+    const selected = id ?? this.selected; if (!selected) throw new ProviderError("INVALID_INPUT", "Select a mission with /open or /new first");
+    if (/^\d+$/.test(selected)) { const value = this.missionRows[Number(selected) - 1]; if (!value) throw new ProviderError("INVALID_INPUT", "Choose a row number from /missions, or use the full mission ID"); return value; }
+    return selected;
+  }
   private async commissionId() { const detail = await this.client.detail(this.mission()); if (!detail.commission) throw new ProviderError("OPERATION_CONFLICT", "Select a specialist commission first"); return detail.commission.id; }
   async dispatch(argv: string[]): Promise<boolean> {
     const [raw = "help", ...args] = argv, named = raw.replace(/^\//, ""), command = named === "resume" ? "run" : named;
-    if (["status", "info", "init", "help", "connect", "disconnect", "new", "missions", "activity", "reserve", "settle", "reconcile", "receipt", "memory-recover", "pause", "resume-agent", "exit", "quit"].includes(command) && args.length) throw new ProviderError("INVALID_INPUT", "Unexpected command arguments; use /help");
+    if (["status", "info", "init", "connect", "disconnect", "new", "missions", "activity", "reserve", "settle", "reconcile", "receipt", "memory-recover", "pause", "resume-agent", "exit", "quit"].includes(command) && args.length) throw new ProviderError("INVALID_INPUT", "Unexpected command arguments; use /help");
     if (["exit", "quit"].includes(command)) return false;
-    if (["help", "-h", "--help"].includes(command)) { this.print(terminalHelp); return true; }
+    if (["help", "-h", "--help"].includes(command)) { if (args.length > 1) throw new ProviderError("INVALID_INPUT", "Use /help [missions|specialist|memory|controls|all]"); this.print(terminalHelpFor(args[0])); return true; }
     if (command === "status" || command === "info" || command === "init") { const result = await this.client.status(); this.print(this.json ? result : statusText(result) + (command === "init" ? "\nExisting workspace checked. This command does not enroll a new agent. Use /connect next." : "")); return true; }
-    if (command === "connect") { this.print(await this.client.connect()); return true; }
+    if (command === "connect") { await this.connect(); this.io.print("Next: /missions to browse saved work, or /new to start.", "muted"); return true; }
     if (command === "disconnect") { this.client.disconnect(); this.print("Owner disconnected. Saved work is retained."); return true; }
     if (!["missions", "new", "open", "run", "review", "cancel", "activity", "commission", "quote", "delivery", "reserve", "settle", "reconcile", "receipt", "export-request", "export-dossier", "memory", "memory-recover", "pause", "resume-agent", "owner-reconcile", "owner-cancel"].includes(command)) { this.print("Unknown terminal command. AI chat is not available yet. Use /help for the implemented workflow."); return true; }
     await this.connected();
-    if (command === "missions") { const rows = await this.client.list(); this.print(this.json ? rows : missionListText(rows)); }
+    if (command === "missions") { const rows = await this.client.list(); this.missionRows = rows.map(row => row.id); this.print(this.json ? rows : missionListText(rows, true)); }
     else if (command === "new") {
       const title = await this.io.ask("Mission title: "); if (!title) return true;
       const objective = await this.io.ask("Objective: "); if (!objective) return true;
@@ -103,12 +117,14 @@ export class TerminalShell {
     return true;
   }
   async loop(signal: AbortSignal) {
-    this.print("PERSISTARA / TERMINAL\nDurable missions, recoverable memory, bounded commerce.\nNo AI inference is used. Type /help for commands.");
-    try { await this.dispatch(["status"]); } catch (error) { this.io.print(terminalText(errorText(error))); }
+    this.io.print("\nPersistara  /  Research workspace", "brand");
+    this.io.print("─".repeat(48), "muted");
+    try { this.print(homeText(await this.client.status())); } catch (error) { this.io.print(terminalText(errorText(error)), "warning"); }
+    this.io.print("\n  Start with /connect, then /missions or /new.\n  /help shows the basics. Tab completes commands.\n  AI chat is not connected; source missions need no credits.\n", "muted");
     while (!signal.aborted) {
       const line = await this.io.ask(this.selected ? `persistara [${this.selected.slice(-8)}]> ` : "persistara> "); if (line === null) break;
       try { const args = words(line); if (args.length && !await this.dispatch(args)) break; }
-      catch (error) { this.io.print(terminalText(errorText(error))); }
+      catch (error) { this.io.print(terminalText(errorText(error)), "warning"); }
     }
   }
 }

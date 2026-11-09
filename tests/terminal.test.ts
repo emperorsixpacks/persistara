@@ -10,7 +10,7 @@ import { baseEncode } from "near-api-js";
 import { TerminalClient, commissionReviews, type TerminalReview } from "../packages/terminal/src/client.js";
 import { NearCliWallet, type TerminalWallet } from "../packages/terminal/src/wallet.js";
 import { TerminalShell, reviewApproval, words } from "../packages/terminal/src/shell.js";
-import { parseNear, nearAmount, terminalJson, terminalText, commandExitCode } from "../packages/terminal/src/render.js";
+import { parseNear, nearAmount, terminalJson, terminalText, terminalOutput, terminalColor, terminalHelpFor, completeCommand, commandExitCode } from "../packages/terminal/src/render.js";
 import { MissionService } from "../packages/runtime/src/service.js";
 import { createRecoveryKit } from "../packages/recovery/src/kit.js";
 import { MemoryKeyring } from "../packages/memory/src/keyring.js";
@@ -155,9 +155,43 @@ describe("terminal presentation and external signing boundary", () => {
       const answers = ["/connect", "/new", "Interactive fixture", "Collect sources.", "Inspect capture fingerprints.", "https://docs.near.org/", "/run", "/review", "/missions", "/exit"], output: string[] = [];
       const shell = new TerminalShell(f.client(), { ask: async () => answers.shift() ?? null, print: value => { output.push(value); } }, { recall: async () => ({}), recover: async () => ({}) });
       await shell.loop(new AbortController().signal);
-      const transcript = output.join("\n"); assert.ok(transcript.includes("PERSISTARA / TERMINAL")); assert.ok(transcript.includes("completed")); assert.equal(transcript.includes("\x1b"), false);
+      const transcript = output.join("\n"); assert.ok(transcript.includes("completed")); assert.equal(transcript.includes("\x1b"), false);
       assert.equal(f.data.uploads, 0); assert.equal(f.data.submissions, 0); assert.equal(f.sends(), 0);
     } finally { await f.closeTerminal(); }
+  });
+  it("retains the full login message for inspection without treating details or EOF as approval", async () => {
+    const review: TerminalReview = { kind: "connect", title: "Connect owner wallet", digest: "3".repeat(64), costs: false, details: { account: "owner.testnet", publicKey: "ed25519:EXACT_OWNER_KEY", message: "Exact signed challenge", recipient: "Exact CLI domain", effect: "Off-chain only" } };
+    const output: string[] = [], answers: (string | null)[] = ["details", null];
+    const approve = reviewApproval({ print: text => { output.push(text); }, ask: async () => answers.shift() ?? null }, { interactive: true, approveLogin: false, acknowledgeCosts: false });
+    assert.equal(await approve(review), false);
+    assert.ok(output[0]!.includes(review.details.publicKey!)); assert.ok(!output[0]!.includes(review.details.message!));
+    assert.ok(output[1]!.includes(review.details.message!)); assert.ok(output[1]!.includes(review.details.recipient!)); assert.ok(output[1]!.includes(review.digest));
+    const approveTyped = reviewApproval({ print: () => {}, ask: async () => "connect" }, { interactive: true, approveLogin: false, acknowledgeCosts: false });
+    assert.equal(await approveTyped(review), true);
+    const amounts: string[] = [];
+    await reviewApproval({ print: text => { amounts.push(text); }, ask: async () => null }, { interactive: true, approveLogin: false, acknowledgeCosts: false })({ kind: "reserve", title: "Reserve", digest: review.digest, costs: true, details: { amountYoctoNear: "10000000000000000000000", quoteDigest: "4".repeat(64) } });
+    assert.ok(amounts[0]!.includes("10000000000000000000000")); assert.ok(amounts[0]!.includes("4".repeat(64))); assert.ok(amounts[0]!.includes(review.digest));
+  });
+  it("keeps numbered mission selection bound to the displayed saved ID, even after another mission is created", async () => {
+    const f = await setup();
+    try {
+      const c = f.client(); await c.connect(); const first = await f.create(c), output: string[] = [];
+      const shell = new TerminalShell(c, { print: text => { output.push(text); }, ask: async () => null }, { recall: async () => ({}), recover: async () => ({}) });
+      await shell.dispatch(["missions"]); await f.create(c); await shell.dispatch(["open", "1"]);
+      assert.equal(shell.selected, first.mission.id); assert.ok(output[0]!.includes(first.mission.brief.title));
+      await assert.rejects(shell.dispatch(["open", "0"])); await assert.rejects(shell.dispatch(["open", "999999999999999999999999"]));
+      assert.equal(f.data.submissions, 0); assert.equal(f.data.uploads, 0); assert.equal(f.sends(), 0);
+    } finally { await f.closeTerminal(); }
+  });
+  it("escapes untrusted content before optional styling and keeps default help short without completing paths or source prose", () => {
+    const injected = "\x1b]52;c;bad\x07\u202eunsafe";
+    const plain = terminalOutput(injected, "brand", false), colored = terminalOutput(injected, "brand", true);
+    assert.equal(plain.includes("\x1b"), false); assert.equal(colored.includes("\x1b]"), false); assert.equal(colored.includes("\u202e"), false);
+    assert.equal(colored.replace(/\x1b\[[\d;]*m/g, ""), plain);
+    assert.equal(terminalColor(true, { NO_COLOR: "" }), false); assert.equal(terminalColor(false, {}), false); assert.equal(terminalColor(true, { TERM: "dumb" }), false); assert.equal(terminalColor(true, {}), true);
+    assert.ok(terminalHelpFor().split("\n").length <= 18); assert.ok(terminalHelpFor().split("\n").every(line => line.length < 80));
+    assert.ok(terminalHelpFor("missions").includes("/run")); assert.ok(terminalHelpFor("all").includes("--acknowledge-costs"));
+    assert.deepEqual(completeCommand("/con"), [["/connect"], "/con"]); assert.deepEqual(completeCommand("/quote /private/"), [[], "/quote /private/"]);
   });
   it("uses only the external keychain message command, verifies the returned identity and parses a bounded transaction receipt", async () => {
     const f = await setup();
