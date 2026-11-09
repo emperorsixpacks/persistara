@@ -31,7 +31,7 @@
     "applicationOwnerWalletPrivateKeyLoaded": false
   },
   "checks": {
-    "typeScriptTests": 229,
+    "typeScriptTests": 230,
     "typeScriptSuites": 34,
     "browserTests": 11,
     "rustTests": 34,

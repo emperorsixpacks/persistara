@@ -62,7 +62,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **229 TypeScript tests in 34 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **230 TypeScript tests in 34 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 

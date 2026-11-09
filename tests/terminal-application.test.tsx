@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+import { once } from "node:events";
+import { PassThrough } from "node:stream";
 import { renderToString } from "ink";
 import { render as renderInteractive } from "ink-testing-library";
 import stringWidth from "string-width";
@@ -12,10 +14,17 @@ import { MissionService } from "../packages/runtime/src/service.js";
 import { captureSource } from "../packages/runtime/src/sources.js";
 import { commerceFixture } from "./fixtures/commerce-support.js";
 import { signChallenge } from "./fixtures/owner-support.js";
+import { createPlainTerminal } from "../packages/terminal/src/plain.js";
 
 async function until(predicate: () => boolean) { for (let i = 0; i < 200; i++) { if (predicate()) return; await delay(5); } assert.fail("Application did not reach the expected input boundary"); }
 function view(store: ApplicationStore, columns = 110, rows = 35) { return renderToString(<TerminalApplicationView store={store} agentId="fixture-owner.testnet:research" project="~/fixture/persistara" interrupt={() => {}} color={false} dimensions={{ columns, rows }} />, { columns }); }
 describe("interactive terminal application", () => {
+  it("drains plain input that reaches EOF while startup is awaiting readiness without prompting a closed reader", async () => {
+    const input = new PassThrough(), output = new PassThrough(), terminal = createPlainTerminal({ input, output, env: { NO_COLOR: "1" } });
+    const closed = once(terminal.rl, "close"); input.end("/help\n/exit\n"); await closed;
+    try { assert.equal(await terminal.io.ask("Command: "), "/help"); assert.equal(await terminal.io.ask("Command: "), "/exit"); assert.equal(await terminal.io.ask("Command: "), null); }
+    finally { terminal.rl.close(); input.destroy(); output.destroy(); }
+  });
   it("keeps the composer usable across sizes, wraps untrusted output and pages the retained transcript", () => {
     const store = new ApplicationStore(); void store.ask("Command", "command");
     for (const [columns, rows] of [[110, 35], [80, 24], [48, 18], [36, 14]] as const) {

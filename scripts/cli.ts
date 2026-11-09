@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createLocalWorkspace } from "../packages/operator/src/workspace.js";
@@ -8,7 +7,8 @@ import { terminalMemory } from "../packages/operator/src/memory.js";
 import { TerminalClient } from "../packages/terminal/src/client.js";
 import { NearCliWallet } from "../packages/terminal/src/wallet.js";
 import { TerminalShell, errorText, inputJson, reviewApproval, type TerminalIO } from "../packages/terminal/src/shell.js";
-import { terminalHelp, terminalHelpFor, terminalJson, terminalText, terminalOutput, terminalColor, completeCommand, parseNear, statusText, missionText, missionListText, commissionText, commandExitCode } from "../packages/terminal/src/render.js";
+import { terminalHelp, terminalHelpFor, terminalJson, terminalText, parseNear, statusText, missionText, missionListText, commissionText, commandExitCode } from "../packages/terminal/src/render.js";
+import { createPlainTerminal } from "../packages/terminal/src/plain.js";
 import { ProviderError } from "../packages/protocol/src/providers.js";
 import { assertRuntime } from "../packages/protocol/src/config.js";
 import { loadEnvironment } from "./common.js";
@@ -31,12 +31,6 @@ function options(argv: string[]): Options {
     else throw new ProviderError("INVALID_INPUT", "Unknown terminal option; use --help");
   }
   result.args = argv.slice(i); return result;
-}
-function lineIO() {
-  const color = terminalColor(Boolean(process.stdout.isTTY), process.env);
-  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY && process.stdout.isTTY), historySize: 0, completer: completeCommand }), lines = rl[Symbol.asyncIterator]();
-  const io: TerminalIO = { print: (text, tone) => { process.stdout.write(terminalOutput(text, tone, color) + "\n"); }, ask: async prompt => { rl.setPrompt(terminalOutput(prompt, "brand", color)); rl.prompt(); const next = await lines.next(); return next.done ? null : next.value; } };
-  return { io, rl };
 }
 const forwarded: Record<string, string> = { specialist: "specialist.js", recovery: "recovery-kit.js", doctor: "provider-doctor.js" };
 async function forward(args: string[], project: string, acknowledgeCosts: boolean) {
@@ -103,11 +97,11 @@ async function main() {
   loadEnvironment();
   const workspace = await createLocalWorkspace(), controller = new AbortController();
   let application: ReturnType<(typeof import("../packages/terminal/src/application.js"))["createTerminalApplication"]> | null = null;
-  let plain: ReturnType<typeof lineIO> | null = null;
+  let plain: ReturnType<typeof createPlainTerminal> | null = null;
   const stop = () => { controller.abort(); application?.closeInput(); plain?.rl.close(); void workspace.missions.close(); process.exitCode = 130; };
   const useApplication = interactive && !opts.plain && process.stdin.isTTY && process.stdout.isTTY && process.env.TERM !== "dumb" && process.env.INK_SCREEN_READER !== "true";
   if (useApplication) application = (await import("../packages/terminal/src/application.js")).createTerminalApplication({ agentId: workspace.config.agentId, project: opts.project, interrupt: stop });
-  else plain = lineIO();
+  else plain = createPlainTerminal();
   const io = application?.io ?? plain!.io;
   // Machine-readable stdout contains one result; reviews/errors go to stderr.
   const reviewIO: TerminalIO = { ...io, print: (text, tone) => { if (opts.json) process.stderr.write(terminalText(text) + "\n"); else io.print(text, tone); } };
