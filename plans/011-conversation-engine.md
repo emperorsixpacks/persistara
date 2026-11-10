@@ -140,14 +140,14 @@ Do not run `pnpm spike:inference` or any upload/payment command during this offl
 
 ## Done criteria
 
-- [ ] Private scope-bound sessions reopen in a fresh process with valid message/tool ordering and stable IDs.
-- [ ] One session turn has bounded rounds/context/tools, persisted intent and no duplicate request after unknown outcomes.
-- [ ] Only the three read-only tools are advertised; owner/scoping checks remain outside the model.
-- [ ] Existing commands, question/review input, paste handling and terminal restoration keep working.
-- [ ] No configuration/opt-in means zero model requests and no fabricated answer.
-- [ ] Test-only injection demonstrates a conversation → read-only tool → reply → exit/reopen workflow, distinctly labeled synthetic.
-- [ ] All verification commands pass; docs and index accurately distinguish offline completion from unexecuted live acceptance.
-- [ ] No contract deployment, owner transaction, 0G upload, credential export or paid inference was performed for this milestone.
+- [x] Private scope-bound sessions reopen in a fresh process with valid message/tool ordering and stable IDs.
+- [x] One session turn has bounded rounds/context/tools, persisted intent and no duplicate request after unknown outcomes.
+- [x] Only the three read-only tools are advertised; owner/scoping checks remain outside the model.
+- [x] Existing commands, question/review input, paste handling and terminal restoration keep working.
+- [x] No configuration/opt-in means zero model requests and no fabricated answer.
+- [x] Test-only injection demonstrates a conversation → read-only tool → reply → exit/reopen workflow, distinctly labeled synthetic.
+- [ ] All verification commands pass; docs and index accurately distinguish offline completion from unexecuted live acceptance. (Open: `pnpm contract:check` not run — `cargo-near` missing here. Docs/index are accurate.)
+- [x] No contract deployment, owner transaction, 0G upload, credential export or paid inference was performed for this milestone.
 
 ## Stop conditions and maintenance
 
