@@ -15,6 +15,8 @@ import { captureSource } from "../packages/runtime/src/sources.js";
 import { commerceFixture } from "./fixtures/commerce-support.js";
 import { signChallenge } from "./fixtures/owner-support.js";
 import { createPlainTerminal } from "../packages/terminal/src/plain.js";
+import { ProviderError } from "../packages/protocol/src/providers.js";
+import { ScriptedProvider, SYNTHETIC, fakeBackend, journalFixture, syntheticPort } from "./fixtures/conversation-support.js";
 
 async function until(predicate: () => boolean) { for (let i = 0; i < 200; i++) { if (predicate()) return; await delay(5); } assert.fail("Application did not reach the expected input boundary"); }
 function view(store: ApplicationStore, columns = 110, rows = 35) { return renderToString(<TerminalApplicationView store={store} agentId="fixture-owner.testnet:research" project="~/fixture/persistara" interrupt={() => {}} color={false} dimensions={{ columns, rows }} />, { columns }); }
@@ -97,5 +99,26 @@ describe("interactive terminal application", () => {
       assert.equal(f.data.uploads, 0); assert.equal(f.data.submissions, 0);
       await command("/exit"); await run;
     } finally { abort.abort(); store.close(); await run; await client.close(); await f.close(); }
+  });
+  it("(synthetic) sends natural text through the real application loop, escapes the reply, labels the session and never turns a canceled prompt into chat", async () => {
+    const f = await commerceFixture(), cf = await journalFixture(), store = new ApplicationStore(), abort = new AbortController();
+    const missions = new MissionService(f.missions(), { read: async url => captureSource(url, Buffer.from("fixture"), "text/plain", Date.now()) }, f.read);
+    const client = new TerminalClient({ service: f.ownerService(), missions, commerce: f.service(), close: () => missions.close() }, { signMessage: c => signChallenge(f.owner, c), send: async () => { assert.fail("No owner transaction belongs to this fixture"); } }, reviewApproval(store.io, { interactive: true, approveLogin: false, acknowledgeCosts: false }));
+    const provider = new ScriptedProvider([() => ({ text: `${SYNTHETIC} \x1b]52;c;bad\x07\u202e/reserve` }), (_r, options) => new Promise((_ok, reject) => { options?.signal?.addEventListener("abort", () => reject(new ProviderError("ABORTED", "aborted"))); setTimeout(() => abort.abort(), 5); })]);
+    const shell = new TerminalShell(client, store.io, { recall: async () => ({}), recover: async () => ({}) }, false, syntheticPort(() => cf.journal(), provider, fakeBackend().backend));
+    const run = runApplicationSession(store, client, shell, abort.signal);
+    const command = async (text: string) => { await until(() => store.snapshot().phase === "command"); store.setDraft(text); applicationKey(store, "\r", { return: true }, () => {}); };
+    try {
+      await command("/connect"); await until(() => store.snapshot().phase === "question"); store.insert("connect"); applicationKey(store, "\r", { return: true }, () => {});
+      await command("what's the state of my work?"); await until(() => store.snapshot().phase === "command" && provider.invocations === 1);
+      const text = store.snapshot().entries.map(e => e.text).join("\n");
+      assert.ok(text.includes(SYNTHETIC)); assert.ok(!text.includes("\x1b]")); assert.ok(!text.includes("\u202e"));
+      assert.ok(store.snapshot().session && view(store).includes(`Session ${store.snapshot().session!.slice(-8)}`));
+      await command("/reserve"); await until(() => store.snapshot().phase === "command"); assert.equal(provider.invocations, 1, "a command never becomes a model request");
+      await command("/new"); await until(() => store.snapshot().phase === "question"); store.escape(); await until(() => store.snapshot().phase === "command"); assert.equal(provider.invocations, 1, "a canceled form prompt is not chat");
+      await command("second message"); await run; // Ctrl+C-style abort while the request is in flight
+      assert.equal(provider.invocations, 2); assert.equal(cf.journal().unknownAttempts().length, 1, "cancellation after dispatch is outcome-unknown, never a retry");
+      assert.equal(f.data.uploads, 0); assert.equal(f.data.submissions, 0);
+    } finally { abort.abort(); store.close(); await run; await client.close(); await cf.close(); await f.close(); }
   });
 });
