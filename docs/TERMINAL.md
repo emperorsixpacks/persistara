@@ -109,6 +109,17 @@ Forwarding routes use fixed program paths and argument arrays, never a shell eva
 
 `persistara doctor` runs storage-only diagnostics by default. No AI credits are used. Sensitive material is never accepted as an inline command-line key/secret value; recovery commands take protected file paths.
 
+## Conversation sessions (offline core)
+
+Ordinary text that is not a command goes to a durable conversation session. **It is disabled by default**: with no opt-in the terminal prints an AI-not-enabled message, makes zero provider calls, opens no wallet and writes nothing. An API key alone never enables it; live use needs `PERSISTARA_AI_CHAT=enabled` plus `NEARAI_API_KEY` and a verified TEE `NEARAI_MODEL`. Live inference, attestation, tool calling and cost limits have **not** been accepted; do not enable it until that separate check is authorized.
+
+- Routing: a leading `/` is always an operator command (unknown slash commands are errors). A bare word is a command only when it is a documented command and its arguments fit (`status`, `open 1`, `help memory`, `memory rent`); anything else (`what's my status?`) is conversation. Answers to approval/form questions are never routed.
+- `/sessions` lists saved conversations, `/session new` starts one and `/session open <number|ID>` reopens it with its history. The composer shows the selected session. `--resume <mission-id>` still selects a **mission** only.
+- Limits per message: 4 model rounds, 4 tool calls per round, 1,024 output tokens per call, 128 messages / 256 KB request. An over-cap tool batch runs nothing; a `length` finish is shown as partial; an over-long session reports a context limit and never silently drops history.
+- Tools: only `mission_list`, `mission_detail` and `memory_recall`, all read-only, re-authorized against the original owner on every call, results bounded to 16 KB and marked untrusted. There is no command, fetch, filesystem, upload, payment, pause, rotation or memory-write tool.
+- Lost outcomes: each request is journaled before dispatch. If the process exits, times out or is canceled after dispatch, the attempt becomes **outcome unknown**, the session is fenced and the request is never resent automatically; it may have been billed (cost is never recorded as zero). Start `/session new` to continue.
+- Custody: sessions are private plaintext in `.persistara/conversations/research/conversations.sqlite` (0700/0600). They are **not** committed memory, are not encrypted to 0G and are **not** in the memory backup or portable kit.
+
 ## Structured commands and approvals
 
 For scripts, put `--json` and global consent flags **before** the command:

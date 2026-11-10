@@ -21,7 +21,7 @@ After building, run `pnpm cli` for normal use, or `pnpm cli:dev` to rebuild sour
 
 Real native acceptance verified owner login, memory-cache recovery and a source mission interrupted after its first capture, resumed/reviewed/reopened in fresh CLI processes with the same artifact. No upload, transaction or inference was used. See [terminal acceptance evidence](docs/evidence/native-terminal-2026-11-08.json).
 
-**AI chat/reasoning is not enabled yet.** This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
+**AI chat is built offline but disabled by default and not live-accepted.** A durable conversation/session core with three read-only tools exists and is tested only with clearly labeled synthetic providers; no real model request, attestation or tool call has been verified. Enabling it needs deliberate operator opt-in (see [terminal docs](docs/TERMINAL.md#conversation-sessions-offline-core)). This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
 
 ## Current implementation
 

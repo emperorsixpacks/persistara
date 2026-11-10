@@ -112,7 +112,7 @@ export function TerminalApplicationView({ store, agentId, project, interrupt, co
     </Box>}
     <Box height={1} flexShrink={0}><Text color={c(state.phase === "question" ? "#e5be7e" : muted)}>{clip(phaseLabel, width - 2)}</Text><Spacer />{offset > 0 && <Text color={c(copper)}>↑ scrollback</Text>}</Box>
     <Box flexDirection="column" borderStyle="round" borderColor={c(state.phase === "question" ? "#e5be7e" : copper)} paddingX={1} height={4} flexShrink={0}>
-      <Text color={c(muted)} wrap="truncate-end">{state.phase === "question" ? clip(state.prompt, width - 6) : state.selected ? `Mission ${state.selected.slice(-8)}  /  Command` : "Command"}</Text>
+      <Text color={c(muted)} wrap="truncate-end">{state.phase === "question" ? clip(state.prompt, width - 6) : [state.session ? `Session ${state.session.slice(-8)}` : "", state.selected ? `Mission ${state.selected.slice(-8)}` : ""].filter(Boolean).concat("Command").join("  /  ")}</Text>
       <Text wrap="truncate-end"><Text color={c(copper)}>{state.phase === "question" ? "? " : "› "}</Text>{parts.before}<Text inverse={state.phase === "command" || state.phase === "question"}>{parts.current}</Text>{parts.after}{!state.draft && state.phase === "command" && <Text color={c(muted)}> Type / for commands</Text>}{working && <Text color={c(muted)}>Working — Ctrl+C stops and exits safely</Text>}</Text>
     </Box>
     <Box height={1} flexShrink={0}><Text color={c(muted)} wrap="truncate-end">{clip(status ? `Last check: ${status.view.paused ? "paused" : "active"} · ${nearAmount(status.view.balances.available)} · Memory ${status.view.checkpointVersion} · Owner ${status.authenticated ? "connected" : "disconnected"}` : "○ NEAR readiness not verified", width)}</Text></Box>
@@ -121,16 +121,16 @@ export function TerminalApplicationView({ store, agentId, project, interrupt, co
 }
 
 export async function runApplicationSession(store: ApplicationStore, client: TerminalClient, shell: TerminalShell, signal: AbortSignal) {
-      store.update({ selected: shell.selected });
+      store.update({ selected: shell.selected, session: shell.session });
       const refresh = async () => { try { store.update({ status: await client.status() }); } catch (error) { store.update({ status: null }); store.print(errorText(error), "warning"); } };
       await refresh();
       while (!signal.aborted && store.snapshot().phase !== "closing") {
         const line = await store.ask("Command", "command"); if (line === null) break;
         let args: string[] = [];
-        try { args = words(line); if (!args.length) continue; if (!await shell.dispatch(args)) break; }
+        try { const route = shell.route(line); if (route.kind === "command") args = route.args; if (route.kind === "command" && !args.length) continue; if (!await shell.handle(line, signal)) break; }
         catch (error) { store.print(errorText(error), "warning"); }
         const status = store.snapshot().status;
-        store.update({ selected: shell.selected, ...(status ? { status: { ...status, authenticated: client.authenticated() } } : {}) });
+        store.update({ selected: shell.selected, session: shell.session, ...(status ? { status: { ...status, authenticated: client.authenticated() } } : {}) });
         if (["connect", "disconnect", "pause", "resume-agent", "status", "memory-recover"].includes((args[0] ?? "").replace(/^\//, "")) && !signal.aborted && store.snapshot().phase !== "closing") { store.busy("Refreshing workspace"); await refresh(); }
       }
 }

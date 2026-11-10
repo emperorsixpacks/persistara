@@ -19,6 +19,10 @@ Use separate owner, specialist wallet, NEAR runtime, 0G uploader, memory and com
 | Evidence | Precise verified/unverified/failed/unsupported states | Corrupted signature and unavailable evidence cases |
 | Recovery | Owner-held keys plus committed head, no original cache | Fresh-runtime recovery fixture and live artifact evidence |
 
+## Conversation sessions
+
+Chat history is private owner-runtime plaintext in its own SQLite journal, scoped to owner/agent/contract/code hash, outside every backup. Model output and tool results are untrusted data and are escaped before display. The model only sees three read-only tools that re-check the original owner per call; economic and owner actions remain human-reviewed commands. Provider requests are journaled before dispatch; an interrupted charged request is outcome-unknown and fenced, never auto-retried. Offline tests use synthetic providers only; live attestation/E2EE/tool behavior is unverified.
+
 ## Crypto choices
 
 Use application-owned AES-256-GCM envelopes with authenticated context and bounded canonical encodings. Random 32-byte memory keys are never derived from addresses, passwords alone, or wallet signatures without a reviewed scheme. Commission briefs/deliveries use standard JWE RSA-OAEP-256 / A256GCM through pinned jose with distinct 3072-bit recipient keys and authenticated scope/purpose context. Neither wallet signatures nor addresses derive these secrets. Memory backups do not contain commission recipient keys; recovery custody must be verified separately.

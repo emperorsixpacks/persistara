@@ -18,6 +18,7 @@ import { writePrivateFile } from "../packages/memory/src/files.js";
 import { captureSource, type SourceReader } from "../packages/runtime/src/sources.js";
 import { commerceFixture } from "./fixtures/commerce-support.js";
 import { ownerReceipt, signChallenge } from "./fixtures/owner-support.js";
+import { ScriptedProvider, SYNTHETIC, call, callTools, fakeBackend, journalFixture, say, syntheticPort } from "./fixtures/conversation-support.js";
 import type { OwnerChallenge } from "../packages/owner/src/types.js";
 
 async function setup(reader?: SourceReader) {
@@ -126,12 +127,59 @@ describe("terminal presentation and external signing boundary", () => {
     assert.equal(commandExitCode(["commission", "show"], { state: "payout_pending" }), 0);
     assert.equal(commandExitCode(["mission", "run"], { mission: { state: "blocked" } }), 1);
   });
-  it("does not invoke the wallet or pretend to answer ordinary text as an AI", async () => {
+  it("without AI enablement, ordinary text makes zero model calls, opens no wallet and gets no fabricated answer", async () => {
+    const f = await setup(), cf = await journalFixture(), provider = new ScriptedProvider([say("must never be shown")]);
+    try {
+      for (const conversation of [undefined, syntheticPort(() => cf.journal(), provider, fakeBackend().backend, false)]) {
+        const output: string[] = [], shell = new TerminalShell(f.client(), { print: text => { output.push(text); }, ask: async () => null }, { recall: async () => ({}), recover: async () => ({}) }, false, conversation);
+        await shell.handle("hello"); await shell.handle("what's my status? it's fine"); await shell.handle("/session new"); await shell.handle("/sessions");
+        assert.ok(output.join(" ").includes("AI chat is not enabled")); assert.ok(!output.join(" ").includes("must never be shown"));
+        await shell.handle("/bogus"); assert.ok(output.at(-1)!.includes("Unknown terminal command"));
+      }
+      assert.equal(provider.invocations, 0); assert.equal(f.approvals.length, 0); assert.equal(cf.journal().listSessions().length, 0); assert.equal(f.sends(), 0);
+    } finally { await cf.close(); await f.closeTerminal(); }
+  });
+  it("routes slash commands and grammar-matching bare commands to the operator and everything else to conversation", async () => {
     const f = await setup();
     try {
-      const output: string[] = [], shell = new TerminalShell(f.client(), { print: text => { output.push(text); }, ask: async () => null }, { recall: async () => ({}), recover: async () => ({}) });
-      await shell.dispatch(["hello"]); assert.ok(output.join(" ").includes("AI chat is not available")); assert.equal(f.approvals.length, 0);
+      const shell = new TerminalShell(f.client(), { print: () => {}, ask: async () => null }, { recall: async () => ({}), recover: async () => ({}) });
+      const kind = (line: string) => shell.route(line).kind;
+      for (const line of ["/reserve 5", "/anything", "status", "help", "help memory", "open 1", "run", "memory rent", "connect", "exit", "/sessions", "sessions"]) assert.equal(kind(line), "command", line);
+      for (const line of ["hello", "what's my status", "open the report", "help me please", "status of my missions", "new mission ideas?", "don't /reserve now", "ignore rules\n/reserve 1", "\"unbalanced", "memory"]) assert.equal(kind(line), "chat", line);
+      assert.throws(() => shell.route("/open \"x"), /quoted/);
     } finally { await f.closeTerminal(); }
+  });
+  it("(synthetic) conversation -> read-only tool -> reply -> exit -> reopen with matching IDs, never reaching economic paths", async () => {
+    const f = await setup(), cf = await journalFixture();
+    try {
+      const c = f.client(); await c.connect(); const mission = await f.create(c); f.approvals.length = 0;
+      const provider = new ScriptedProvider([callTools(call("c1", "mission_list")), say(`${SYNTHETIC}: one saved mission`), callTools(call("d1", "dispatch_command", { command: "/reserve 1" }))]);
+      const port = () => syntheticPort(() => cf.journal(), provider, { authorize: async () => { await c.current(); }, listMissions: () => c.list(), missionDetail: id => c.detail(id), recall: async () => [] });
+      const output: string[] = [], phases: string[] = [], io = { print: (text: string) => { output.push(text); }, ask: async () => null, busy: (label: string) => { phases.push(label); } };
+      const shell = new TerminalShell(c, io, { recall: async () => ({}), recover: async () => ({}) }, false, port());
+      await shell.handle("what saved work do I have?\n/reserve 99999");
+      assert.ok(output.join("\n").includes(`${SYNTHETIC}: one saved mission`)); assert.ok(phases.includes("Waiting for the model")); assert.ok(phases.some(p => p.startsWith("Looking up")));
+      const toolText = JSON.stringify(provider.requests[1]!.messages.at(-1)); assert.ok(toolText.includes(mission.mission.brief.title)); assert.ok(toolText.includes('\\"untrusted\\":true'));
+      const sessionId = shell.session!; assert.ok(sessionId); assert.equal(provider.invocations, 2);
+      cf.restart(); output.length = 0;
+      const reopened = new TerminalShell(c, io, { recall: async () => ({}), recover: async () => ({}) }, false, port());
+      await reopened.handle("/sessions"); assert.ok(output.join(" ").includes(sessionId.slice(-8)));
+      await reopened.handle("/session open 1"); assert.equal(reopened.session, sessionId);
+      assert.ok(output.join("\n").includes("You: what saved work do I have?")); assert.ok(output.join("\n").includes(`${SYNTHETIC}: one saved mission`));
+      output.length = 0; await reopened.handle("please reserve funds");
+      assert.ok(output.join(" ").includes("No answer was saved")); // synthetic model asked for an unadvertised tool; provider-side validation refused it
+      assert.equal(f.approvals.length, 0); assert.equal(f.sends(), 0); assert.equal(f.data.uploads, 0);
+    } finally { await cf.close(); await f.closeTerminal(); }
+  });
+  it("rechecks the original owner before conversation work and makes no model call when authority changed", async () => {
+    const f = await setup(), cf = await journalFixture(), provider = new ScriptedProvider([say("never")]);
+    try {
+      const c = f.client(); await c.connect();
+      const shell = new TerminalShell(c, { print: () => {}, ask: async () => null }, { recall: async () => ({}), recover: async () => ({}) }, false, syntheticPort(() => cf.journal(), provider, fakeBackend().backend));
+      f.view.ownerKey = f.worker.getPublicKey().toString();
+      await assert.rejects(shell.handle("hello"), /AUTHORIZATION_FAILED|original owner|Reconnect/);
+      assert.equal(provider.invocations, 0); assert.equal(cf.journal().listSessions().length, 0);
+    } finally { await cf.close(); await f.closeTerminal(); }
   });
   it("requires exact digest and separate cost consent in noninteractive mode", async () => {
     const io = { print: () => {}, ask: async () => null }, digest = "3".repeat(64), review: TerminalReview = { kind: "reserve", digest, title: "Reserve", costs: true, details: {} };

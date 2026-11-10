@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createLocalWorkspace } from "../packages/operator/src/workspace.js";
 import { terminalMemory } from "../packages/operator/src/memory.js";
+import { terminalConversation } from "../packages/operator/src/conversation.js";
 import { TerminalClient } from "../packages/terminal/src/client.js";
 import { NearCliWallet } from "../packages/terminal/src/wallet.js";
 import { TerminalShell, errorText, inputJson, reviewApproval, type TerminalIO } from "../packages/terminal/src/shell.js";
@@ -98,6 +99,7 @@ async function main() {
   const workspace = await createLocalWorkspace(), controller = new AbortController();
   let application: ReturnType<(typeof import("../packages/terminal/src/application.js"))["createTerminalApplication"]> | null = null;
   let plain: ReturnType<typeof createPlainTerminal> | null = null;
+  let conversations: { close(): void } | null = null;
   const stop = () => { controller.abort(); application?.closeInput(); plain?.rl.close(); void workspace.missions.close(); process.exitCode = 130; };
   const useApplication = interactive && !opts.plain && process.stdin.isTTY && process.stdout.isTTY && process.env.TERM !== "dumb" && process.env.INK_SCREEN_READER !== "true";
   if (useApplication) application = (await import("../packages/terminal/src/application.js")).createTerminalApplication({ agentId: workspace.config.agentId, project: opts.project, interrupt: stop });
@@ -108,7 +110,7 @@ async function main() {
   const client = new TerminalClient(workspace, new NearCliWallet(process.env.NEAR_CLI_BIN || "near", undefined, controller.signal), reviewApproval(reviewIO, { interactive: interactive || Boolean(process.stdin.isTTY && !opts.json), approveLogin: opts.approveLogin, acknowledgeCosts: opts.acknowledgeCosts, ...(opts.approveDigest ? { approveDigest: opts.approveDigest } : {}) }));
   process.once("SIGINT", stop); process.once("SIGTERM", stop); plain?.rl.once("SIGINT", stop);
   try {
-    if (interactive) { const shell = new TerminalShell(client, io, terminalMemory(workspace)); shell.selected = opts.resume ?? null; if (application) await application.run(client, shell, controller.signal); else await shell.loop(controller.signal); }
+    if (interactive) { const memory = terminalMemory(workspace), conversation = terminalConversation(workspace, client, memory); conversations = conversation; const shell = new TerminalShell(client, io, memory, false, conversation); shell.selected = opts.resume ?? null; if (application) await application.run(client, shell, controller.signal); else await shell.loop(controller.signal); }
     else {
       const result = await oneShot(client, opts.args, opts.json ? undefined : text => io.print(text));
       if (opts.json) process.stdout.write(terminalJson(result) + "\n");
@@ -119,6 +121,6 @@ async function main() {
       else io.print(terminalJson(result));
       if (!controller.signal.aborted) process.exitCode = commandExitCode(opts.args, result);
     }
-  } finally { plain?.rl.close(); try { await client.close(); } finally { await application?.close(); process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); } }
+  } finally { conversations?.close(); plain?.rl.close(); try { await client.close(); } finally { await application?.close(); process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); } }
 }
 main().catch(error => { console.error(terminalText(errorText(error))); if (process.exitCode !== 130) process.exitCode = error instanceof ProviderError && error.code === "NOT_CONFIGURED" ? 2 : 1; });
