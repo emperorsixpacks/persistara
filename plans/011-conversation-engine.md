@@ -6,7 +6,7 @@
 
 ## Status and purpose
 
-- Status: **Offline core DONE (2026-11-10)**; live inference/streaming acceptance and the contract gate remain open. Evidence: `pnpm check` 265 tests / 37 suites pass (35 new: 12 journal, 12 runner, 7 tools, 3 terminal integration, 1 Ink application session); `pnpm test:e2e` 11 pass; `git diff --check` clean. `pnpm contract:check` was **not run** (`cargo-near` absent on the verifying machine; no contract file changed). No paid call, upload, payment or owner transaction occurred. Remaining limits: disabled by default; real provider adapter wiring is untested live; no streaming; unknown attempts have no owner-resolution command (start a new session); sessions are not backed up; the Ink loop is covered by a synthetic application test (natural text, escaped reply, session label, canceled prompt, Ctrl+C after dispatch), but there is no real-terminal capture.
+- Status: **Offline core DONE (2026-11-10)**; live inference/streaming acceptance remains open. Evidence: `pnpm check` 265 tests / 37 suites pass (35 new: 12 journal, 12 runner, 7 tools, 3 terminal integration, 1 Ink application session); `pnpm test:e2e` 11 pass; `git diff --check` clean. `pnpm contract:check` passed on 2026-11-10 (fmt, Clippy, contract tests, six sandbox scenarios; no contract file changed). No paid call, upload, payment or owner transaction occurred. Remaining limits: disabled by default; real provider adapter wiring is untested live; no streaming; unknown attempts have no owner-resolution command (start a new session); sessions are not backed up; the Ink loop is covered by a synthetic application test (natural text, escaped reply, session label, canceled prompt, Ctrl+C after dispatch), but there is no real-terminal capture.
 - Priority: P0 for the product; effort L; change risk HIGH because model suggestions meet authorization and charged-request boundaries.
 - Category: direction / runtime architecture.
 - Planned at: `4d2bbfd2aadb9e8c25db3f5fd0ea32b70dd2e972`, 2026-11-09.
@@ -146,7 +146,7 @@ Do not run `pnpm spike:inference` or any upload/payment command during this offl
 - [x] Existing commands, question/review input, paste handling and terminal restoration keep working.
 - [x] No configuration/opt-in means zero model requests and no fabricated answer.
 - [x] Test-only injection demonstrates a conversation → read-only tool → reply → exit/reopen workflow, distinctly labeled synthetic.
-- [ ] All verification commands pass; docs and index accurately distinguish offline completion from unexecuted live acceptance. (Open: `pnpm contract:check` not run — `cargo-near` missing here. Docs/index are accurate.)
+- [x] All verification commands pass; docs and index accurately distinguish offline completion from unexecuted live acceptance. (`pnpm contract:check` exit 0 with Rust 1.96.0 and checksum-verified cargo-near 0.22.0.)
 - [x] No contract deployment, owner transaction, 0G upload, credential export or paid inference was performed for this milestone.
 
 ## Stop conditions and maintenance
