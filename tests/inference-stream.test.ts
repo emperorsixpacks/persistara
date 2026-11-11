@@ -78,3 +78,21 @@ describe("provider failure diagnostics are codes only", () => {
     for (const bad of ["HTTP 401 for https://x", "Bearer abc", "api key sk-123", "UPPER.case", "a".repeat(70), "with space", "api.", ".api", "", undefined, 5, { code: "api.x" }]) assert.equal(diagnosticCode(bad), undefined, String(bad));
   });
 });
+
+describe("stream failures name the violated rule without echoing content", () => {
+  it("attaches a fixed-string diagnostic that passes the allowlist and never contains stream data", async () => {
+    const { diagnosticCode } = await import("../packages/protocol/src/worker.js");
+    const secret = "SECRET-PROMPT-TEXT-123";
+    const cases: [string, RegExp][] = [
+      [sse(chunk("c", { content: secret }), chunk("c", {}, "stop"), "[DONE]"), /^stream\.stream_carried_no_usage/],
+      [sse(chunk("c", { content: secret }), chunk("c", {}, "stop"), usage("c")), /^stream\.stream_ended_before_its_terminator/],
+    ];
+    for (const [body, expected] of cases) {
+      await assert.rejects(run(body), (error: unknown) => {
+        const diagnostic = (error as { diagnostic?: string }).diagnostic;
+        assert.ok(diagnostic && expected.test(diagnostic), String(diagnostic)); assert.equal(diagnosticCode(diagnostic), diagnostic); assert.ok(!diagnostic.includes("secret"));
+        return true;
+      });
+    }
+  });
+});

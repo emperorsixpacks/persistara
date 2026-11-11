@@ -14,7 +14,8 @@ export interface StreamedCall { id: string; type: "function"; function: { name: 
 export interface StreamedCompletion {
   id: string; text: string; toolCalls: StreamedCall[]; finishReason: string; usage: { prompt_tokens: number; completion_tokens: number };
 }
-const bad = (message: string) => new ProviderError("PROTOCOL_ERROR", message);
+/** The diagnostic is derived only from this module's own fixed message strings, never from stream content. */
+const bad = (message: string) => new ProviderError("PROTOCOL_ERROR", message, false, undefined, `stream.${message.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 50)}`);
 
 export async function accumulateChatStream(body: AsyncIterable<Uint8Array>): Promise<StreamedCompletion> {
   const decoder = new TextDecoder("utf-8", { fatal: true });
