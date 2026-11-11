@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "live_inference_spike_acceptance",
+  "fixture": false,
+  "date": "2026-11-11",
+  "step": "INFERENCE-ACCEPTANCE step 3 (non-streaming, fictional specimen)",
+  "model": "z-ai/glm-5.3-flash",
+  "completionId": "e35b3025a84a44b490c69ce78e196489",
+  "evidence": {
+    "status": "verified",
+    "completionId": "e35b3025a84a44b490c69ce78e196489",
+    "signatureKind": "provider_tee",
+    "checks": [
+      "gateway_attestation",
+      "model_attestation",
+      "gateway_tls_binding",
+      "response_signature"
+    ],
+    "e2ee": true,
+    "tcbPolicy": "UpToDate"
+  },
+  "usage": {
+    "inputTokens": 168,
+    "outputTokens": 39
+  },
+  "toolCallVerified": true,
+  "elapsedMs": 23658,
+  "sdkVersion": "0.2.1",
+  "attempts": {
+    "total": 2,
+    "firstResult": "VERIFICATION_FAILED, no completion reference, no diagnostic code available at the time; cause unknown, possibly transient; the first request may have been billed",
+    "secondResult": "verified_inference_and_tool_call"
+  },
+  "notRun": [
+    "step 3b streaming",
+    "step 4 terminal chat with read-only tools against a configured workspace"
+  ],
+  "limits": "One real request proves this model/gateway path once. It does not prove streaming, the conversation loop, sustained reliability or cost control.",
+  "secretsIncluded": false
+}
