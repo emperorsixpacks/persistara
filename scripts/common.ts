@@ -14,7 +14,7 @@ export function saveReport(name: string, report: unknown): string {
 }
 export function printFailure(error: unknown): void {
   const report = error instanceof ProviderError
-    ? { status: "failed", code: error.code, retryable: error.retryable, externalReference: error.externalReference ?? null }
+    ? { status: "failed", code: error.code, retryable: error.retryable, externalReference: error.externalReference ?? null, ...(error.diagnostic ? { diagnostic: error.diagnostic } : {}) }
     : { status: "failed", code: "UNEXPECTED_ERROR", retryable: false };
   console.error(JSON.stringify(report));
   process.exitCode = error instanceof ProviderError && error.code === "NOT_CONFIGURED" ? 2 : 1;

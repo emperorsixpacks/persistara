@@ -72,8 +72,8 @@ process.once("message", async (input: unknown) => {
       evidence: { status: "verified", completionId: completion.id, signatureKind: "provider_tee", checks: ["gateway_attestation", "model_attestation", "gateway_tls_binding", "response_signature"], e2ee: true, tcbPolicy: "UpToDate" } });
   } catch (error) {
     if (error instanceof ProviderError) fail(error.code);
-    else if (isVerificationError(error)) fail("VERIFICATION_FAILED");
+    else if (isVerificationError(error)) fail("VERIFICATION_FAILED", (error as { failure?: { code?: unknown } }).failure?.code as string | undefined);
     else if (isApiError(error) && error.failure.code === "api.completion_signature_unavailable") fail("UNSUPPORTED");
-    else fail(completionPossible ? "OUTCOME_UNKNOWN" : "UPSTREAM_ERROR");
+    else fail(completionPossible ? "OUTCOME_UNKNOWN" : "UPSTREAM_ERROR", isApiError(error) ? (error as { failure?: { code?: unknown } }).failure?.code as string | undefined : undefined);
   } finally { client?.clearResponseCache(); }
 });

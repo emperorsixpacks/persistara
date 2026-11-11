@@ -75,7 +75,7 @@ export const executeWorker: WorkerExecutor = async (module, request, options) =>
         finish(undefined, message.value);
       } else {
         const code = knownCodes.has(message.code as ProviderErrorCode) ? message.code as ProviderErrorCode : "UPSTREAM_ERROR";
-        finish(new ProviderError(code, `Provider operation failed (${code})`, code === "UPSTREAM_ERROR" && options.effect === "read", externalReference));
+        finish(new ProviderError(code, `Provider operation failed (${code})`, code === "UPSTREAM_ERROR" && options.effect === "read", externalReference, diagnosticCode(message.diagnostic)));
       }
     });
     child.on("error", () => interrupted("UPSTREAM_ERROR"));
@@ -90,8 +90,13 @@ export const executeWorker: WorkerExecutor = async (module, request, options) =>
 export function reply(value: unknown): void {
   process.send?.({ type: "result", ok: true, value }, undefined, undefined, () => process.exit(0));
 }
-export function fail(code: ProviderErrorCode): void {
-  process.send?.({ type: "result", ok: false, code }, undefined, undefined, () => process.exit(1));
+/** Allowlist for a provider/SDK failure code: lowercase dotted identifier only. Anything else (messages, URLs, keys) is dropped. */
+export function diagnosticCode(value: unknown): string | undefined {
+  return typeof value === "string" && /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){0,3}$/.test(value) && value.length <= 64 ? value : undefined;
+}
+export function fail(code: ProviderErrorCode, diagnostic?: string): void {
+  const safe = diagnosticCode(diagnostic);
+  process.send?.({ type: "result", ok: false, code, ...(safe ? { diagnostic: safe } : {}) }, undefined, undefined, () => process.exit(1));
 }
 export function progress(stage: "prepared" | "submitted" | "completion", reference: string): void {
   process.send?.({ type: "progress", stage, reference });

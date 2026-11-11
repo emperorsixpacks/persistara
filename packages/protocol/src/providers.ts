@@ -10,6 +10,8 @@ export class ProviderError extends Error {
     message: string,
     readonly retryable = false,
     readonly externalReference?: string,
+    /** Sanitized machine code only (for example `api.http_status`), never message text. See `diagnosticCode`. */
+    readonly diagnostic?: string,
   ) {
     super(message);
     this.name = "ProviderError";

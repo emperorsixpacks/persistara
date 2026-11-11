@@ -70,3 +70,11 @@ describe("chat stream accumulation (synthetic bytes; unverified transport parsin
     assert.equal(inferenceConfig({ NEARAI_API_KEY: "k", NEARAI_MODEL: "m", NEARAI_STREAM: "enabled" }).stream, true);
   });
 });
+
+describe("provider failure diagnostics are codes only", () => {
+  it("passes lowercase dotted SDK codes and drops anything that could carry message text, URLs or secrets", async () => {
+    const { diagnosticCode } = await import("../packages/protocol/src/worker.js");
+    for (const ok of ["api.http_status", "verification.tls_binding_mismatch", "api.completion_signature_unavailable"]) assert.equal(diagnosticCode(ok), ok);
+    for (const bad of ["HTTP 401 for https://x", "Bearer abc", "api key sk-123", "UPPER.case", "a".repeat(70), "with space", "api.", ".api", "", undefined, 5, { code: "api.x" }]) assert.equal(diagnosticCode(bad), undefined, String(bad));
+  });
+});
