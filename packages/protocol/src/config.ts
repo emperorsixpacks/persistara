@@ -11,6 +11,8 @@ export interface InferenceConfig {
   baseUrl: "https://cloud-api.near.ai/v1";
   apiKey?: string;
   model?: string;
+  /** Opt-in streamed transport (NEARAI_STREAM=enabled). Streamed replies are still verified in full before any use. Unaccepted live. */
+  stream?: boolean;
 }
 
 function secureUrl(value: string): string {
@@ -40,6 +42,7 @@ export function inferenceConfig(env: Record<string, string | undefined>): Infere
   const config: InferenceConfig = { baseUrl: "https://cloud-api.near.ai/v1" };
   if (env.NEARAI_API_KEY?.trim()) config.apiKey = env.NEARAI_API_KEY.trim();
   if (env.NEARAI_MODEL?.trim()) config.model = env.NEARAI_MODEL.trim();
+  if (env.NEARAI_STREAM === "enabled") config.stream = true;
   return config;
 }
 

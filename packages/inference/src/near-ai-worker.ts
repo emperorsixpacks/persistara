@@ -4,6 +4,7 @@ import { assertRuntime, type InferenceConfig } from "../../protocol/src/config.j
 import { ProviderError } from "../../protocol/src/providers.js";
 import { fail, progress, reply } from "../../protocol/src/worker.js";
 import { validateInferenceRequest } from "./near-ai.js";
+import { accumulateChatStream } from "./stream.js";
 import type { InferenceRequest } from "./provider.js";
 
 process.once("message", async (input: unknown) => {
@@ -12,7 +13,8 @@ process.once("message", async (input: unknown) => {
   try {
     assertRuntime();
     if (!isObject(input) || !isObject(input.config) || input.config.baseUrl !== "https://cloud-api.near.ai/v1" ||
-        typeof input.config.apiKey !== "string" || !input.config.apiKey || typeof input.config.model !== "string" || !input.config.model || !isObject(input.request)) {
+        typeof input.config.apiKey !== "string" || !input.config.apiKey || typeof input.config.model !== "string" || !input.config.model || !isObject(input.request) ||
+        (input.config.stream !== undefined && typeof input.config.stream !== "boolean")) {
       fail("INVALID_INPUT"); return;
     }
     const config = input.config as unknown as Required<InferenceConfig>;
@@ -32,15 +34,22 @@ process.once("message", async (input: unknown) => {
     // Use the SDK fetch boundary directly: one paid POST, no automatic SDK retries.
     const response = await client.fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: config.model, messages, stream: false, max_tokens: request.maxOutputTokens ?? 1024,
+      body: JSON.stringify({ model: config.model, messages, stream: config.stream === true, ...(config.stream === true ? { stream_options: { include_usage: true } } : {}), max_tokens: request.maxOutputTokens ?? 1024,
         ...(request.tools?.length ? { tools: request.tools.map(tool => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } })) } : {}) }),
     });
     if (!response.ok) { fail("UPSTREAM_ERROR"); return; }
-    const body = await response.text();
-    if (Buffer.byteLength(body) > 256_000) { fail("PROTOCOL_ERROR"); return; }
     let completion: unknown;
-    try { completion = JSON.parse(body); }
-    catch { fail("PROTOCOL_ERROR"); return; }
+    if (config.stream === true) {
+      // Consume the ENTIRE stream first (the signature covers all of it), then verify. Nothing is displayed or saved before that.
+      if (!response.body) { fail("PROTOCOL_ERROR"); return; }
+      const streamed = await accumulateChatStream(response.body as unknown as AsyncIterable<Uint8Array>);
+      completion = { id: streamed.id, choices: [{ message: { content: streamed.text, ...(streamed.toolCalls.length ? { tool_calls: streamed.toolCalls } : {}) }, finish_reason: streamed.finishReason }], usage: streamed.usage };
+    } else {
+      const body = await response.text();
+      if (Buffer.byteLength(body) > 256_000) { fail("PROTOCOL_ERROR"); return; }
+      try { completion = JSON.parse(body); }
+      catch { fail("PROTOCOL_ERROR"); return; }
+    }
     if (!isObject(completion) || typeof completion.id !== "string") { fail("PROTOCOL_ERROR"); return; }
     progress("completion", completion.id);
     const verified = await client.verifyResponse(completion.id);
