@@ -34,19 +34,29 @@ export function parseNear(value: string) {
   const [whole, fraction = ""] = value.split("."); const amount = BigInt(whole!) * 10n ** 24n + BigInt(fraction.padEnd(24, "0"));
   if (amount <= 0n) throw new ProviderError("INVALID_INPUT", "Enter a positive NEAR amount"); return amount.toString();
 }
+/**
+ * Human-facing agent name in NEAR subaccount style: `research.owner.testnet` for the registry ID `owner.testnet:research`.
+ * Display only. It is NOT a NEAR account and nothing is created, resolved or authorized from it; the registry ID stays canonical
+ * for the contract, journals and scope checks. Anything that does not match the registry format is shown unchanged.
+ */
+export function agentDisplayName(agentId: string) {
+  const split = agentId.indexOf(":");
+  const owner = agentId.slice(0, split), name = agentId.slice(split + 1);
+  return split > 0 && name && !name.includes(":") ? `${name}.${owner}` : agentId;
+}
 export function statusText(result: Awaited<ReturnType<TerminalClient["status"]>>) {
   const v = result.view;
-  return [`${v.agentId}  |  NEAR testnet  |  ${v.paused ? "PAUSED" : "ACTIVE"}`,
+  return [`${agentDisplayName(v.agentId)}  |  NEAR testnet  |  ${v.paused ? "PAUSED" : "ACTIVE"}`,
     `Owner ${v.owner}  |  ${result.authenticated ? "connected" : "use /connect"}`,
     `Treasury ${nearAmount(v.balances.available)} available  |  ${nearAmount(v.balances.reserved)} reserved`,
     `Memory checkpoint ${v.checkpointVersion} / epoch ${v.keyEpoch}  |  local backup ${v.backup.status}`,
     `Restricted runtime ${v.runtimeKeys.some(key => key.ready) ? "ready" : "needs attention"}  |  local rotation hold ${v.localRotationHold === null ? "unknown" : v.localRotationHold ? "active" : "clear"}`,
-    "AI conversation: unavailable in this release. Source missions use no inference.",
+    "AI conversation: off unless the operator enables it (see docs/TERMINAL.md). Source missions use no inference.",
     ...(result.pendingOwner ? [`Owner request ${result.pendingOwner.request.id}: ${result.pendingOwner.state} — reconcile before another handoff.`] : [])].join("\n");
 }
 export function homeText(result: Awaited<ReturnType<TerminalClient["status"]>>) {
   const v = result.view;
-  return [`  Workspace   ${v.agentId}`,
+  return [`  Workspace   ${agentDisplayName(v.agentId)}`,
     `  NEAR        Testnet · ${v.paused ? "paused" : "active"} · ${nearAmount(v.balances.available)} available`,
     `  Owner       ${result.authenticated ? "Connected" : "Not connected"}`,
     `  Memory      Checkpoint ${v.checkpointVersion} · local backup ${v.backup.status}`,

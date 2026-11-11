@@ -97,7 +97,7 @@ export class ConversationJournal {
       this.db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=1000;");
       this.atomic(() => {
         const version = Number(this.db.prepare("PRAGMA user_version").get()?.user_version);
-        if (![0, 1].includes(version)) throw fail();
+        if (![0, 1, 2].includes(version)) throw fail();
         if (version === 0) this.db.exec(`
           CREATE TABLE conversation_scope (id INTEGER PRIMARY KEY CHECK(id=1), binding TEXT NOT NULL) STRICT;
           CREATE TABLE sessions (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
@@ -113,6 +113,11 @@ export class ConversationJournal {
           CREATE TABLE tool_actions (operation_id TEXT PRIMARY KEY, turn_id TEXT NOT NULL REFERENCES turns(id), attempt_id TEXT NOT NULL REFERENCES attempts(operation_id), call_id TEXT NOT NULL,
             name TEXT NOT NULL, arguments_digest TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('queued','completed','failed')), outcome TEXT, outcome_digest TEXT, UNIQUE(turn_id,call_id)) STRICT;
           PRAGMA user_version=1;
+        `);
+        if (version < 2) this.db.exec(`
+          CREATE TABLE attempt_resolutions (operation_id TEXT PRIMARY KEY REFERENCES attempts(operation_id), resolution TEXT NOT NULL CHECK(resolution IN ('billed','not_billed','unverified')),
+            resolved_at INTEGER NOT NULL) STRICT;
+          PRAGMA user_version=2;
         `);
         const binding = stable(scope);
         this.db.prepare("INSERT OR IGNORE INTO conversation_scope VALUES(1,?)").run(binding);
@@ -195,6 +200,12 @@ export class ConversationJournal {
       return { ordinal: index, turnId: String(row.turn_id), message };
     });
   }
+  private resolutionOf(operationId: string, state: string): Attempt["resolution"] {
+    const row = this.db.prepare("SELECT resolution FROM attempt_resolutions WHERE operation_id=?").get(operationId);
+    if (!row) return null;
+    if (state !== "unknown" || !["billed", "not_billed", "unverified"].includes(String(row.resolution))) throw fail();
+    return row.resolution as Attempt["resolution"];
+  }
   private attempts(id: string): Attempt[] {
     return this.db.prepare("SELECT a.* FROM attempts a JOIN turns t ON t.id=a.turn_id WHERE t.session_id=? ORDER BY t.ordinal,a.round").all(id).map((row) => {
       let usage: Attempt["usage"] = null;
@@ -205,7 +216,7 @@ export class ConversationJournal {
         (!terminal && row.completion_id !== null)) throw fail();
       return { operationId: String(row.operation_id), turnId: String(row.turn_id), round: Number(row.round), requestDigest: String(row.request_digest), model: String(row.model),
         maxOutputTokens: Number(row.max_output_tokens), state: row.state as Attempt["state"], completionId: row.completion_id as string | null, finishReason: row.finish_reason as Attempt["finishReason"],
-        usage, evidenceDigest: row.evidence_digest as string | null, failureCode: row.failure_code as string | null };
+        usage, evidenceDigest: row.evidence_digest as string | null, failureCode: row.failure_code as string | null, resolution: this.resolutionOf(String(row.operation_id), String(row.state)) };
     });
   }
   private tools(id: string): ToolAction[] {
@@ -262,7 +273,7 @@ export class ConversationJournal {
         return { turn: this.turns(session).find((turn) => turn.id === prior.id)!, lease: null };
       }
       const row = this.sessionRow(session);
-      if (row.holder !== null || Number(this.db.prepare("SELECT count(*) AS n FROM turns WHERE session_id=? AND state='unknown'").get(session)?.n) > 0) throw conflict();
+      if (row.holder !== null || Number(this.db.prepare("SELECT count(*) AS n FROM attempts a JOIN turns t ON t.id=a.turn_id WHERE t.session_id=? AND a.state='unknown' AND NOT EXISTS (SELECT 1 FROM attempt_resolutions r WHERE r.operation_id=a.operation_id)").get(session)?.n) > 0) throw conflict();
       const ordinal = Number(this.db.prepare("SELECT count(*) AS n FROM turns WHERE session_id=?").get(session)?.n);
       if (ordinal >= MAX_TURNS) throw conflict();
       const id = `turn:${randomUUID()}`, at = this.now(), fence = Number(row.fence) + 1;
@@ -404,7 +415,30 @@ export class ConversationJournal {
   unknownAttempts(): Attempt[] {
     return this.atomic(() => {
       this.expireAll();
-      return this.db.prepare("SELECT id FROM sessions").all().flatMap((row) => this.attempts(String(row.id))).filter((attempt) => attempt.state === "unknown");
+      return this.db.prepare("SELECT id FROM sessions").all().flatMap((row) => this.attempts(String(row.id))).filter((attempt) => attempt.state === "unknown" && attempt.resolution === null);
+    });
+  }
+  /**
+   * Owner acknowledgement that an outcome-unknown attempt was checked against the provider's own records. It releases the
+   * session fence only. The attempt stays `unknown` and its usage stays null: the journal never invents a cost, and nothing
+   * is resubmitted. Same resolution again is idempotent; a different one is a conflict.
+   */
+  resolveUnknown(operationId: string, resolution: "billed" | "not_billed" | "unverified"): Attempt {
+    if (!attemptId(operationId)) throw invalid("Invalid attempt operation ID");
+    if (!["billed", "not_billed", "unverified"].includes(resolution)) throw invalid("Resolution must be billed, not_billed or unverified");
+    return this.atomic(() => {
+      this.expireAll();
+      const row = this.db.prepare("SELECT a.state, t.session_id FROM attempts a JOIN turns t ON t.id=a.turn_id WHERE a.operation_id=?").get(operationId);
+      if (!row) throw invalid("Attempt is not in this agent's journal");
+      if (row.state !== "unknown") throw conflict();
+      const prior = this.db.prepare("SELECT resolution FROM attempt_resolutions WHERE operation_id=?").get(operationId);
+      if (prior) { if (prior.resolution !== resolution) throw conflict(); }
+      else {
+        const at = this.now();
+        this.db.prepare("INSERT INTO attempt_resolutions VALUES(?,?,?)").run(operationId, resolution, at);
+        this.db.prepare("UPDATE sessions SET version=version+1,updated_at=? WHERE id=?").run(at, String(row.session_id));
+      }
+      return this.attempts(String(row.session_id)).find((attempt) => attempt.operationId === operationId)!;
     });
   }
 }

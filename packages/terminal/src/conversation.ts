@@ -11,6 +11,8 @@ export interface TerminalConversation {
   list(): Promise<SessionSummary[]>;
   create(): Promise<SessionSummary>;
   open(id: string): Promise<SessionDetail>;
+  /** Owner acknowledgement after checking the provider's own records. Releases the pause only; never records cost and never resends. */
+  resolve(operationId: string, resolution: "billed" | "not_billed" | "unverified"): Promise<void>;
   send(sessionId: string, text: string, hooks: { signal?: AbortSignal; onPhase?: (phase: "model" | "tool", detail?: string) => void }): Promise<TurnResult>;
   close(): void;
 }
@@ -38,8 +40,8 @@ export function transcriptText(detail: SessionDetail, maximumMessages = 24) {
     else if (message.role === "assistant") lines.push(message.toolCalls?.length ? `Assistant looked up: ${message.toolCalls.map((call) => call.name).join(", ")}` : `Assistant: ${clipText(message.content ?? "", 4000)}`);
     else if (message.role === "tool") lines.push(`  tool result (${names.get(message.toolCallId + turnId) ?? "tool"}) saved`);
   }
-  const unknown = detail.attempts.filter((attempt) => attempt.state === "unknown");
-  if (unknown.length) lines.push(`Paused: a model request may have been accepted without a recorded result (${unknown.map((attempt) => attempt.operationId).join(", ")}). It was not retried and may have been billed. Start /session new to continue.`);
+  const unknown = detail.attempts.filter((attempt) => attempt.state === "unknown" && attempt.resolution === null);
+  if (unknown.length) lines.push(`Paused: a model request may have been accepted without a recorded result (${unknown.map((attempt) => attempt.operationId).join(", ")}). It was not retried and may have been billed. Check your NEAR AI usage records, then run /session resolve <attempt ID> billed|not_billed|unverified to continue here, or start /session new.`);
   return lines.join("\n");
 }
 export function turnText(result: TurnResult): { text: string; tone?: "success" | "warning" | "muted" } [] {
@@ -51,7 +53,7 @@ export function turnText(result: TurnResult): { text: string; tone?: "success" |
     CONTEXT_LIMIT: "This session is too long to send safely. Nothing was dropped or sent. Use /session new to continue.",
   };
   if (result.reply) out.push({ text: result.reply });
-  if (result.state === "unknown") out.push({ text: `A model request may have been accepted, but its outcome was lost (attempt ${result.unknownAttempt}). It was not retried and may have been billed. This session is paused; use /session new to continue.`, tone: "warning" });
+  if (result.state === "unknown") out.push({ text: `A model request may have been accepted, but its outcome was lost (attempt ${result.unknownAttempt}). It was not retried and may have been billed. This session is paused. Check your NEAR AI usage records, then /session resolve ${result.unknownAttempt} billed|not_billed|unverified, or use /session new.`, tone: "warning" });
   else if (result.state === "failed") out.push({ text: `No answer was saved (${result.failureCode ?? "FAILED"}). ${result.failureCode === "ABORTED" ? "Canceled before sending." : "Nothing was retried automatically; send the message again if you want another request."}`, tone: "warning" });
   else if (result.failureCode && notes[result.failureCode]) out.push({ text: notes[result.failureCode]!, tone: "warning" });
   if (result.replayed) out.push({ text: "This message was already handled; showing the saved result.", tone: "muted" });

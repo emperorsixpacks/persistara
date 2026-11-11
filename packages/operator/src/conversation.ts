@@ -42,6 +42,7 @@ export function terminalConversation(workspace: LocalWorkspace, client: Terminal
     async list() { return open().listSessions(); },
     async create() { return open().createSession(randomUUID()); },
     async open(id) { return open().get(id); },
+    async resolve(operationId, resolution) { open().resolveUnknown(operationId, resolution); },
     async send(sessionId, text, hooks) {
       if (!ready.enabled || !ready.provider || !ready.model) throw new Error("AI chat is not enabled");
       const tools = createReadOnlyTools({

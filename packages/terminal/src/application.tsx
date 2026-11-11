@@ -3,7 +3,7 @@ import { Box, Text as InkText, Spacer, render, useInput, usePaste, useWindowSize
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 import { ApplicationStore, graphemes, suggestions, type ApplicationState, type SessionEntry } from "./application-state.js";
-import { nearAmount, terminalColor, terminalText, type TerminalTone } from "./render.js";
+import { agentDisplayName, nearAmount, terminalColor, terminalText, type TerminalTone } from "./render.js";
 import { errorText, words, type TerminalShell } from "./shell.js";
 import type { TerminalClient } from "./client.js";
 
@@ -89,7 +89,7 @@ export function TerminalApplicationView({ store, agentId, project, interrupt, co
             {rows > 25 && <Text color={c(copper)}>╵</Text>}
             <Text>Make progress. Keep the record.</Text>
             <Text color={c(muted)}>{clip(project, roomy ? 42 : width - 6)}</Text>
-            {rows > 25 && <Text color={c(muted)}>{clip(agentId, roomy ? 42 : width - 6)}</Text>}
+            {rows > 25 && <Text color={c(muted)}>{clip(agentDisplayName(agentId), roomy ? 42 : width - 6)}</Text>}
             {roomy && <Text color={c(muted)}>Source missions · AI not connected</Text>}
           </Box>
           {roomy && <Box flexDirection="column" paddingLeft={3} borderLeft borderTop={false} borderBottom={false} borderRight={false} borderStyle="single" borderColor={c(muted)}>

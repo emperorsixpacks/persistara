@@ -104,6 +104,39 @@ describe("durable conversation journal (offline, synthetic scope)", () => {
     } finally { await f.close(); }
   });
 
+  it("lets the owner acknowledge an unknown attempt without inventing cost, resending or rewriting history", async () => {
+    const f = await fixture();
+    try {
+      const { session, lease } = start(f);
+      const a = attempt(f, lease);
+      f.restart(); f.advance();
+      assert.throws(() => f.journal().resolveUnknown(a.operationId, "free" as never), /Resolution must be/);
+      assert.throws(() => f.journal().resolveUnknown(`attempt:${randomUUID()}`, "billed"), /not in this agent/);
+      const done = f.journal().resolveUnknown(a.operationId, "unverified");
+      assert.equal(done.state, "unknown"); assert.equal(done.usage, null); assert.equal(done.resolution, "unverified");
+      assert.equal(f.journal().resolveUnknown(a.operationId, "unverified").resolution, "unverified", "idempotent");
+      assert.throws(() => f.journal().resolveUnknown(a.operationId, "not_billed"), /already running/, "a recorded answer is never silently changed");
+      assert.deepEqual(f.journal().unknownAttempts(), []);
+      f.restart();
+      const next = f.journal().beginTurn(session.id, randomUUID(), "after acknowledgement", randomUUID());
+      assert.ok(next.lease, "session accepts a new message");
+      const detail = f.journal().get(session.id);
+      assert.equal(detail.turns[0]!.state, "unknown"); assert.equal(detail.attempts[0]!.state, "unknown"); assert.equal(detail.attempts[0]!.usage, null);
+      assert.throws(() => f.journal().resolveUnknown(next.lease!.turnId as never, "billed"), /Invalid attempt/);
+    } finally { await f.close(); }
+  });
+
+  it("refuses to resolve an attempt that is not outcome-unknown", async () => {
+    const f = await fixture();
+    try {
+      const { lease } = start(f);
+      const a = attempt(f, lease);
+      assert.throws(() => f.journal().resolveUnknown(a.operationId, "billed"), /already running/);
+      f.journal().completeAttempt(lease, a.operationId, reply("ok"));
+      assert.throws(() => f.journal().resolveUnknown(a.operationId, "billed"), /already running/);
+    } finally { await f.close(); }
+  });
+
   it("keeps a never-dispatched attempt retryable only because nothing was submitted", async () => {
     const f = await fixture();
     try {
@@ -189,7 +222,7 @@ describe("durable conversation journal (offline, synthetic scope)", () => {
       assert.throws(() => new ConversationJournal(f.path, { ...scope, extra: "x" } as unknown as ConversationScope), /Invalid conversation scope/);
       const raw = new DatabaseSync(f.path); raw.exec("PRAGMA user_version=9"); raw.close();
       assert.throws(() => new ConversationJournal(f.path, scope), /integrity/);
-      const reset = new DatabaseSync(f.path); reset.exec("PRAGMA user_version=1"); reset.close();
+      const reset = new DatabaseSync(f.path); reset.exec("DROP TABLE attempt_resolutions; PRAGMA user_version=1"); reset.close();
       f.restart();
       assert.throws(() => f.journal().createSession("not-a-uuid"), /UUID/);
       assert.throws(() => f.journal().beginTurn("session:nope", randomUUID(), "x", randomUUID()), /Invalid session/);

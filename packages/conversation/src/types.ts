@@ -21,6 +21,8 @@ export interface Attempt {
   operationId: string; turnId: string; round: number; requestDigest: string; model: string; maxOutputTokens: number; state: AttemptState;
   completionId: string | null; finishReason: "stop" | "tool_calls" | "length" | null; usage: { inputTokens: number; outputTokens: number } | null;
   evidenceDigest: string | null; failureCode: string | null;
+  /** Owner acknowledgement of an unknown outcome. It never supplies usage or cost. */
+  resolution: "billed" | "not_billed" | "unverified" | null;
 }
 export interface ToolAction {
   operationId: string; turnId: string; attemptId: string; callId: string; name: string; argumentsDigest: string;

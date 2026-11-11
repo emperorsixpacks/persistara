@@ -1,3 +1,4 @@
+import { ProviderError } from "../packages/protocol/src/providers.js";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -10,7 +11,7 @@ import { baseEncode } from "near-api-js";
 import { TerminalClient, commissionReviews, type TerminalReview } from "../packages/terminal/src/client.js";
 import { NearCliWallet, type TerminalWallet } from "../packages/terminal/src/wallet.js";
 import { TerminalShell, reviewApproval, words } from "../packages/terminal/src/shell.js";
-import { parseNear, nearAmount, terminalJson, terminalText, terminalOutput, terminalColor, terminalHelpFor, completeCommand, commandExitCode } from "../packages/terminal/src/render.js";
+import { agentDisplayName, parseNear, nearAmount, terminalJson, terminalText, terminalOutput, terminalColor, terminalHelpFor, completeCommand, commandExitCode } from "../packages/terminal/src/render.js";
 import { MissionService } from "../packages/runtime/src/service.js";
 import { createRecoveryKit } from "../packages/recovery/src/kit.js";
 import { MemoryKeyring } from "../packages/memory/src/keyring.js";
@@ -139,6 +140,10 @@ describe("terminal presentation and external signing boundary", () => {
       assert.equal(provider.invocations, 0); assert.equal(f.approvals.length, 0); assert.equal(cf.journal().listSessions().length, 0); assert.equal(f.sends(), 0);
     } finally { await cf.close(); await f.closeTerminal(); }
   });
+  it("shows agents as name.owner for readability without changing the canonical registry ID or accepting it as authority", () => {
+    assert.equal(agentDisplayName("persistara-owner.testnet:research"), "research.persistara-owner.testnet");
+    for (const odd of ["no-separator", ":x", "owner.testnet:", "a:b:c"]) assert.equal(agentDisplayName(odd), odd, "non-registry text is shown unchanged");
+  });
   it("routes slash commands and grammar-matching bare commands to the operator and everything else to conversation", async () => {
     const f = await setup();
     try {
@@ -169,6 +174,25 @@ describe("terminal presentation and external signing boundary", () => {
       output.length = 0; await reopened.handle("please reserve funds");
       assert.ok(output.join(" ").includes("No answer was saved")); // synthetic model asked for an unadvertised tool; provider-side validation refused it
       assert.equal(f.approvals.length, 0); assert.equal(f.sends(), 0); assert.equal(f.data.uploads, 0);
+    } finally { await cf.close(); await f.closeTerminal(); }
+  });
+  it("(synthetic) a lost model outcome pauses the session until the owner records what they found, with no resend or invented cost", async () => {
+    const f = await setup(), cf = await journalFixture();
+    try {
+      const c = f.client(); await c.connect(); f.approvals.length = 0;
+      const provider = new ScriptedProvider([() => { throw new ProviderError("TIMEOUT", "Provider timed out", true); }, say(`${SYNTHETIC}: after acknowledgement`)]);
+      const output: string[] = [], shell = new TerminalShell(c, { print: text => { output.push(text); }, ask: async () => null }, { recall: async () => ({}), recover: async () => ({}) }, false,
+        syntheticPort(() => cf.journal(), provider, fakeBackend().backend));
+      await shell.handle("hello there");
+      const attempt = cf.journal().unknownAttempts()[0]!; assert.ok(attempt); assert.ok(output.join("\n").includes("/session resolve"));
+      output.length = 0; await shell.handle("another message"); assert.equal(provider.invocations, 1, "fenced: nothing was resent"); assert.ok(output.join("\n").includes("busy or paused"));
+      await assert.rejects(shell.handle("/session resolve attempt:not-real billed"), /Use \/session resolve/);
+      await assert.rejects(shell.handle(`/session resolve ${attempt.operationId} free`), /Use \/session resolve/);
+      assert.equal(cf.journal().unknownAttempts().length, 1);
+      await shell.handle(`/session resolve ${attempt.operationId} unverified`); assert.ok(output.at(-1)!.includes("no cost was recorded"));
+      assert.equal(cf.journal().unknownAttempts().length, 0); assert.equal(cf.journal().get(shell.session!).attempts[0]!.usage, null);
+      await shell.handle("one more"); assert.ok(output.join("\n").includes("after acknowledgement")); assert.equal(provider.invocations, 2);
+      assert.equal(f.approvals.length, 0); assert.equal(f.sends(), 0);
     } finally { await cf.close(); await f.closeTerminal(); }
   });
   it("rechecks the original owner before conversation work and makes no model call when authority changed", async () => {

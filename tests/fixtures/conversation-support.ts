@@ -85,6 +85,7 @@ export function syntheticPort(journal: () => ConversationJournal, provider: Scri
     async list() { return journal().listSessions(); },
     async create() { return journal().createSession(randomUUID()); },
     async open(id) { return journal().get(id); },
+    async resolve(operationId, resolution) { journal().resolveUnknown(operationId, resolution); },
     async send(sessionId, text, hooks) {
       const runner = new ConversationRunner({ journal: journal(), provider, tools: createReadOnlyTools(backend), model: "synthetic-model", ...(hooks.signal ? { signal: hooks.signal } : {}), ...(hooks.onPhase ? { onPhase: hooks.onPhase } : {}) });
       return runner.runTurn(sessionId, randomUUID(), text);

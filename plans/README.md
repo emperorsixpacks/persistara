@@ -19,6 +19,7 @@ Prepared 2026-11-06 against Sofer `542813f`. The user delegated product and tech
 | 010 | Interactive terminal application | 008, 009 | DONE — persistent composer, command picker, scoped status, paging, working feedback and real PTY/owner acceptance pass; conversation/enrollment remain separate |
 | 011 | Durable conversation sessions and bounded read-only assistant loop | Implemented portions of 005, 008–010 | **Offline core DONE** (journal, bounded runner, three read-only tools, terminal routing; 264 TS tests, 11 browser tests pass). `pnpm contract:check` passed (2026-11-10: fmt, Clippy, contract tests, six sandbox scenarios). Live inference and streaming remain unexecuted; see `docs/INFERENCE-ACCEPTANCE.md` |
 | 007 | External owner-wallet connection and reviewed controls | 003, 004 | IN PROGRESS — existing-agent authentication/pause/resume implemented; live browser-provider approval and broader enrollment/rotation UI remain |
+| 012 | Agent names as real NEAR subaccounts | 003, 011 | PROPOSED — display-name stage shipped; contract/subaccount work needs owner approval ([plan](012-agent-subaccounts.md)) |
 
 Plans 002 and 003 are independent after 001. This is a dependency observation, not permission to spawn other agents. Keep work single-agent unless the operator authorizes delegation.
 

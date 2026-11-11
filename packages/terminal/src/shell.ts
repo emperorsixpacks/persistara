@@ -79,7 +79,12 @@ export class TerminalShell {
     if (!ready.enabled || !port) { this.io.print(terminalText(ready.message), "warning"); return true; }
     await this.connected(); await this.client.current();
     if (!this.session) { this.session = (await port.create()).id; this.io.print(`Started conversation session ${this.session.slice(-8)}. /sessions lists saved conversations.`, "muted"); }
-    const result = await port.send(this.session, text, { ...(signal ? { signal } : {}), onPhase: (phase, detail) => this.io.busy?.(phase === "model" ? "Waiting for the model" : `Looking up ${terminalText(detail ?? "saved data", 40)}`) });
+    let result;
+    try { result = await port.send(this.session, text, { ...(signal ? { signal } : {}), onPhase: (phase, detail) => this.io.busy?.(phase === "model" ? "Waiting for the model" : `Looking up ${terminalText(detail ?? "saved data", 40)}`) }); }
+    catch (error) {
+      if (error instanceof ProviderError && error.code === "OPERATION_CONFLICT") { this.io.print("This conversation is busy or paused after a lost model outcome, so nothing was sent. Use /session open to see why, /session resolve <attempt ID> billed|not_billed|unverified after checking your usage records, or /session new.", "warning"); return true; }
+      throw error;
+    }
     for (const part of turnText(result)) this.io.print(terminalText(part.text, 100_000), part.tone);
     return true;
   }
@@ -95,7 +100,13 @@ export class TerminalShell {
     if (command === "sessions") { const rows = await port.list(); this.sessionRows = rows.map(row => row.id); this.print(this.json ? rows : sessionListText(rows, this.session)); return; }
     if (args[0] === "new" && args.length === 1) { this.session = (await port.create()).id; this.print(this.json ? { session: this.session } : `Started conversation session ${this.session.slice(-8)}. Type a message to begin.`); return; }
     if (args[0] === "open" && args.length === 2) { const detail = await port.open(this.sessionId(args[1])); this.session = detail.session.id; this.print(this.json ? detail : transcriptText(detail)); return; }
-    throw new ProviderError("INVALID_INPUT", "Use /session new or /session open <number or full ID>");
+    if (args[0] === "resolve" && args.length === 3) {
+      const resolution = args[2];
+      if (!/^attempt:[0-9a-f-]{36}$/.test(args[1] ?? "") || (resolution !== "billed" && resolution !== "not_billed" && resolution !== "unverified")) throw new ProviderError("INVALID_INPUT", "Use /session resolve <attempt ID> billed|not_billed|unverified");
+      await port.resolve(args[1]!, resolution);
+      this.print(this.json ? { attempt: args[1], resolution } : `Recorded "${resolution}" for ${args[1]}. The request was not resent and no cost was recorded; this session can accept messages again.`); return;
+    }
+    throw new ProviderError("INVALID_INPUT", "Use /session new, /session open <number or full ID> or /session resolve <attempt ID> billed|not_billed|unverified");
   }
   private print(value: unknown) { this.io.print(this.json ? terminalJson(value) : terminalText(typeof value === "string" ? value : terminalJson(value), 100_000)); }
   private async connect() {
