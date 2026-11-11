@@ -162,3 +162,19 @@ Pausing stops new runtime spending/checkpoints while preserving existing obligat
 Tests cover exact original-owner login, wrong keys/expiry/authority changes, durable mission reopen, interrupted remaining-source resume, signed quote/delivery review, denied/uncertain economic effects, callback-aware payout status, retained owner-wallet handoffs, explicit consent, terminal escape/bidi injection and offline routing. Browser regressions validate the shared setup without redesigning the page. Fixture tests remain explicitly labeled and separate from real CLI acceptance evidence. No inference quality, audited production custody, browser-provider approval or physical off-device claim is implied by a working terminal.
 
 The 2026-11-08 native acceptance connected the real original owner, listed existing missions and rebuilt the committed memory cache without uploading. An actual CLI process then stopped after the first saved public-source capture and exited 130; a fresh process completed the remaining source, reviewed the exact dossier and reopened it with the same digest. Both sources have one capture attempt. No inference, 0G upload or public transaction was used. See [sanitized native acceptance evidence](evidence/native-terminal-2026-11-08.json). Local checks pass 220 TypeScript tests / 33 suites, 11 browser tests, 34 Rust tests and six deployed-WASM sandbox scenarios.
+
+### Backing up conversation sessions
+
+Chat sessions are private owner data and are **not** part of the memory keyring backup or the recovery kit. They have their own encrypted backup:
+
+```sh
+pnpm conversations:backup --bundle /path/protected/chat.bundle --secret-file /path/other-protected/chat.secret
+pnpm conversations:backup:verify --bundle ... --secret-file ...
+pnpm conversations:restore --bundle ... --secret-file ...
+```
+
+- `backup` writes a **new** bundle and a **separate new** secret file (it never replaces either) and then re-opens the pair to prove it decrypts. Keep the two in different protected locations. The secret is random and independent: it is not a memory key, NEAR key or API key, and a memory recovery secret is rejected here.
+- Each session is encrypted with the existing AES-256-GCM envelope, bound to this agent, contract, chain and code hash. A manifest pins the exact session list, so a dropped, swapped or replayed session fails authentication. No chat text appears in the bundle in the clear.
+- `restore` only works on a journal with **no sessions** (it never merges or overwrites). It re-runs the journal's integrity checks and the original message/request digests, and rolls everything back if any session fails. `verify` changes nothing.
+- Backup is refused while a turn is running. Resolved unknown attempts keep their owner finding; an unknown attempt still never gets a recorded cost.
+- Limits: about 900 KB per session and 32 MB per bundle. This is tested offline with synthetic sessions only; it has not been run against a live workspace, and it protects against loss, not against someone who holds both files.

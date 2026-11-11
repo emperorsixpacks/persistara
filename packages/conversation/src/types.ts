@@ -34,3 +34,11 @@ export interface CompletedAttempt {
   id: string; text: string; toolCalls: ToolCall[]; finishReason: "stop" | "tool_calls" | "length";
   usage: { inputTokens: number; outputTokens: number }; evidenceDigest: string;
 }
+
+/** Portable, integrity-checked copy of one settled session. Contains private chat content: it must only ever be stored encrypted. */
+export interface SessionSnapshot {
+  requestId: string; detail: SessionDetail;
+  /** Digests as stored by the exporting journal; restore must reproduce them from the content, so edits made after export are caught. */
+  messageDigests: string[]; turnDigests: string[];
+  resolutions: { operationId: string; resolution: "billed" | "not_billed" | "unverified"; resolvedAt: number }[];
+}

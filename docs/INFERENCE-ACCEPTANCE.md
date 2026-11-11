@@ -31,4 +31,4 @@ Run each paid step once. Do not loop or script retries.
 
 ## After acceptance
 
-Passing this gate enables only the three read-only tools in the current milestone. Still open afterward: verified streaming, richer reviewed agent actions, per-request price validation, owner resolution of unknown attempts, and backup of chat sessions.
+Passing this gate enables only the three read-only tools in the current milestone. Still open afterward: verified streaming, richer reviewed agent actions, per-request price validation, and a real-terminal capture. (Owner resolution of unknown attempts and encrypted chat-session backup exist offline; neither has been exercised against live inference.)

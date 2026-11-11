@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { ChatMessage, ToolCall } from "../../inference/src/provider.js";
 import { isIdentifier, isObject } from "../../protocol/src/memory.js";
 import { ProviderError } from "../../protocol/src/providers.js";
-import { DEFAULT_CAPS, type Attempt, type CompletedAttempt, type ConversationCaps, type ConversationScope, type SessionDetail, type SessionSummary, type StoredMessage, type ToolAction, type Turn, type TurnLease, type TurnState } from "./types.js";
+import { DEFAULT_CAPS, type Attempt, type CompletedAttempt, type ConversationCaps, type ConversationScope, type SessionDetail, type SessionSnapshot, type SessionSummary, type StoredMessage, type ToolAction, type Turn, type TurnLease, type TurnState } from "./types.js";
 
 export const LEASE_MS = 60_000;
 export const MAX_SESSIONS = 250;
@@ -409,6 +409,58 @@ export class ConversationJournal {
       this.guard(lease);
       if (Number(this.db.prepare("SELECT count(*) AS n FROM attempts WHERE turn_id=? AND state IN ('queued','dispatched')").get(lease.turnId)?.n) > 0) throw conflict();
       this.closeTurn(lease.sessionId, lease.turnId, state, code);
+    });
+  }
+  /**
+   * Copies every session for an owner backup. Each one is integrity-checked first. A session with a running turn is refused,
+   * because its lease, in-flight request and outcome are not yet settled and a copy of it could never be restored faithfully.
+   */
+  exportSessions(): SessionSnapshot[] {
+    return this.atomic(() => {
+      this.expireAll();
+      return this.db.prepare("SELECT id,request_id FROM sessions ORDER BY created_at,rowid").all().map((row) => {
+        const detail = this.detail(String(row.id));
+        if (detail.turns.some((turn) => turn.state === "active")) throw conflict();
+        const resolutions = this.db.prepare("SELECT r.* FROM attempt_resolutions r JOIN attempts a ON a.operation_id=r.operation_id JOIN turns t ON t.id=a.turn_id WHERE t.session_id=? ORDER BY r.rowid").all(detail.session.id)
+          .map((item) => ({ operationId: String(item.operation_id), resolution: item.resolution as "billed" | "not_billed" | "unverified", resolvedAt: Number(item.resolved_at) }));
+        const messageDigests = this.db.prepare("SELECT body_digest FROM messages WHERE session_id=? ORDER BY ordinal").all(detail.session.id).map((item) => String(item.body_digest));
+        const turnDigests = this.db.prepare("SELECT request_digest FROM turns WHERE session_id=? ORDER BY ordinal").all(detail.session.id).map((item) => String(item.request_digest));
+        return { requestId: String(row.request_id), detail, resolutions, messageDigests, turnDigests };
+      });
+    });
+  }
+  /**
+   * Restores a backup into a journal that has no sessions yet (never merges or overwrites). Everything is inserted in one
+   * transaction and then re-verified by the same integrity checks as normal reads; any failure rolls the whole restore back.
+   */
+  restoreSessions(snapshots: readonly SessionSnapshot[]): number {
+    if (!Array.isArray(snapshots) || snapshots.length > MAX_SESSIONS) throw invalid("Backup has an invalid session list");
+    return this.atomic(() => {
+      if (Number(this.db.prepare("SELECT count(*) AS n FROM sessions").get()?.n) !== 0) throw conflict();
+      const settled = new Set(["completed", "limited", "context_limit", "failed", "unknown"]), settledAttempt = new Set(["completed", "failed", "unknown"]);
+      for (const item of snapshots) {
+        const raw: unknown = item; if (!isObject(raw) || !isObject(raw.detail) || !uuid(raw.requestId) || !Array.isArray(raw.resolutions) || !Array.isArray(raw.messageDigests) || !Array.isArray(raw.turnDigests)) throw fail();
+        const detail: SessionDetail = item.detail, { session, turns, messages, attempts, toolActions } = detail;
+        if (!sessionId(session.id) || turns.some((turn) => !settled.has(turn.state) || turn.sessionId !== session.id) || attempts.some((attempt) => !settledAttempt.has(attempt.state)) || toolActions.some((action) => action.state === "queued")) throw fail();
+        if (!Number.isSafeInteger(session.createdAt) || !Number.isSafeInteger(session.updatedAt) || !Number.isSafeInteger(session.version)) throw fail();
+        this.db.prepare("INSERT INTO sessions(id,request_id,title,created_at,updated_at,version,fence) VALUES(?,?,?,?,?,?,?)").run(session.id, item.requestId, session.title, session.createdAt, session.updatedAt, session.version, turns.length);
+        messages.forEach((entry, index) => { if (entry.ordinal !== index) throw fail(); });
+        for (const turn of turns) {
+          const first = messages.find((entry) => entry.turnId === turn.id);
+          if (first?.message.role !== "user") throw fail();
+          this.db.prepare("INSERT INTO turns(id,session_id,ordinal,request_id,request_digest,state,version,caps,created_at,updated_at,failure_code) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+            .run(turn.id, session.id, turn.ordinal, turn.requestId, digest({ sessionId: session.id, text: first.message.content }), turn.state, turn.version, stable(validateCaps(turn.caps)), turn.createdAt, turn.updatedAt, turn.failureCode);
+        }
+        for (const entry of messages) { const checked = validateMessage(entry.message); this.db.prepare("INSERT INTO messages VALUES(?,?,?,?,?)").run(session.id, entry.ordinal, entry.turnId, stable(checked), digest(checked)); }
+        for (const a of attempts) this.db.prepare("INSERT INTO attempts VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").run(a.operationId, a.turnId, a.round, a.requestDigest, a.model, a.maxOutputTokens, a.state, a.completionId, a.finishReason, a.usage ? stable(a.usage) : null, a.evidenceDigest, a.failureCode);
+        for (const t of toolActions) this.db.prepare("INSERT INTO tool_actions VALUES(?,?,?,?,?,?,?,?,?)").run(t.operationId, t.turnId, t.attemptId, t.callId, t.name, t.argumentsDigest, t.state, stable(t.outcome), digest(t.outcome));
+        for (const r of item.resolutions) this.db.prepare("INSERT INTO attempt_resolutions VALUES(?,?,?)").run(r.operationId, r.resolution, r.resolvedAt);
+        const storedMessages = this.db.prepare("SELECT body_digest FROM messages WHERE session_id=? ORDER BY ordinal").all(session.id).map((row) => String(row.body_digest));
+        const storedTurns = this.db.prepare("SELECT request_digest FROM turns WHERE session_id=? ORDER BY ordinal").all(session.id).map((row) => String(row.request_digest));
+        if (stable(storedMessages) !== stable(item.messageDigests) || stable(storedTurns) !== stable(item.turnDigests)) throw fail();
+        this.detail(session.id);
+      }
+      return snapshots.length;
     });
   }
   /** Inspectable fenced attempts. Their provider-side cost is unknown, never zero. */
