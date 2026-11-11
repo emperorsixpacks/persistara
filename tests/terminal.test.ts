@@ -142,6 +142,7 @@ describe("terminal presentation and external signing boundary", () => {
   });
   it("shows agents as name.owner for readability without changing the canonical registry ID or accepting it as authority", () => {
     assert.equal(agentDisplayName("persistara-owner.testnet:research"), "research.persistara-owner.testnet");
+    assert.equal(agentDisplayName("research.persistara-owner.testnet"), "research.persistara-owner.testnet", "subaccount-style IDs are shown as registered");
     for (const odd of ["no-separator", ":x", "owner.testnet:", "a:b:c"]) assert.equal(agentDisplayName(odd), odd, "non-registry text is shown unchanged");
   });
   it("routes slash commands and grammar-matching bare commands to the operator and everything else to conversation", async () => {

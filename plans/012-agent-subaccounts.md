@@ -1,6 +1,6 @@
 # Plan 012: Agent names as real NEAR subaccounts (`agent.owner.testnet`)
 
-Status: **PROPOSED, not started.** Stage one is shipped: `agentDisplayName()` in `packages/terminal/src/render.ts` shows the registry ID `owner.testnet:research` as `research.owner.testnet` in the status and home views. It is display only; it is not a NEAR account and nothing resolves or authorizes from it.
+Status: **Contract/source change IMPLEMENTED (2026-11-11); NOT deployed.** Defaults chosen under the owner's delegation: the subaccount is the agent's identity namespace (not a funded worker account), the owner creates any real account externally, names follow NEAR segment rules, and the ID is `name.owner`. `register_agent` now builds `name.owner` and validates it (35 Rust tests, Clippy clean); the live testnet deployment still uses `owner:name`. Adopting it needs a fresh authority deployment and the owner's approval. Stage one is shipped: `agentDisplayName()` in `packages/terminal/src/render.ts` shows the registry ID `owner.testnet:research` as `research.owner.testnet` in the status and home views. It is display only; it is not a NEAR account and nothing resolves or authorizes from it.
 
 ## Why
 

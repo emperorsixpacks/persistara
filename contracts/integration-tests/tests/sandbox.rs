@@ -36,7 +36,7 @@ async fn fixture(
         .transact()
         .await?
         .into_result()?;
-    let id = format!("{}:research", owner.id());
+    let id = format!("research.{}", owner.id());
     owner
         .call(contract.id(), "register_agent")
         .args_json(json!({"name":"research"}))

@@ -1,21 +1,36 @@
 use crate::{Authority, AuthorityExt, types::*};
 use near_sdk::{env, json_types::U64, near};
 
+impl Authority {
+    /// One lowercase NEAR account segment: 2-32 chars of a-z0-9 with single `-` or `_` separators between alphanumerics.
+    /// No dots, so a name can never create a deeper account path.
+    fn valid_agent_name(name: &str) -> bool {
+        let bytes = name.as_bytes();
+        let edge = |b: u8| b.is_ascii_lowercase() || b.is_ascii_digit();
+        bytes.len() >= 2
+            && bytes.len() <= 32
+            && edge(bytes[0])
+            && edge(bytes[bytes.len() - 1])
+            && bytes.iter().all(|&b| edge(b) || b == b'-' || b == b'_')
+            && !bytes.windows(2).any(|w| !edge(w[0]) && !edge(w[1]))
+    }
+}
+
 #[near]
 impl Authority {
     #[payable]
     pub fn register_agent(&mut self, name: String) -> AgentView {
         Self::assert_direct();
+        let owner = env::signer_account_id();
+        // The agent ID is a NEAR subaccount name of the owner: `name.owner`. Only the owner account can ever create that
+        // account, so nobody else can hold the same namespace. The contract cannot see whether the owner has created it yet;
+        // that is an owner action through the wallet/CLI and is not assumed here.
+        assert!(Self::valid_agent_name(&name), "ERR_AGENT_NAME");
+        let id = format!("{name}.{owner}");
         assert!(
-            !name.is_empty()
-                && name.len() <= 32
-                && name
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b)),
+            near_sdk::AccountId::try_from(id.clone()).is_ok(),
             "ERR_AGENT_NAME"
         );
-        let owner = env::signer_account_id();
-        let id = format!("{owner}:{name}");
         assert!(!self.agents.contains_key(&id), "ERR_AGENT_EXISTS");
         let storage_credit = env::attached_deposit().as_yoctonear();
         assert!(

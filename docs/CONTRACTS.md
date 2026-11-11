@@ -44,7 +44,7 @@ Top-level method arguments use Rust `snake_case`; nested structs and views use `
 | Methods | Authority and purpose |
 | --- | --- |
 | `new` | One-time initialization; deployment must initialize immediately |
-| `register_agent(name)` | Direct owner key; attached deposit funds storage credit, minimum 0.1 NEAR |
+| `register_agent(name)` | Direct owner key; attached deposit funds storage credit, minimum 0.1 NEAR. `name` is one lowercase NEAR segment (2–32 chars of `a-z0-9`, single `-`/`_` between alphanumerics, no dots) and the agent ID is the owner-subaccount name `name.owner` (it must also fit NEAR's 64-character account limit). The contract does **not** create or check that account; only the owner can ever create it. |
 | `set_delegate`, `revoke_delegate`, `set_paused` | Registration owner key; update authority generation |
 | `rotate_memory_epoch(agent_id, next_epoch)` | Legacy owner control; next epoch only, does not itself rotate encryption keys |
 | `begin_runtime_rotation(request)` | Owner key; immutable operation ID and generation/epoch/head guards; atomically pause, revoke old single-runtime grant, install replacement grant and advance one epoch |
@@ -69,7 +69,7 @@ Example checkpoint arguments:
 
 ```json
 {
-  "agent_id": "owner.testnet:research",
+  "agent_id": "research.owner.testnet",
   "generation": "3",
   "expected_version": "0",
   "next": {
@@ -123,3 +123,7 @@ The mission journal and signer integration must persist operation ID, exact argu
 2. Run a small public NEAR testnet workflow, recording network, code hash, transaction references and final states.
 3. Connect real 0G encrypted artifacts; keep synthetic sandbox references visibly separate.
 4. Complete owner recovery, upgrade/key custody policy, independent review and operating monitoring before mainnet.
+
+## Agent ID format (changed after the 2026-11-07 deployment)
+
+Source from this point registers agents as `name.owner` (for example `research.persistara-owner.testnet`). The previously deployed testnet contract still uses its original `owner:name` IDs (`persistara-owner.testnet:research`) and is **unchanged**: this source change alters the code hash, and no in-place migration exists. The TypeScript clients treat the agent ID as an opaque identifier, so they work with either format, but a given deployment uses exactly one. Adopting the new format means deploying a fresh authority and re-registering; that is an owner decision and has not been done. Because the contract cannot create or inspect the subaccount, `name.owner` as an ID does not prove the account exists on chain.

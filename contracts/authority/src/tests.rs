@@ -8,7 +8,7 @@ use near_sdk::{
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 const OWNER: &str = "owner.testnet";
-const AGENT: &str = "owner.testnet:research";
+const AGENT: &str = "research.owner.testnet";
 const WORKER: &str = "worker.testnet";
 const NOW: u64 = 100 * DAY_NS;
 const NEAR: u128 = 1_000_000_000_000_000_000_000_000;
@@ -398,8 +398,58 @@ fn agent_names_are_owner_namespaced() {
     let mut c = setup();
     call("another.testnet", 4, NOW, NEAR);
     let other = c.register_agent("research".into());
-    assert_eq!(other.id, "another.testnet:research");
+    assert_eq!(other.id, "research.another.testnet");
     assert_eq!(c.get_agent(AGENT.into()).unwrap().owner, account(OWNER));
+}
+
+#[test]
+fn agent_ids_are_valid_owner_subaccount_names_only() {
+    let mut c = setup();
+    for bad in [
+        "",
+        "a",
+        "Research",
+        "research.sub",
+        "-lead",
+        "trail-",
+        "_lead",
+        "trail_",
+        "dou--ble",
+        "a-_b",
+        "sp ace",
+        "colon:name",
+        "emoji\u{1f600}",
+        "with/slash",
+        "name@x",
+        &"a".repeat(33),
+    ] {
+        call(OWNER, 3, NOW, NEAR);
+        let name = bad.to_string();
+        reject(|| {
+            c.register_agent(name.clone());
+        });
+    }
+    for good in [
+        "ab",
+        "a1",
+        "researcher",
+        "re-search",
+        "re_search",
+        "a-b_c9",
+        &"a".repeat(32),
+    ] {
+        call(OWNER, 3, NOW, NEAR);
+        assert_eq!(
+            c.register_agent(good.into()).id,
+            format!("{good}.owner.testnet")
+        );
+    }
+    // A long owner makes `name.owner` exceed NEAR's 64-character account limit, so it is refused rather than truncated.
+    let long_owner = format!("{}.testnet", "o".repeat(56));
+    call(&long_owner, 3, NOW, NEAR);
+    reject(|| {
+        c.register_agent("research".into());
+    });
 }
 
 #[test]
@@ -413,7 +463,7 @@ fn delegate_cannot_use_owner_methods_or_another_agents_identity() {
         c.set_paused(AGENT.into(), true);
     });
     reject(|| {
-        c.checkpoint_memory("owner.testnet:other".into(), U64(1), U64(0), head(1));
+        c.checkpoint_memory("other.owner.testnet".into(), U64(1), U64(0), head(1));
     });
     conserved(&c);
 }

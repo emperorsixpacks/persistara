@@ -35,9 +35,10 @@ export function parseNear(value: string) {
   if (amount <= 0n) throw new ProviderError("INVALID_INPUT", "Enter a positive NEAR amount"); return amount.toString();
 }
 /**
- * Human-facing agent name in NEAR subaccount style: `research.owner.testnet` for the registry ID `owner.testnet:research`.
- * Display only. It is NOT a NEAR account and nothing is created, resolved or authorized from it; the registry ID stays canonical
- * for the contract, journals and scope checks. Anything that does not match the registry format is shown unchanged.
+ * Human-facing agent name in NEAR subaccount style. Contracts built from this source register `name.owner.testnet` directly and
+ * those IDs are shown unchanged. A legacy registry ID `owner.testnet:research` (the format of the existing testnet deployment)
+ * is shown as `research.owner.testnet`. Display only: nothing is created, resolved or authorized from the shown text, and the
+ * registry ID stays canonical for the contract, journals and scope checks.
  */
 export function agentDisplayName(agentId: string) {
   const split = agentId.indexOf(":");
