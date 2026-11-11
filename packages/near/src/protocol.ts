@@ -61,9 +61,16 @@ export function validateNetwork(config: NearNetwork): void {
     if (config.chainId !== "testnet" || url.protocol !== "https:") failInput();
   } else if (config.chainId === "mainnet" || config.chainId === "testnet" || url.protocol !== "http:" || !["127.0.0.1", "[::1]"].includes(url.hostname)) failInput();
 }
+/** One lowercase NEAR segment, exactly the contract's rule: 2-32 chars, a-z0-9 with single `-`/`_` between alphanumerics, no dots. */
+export const subaccountAgentName = (name: string) => name.length >= 2 && name.length <= 32 && /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(name);
+/** Accepts the current `name.owner` agent ID and the legacy `owner:name` ID of the original testnet deployment; exactly one per deployment. */
+export function agentIdMatchesSigner(agentId: unknown, signerId: string): boolean {
+  if (typeof agentId !== "string") return false;
+  if (agentId.startsWith(`${signerId}:`)) return /^[A-Za-z0-9_-]{1,32}$/.test(agentId.slice(signerId.length + 1));
+  return agentId.endsWith(`.${signerId}`) && agentId.length <= 64 && subaccountAgentName(agentId.slice(0, agentId.length - signerId.length - 1));
+}
 export function validateIdentity(identity: RuntimeIdentity): void {
-  if (!accountId(identity.signerId) || !publicKey(identity.publicKey) || !identity.publicKey.startsWith("ed25519:") || typeof identity.agentId !== "string" || !identity.agentId.startsWith(`${identity.signerId}:`) ||
-      !/^[A-Za-z0-9_-]{1,32}$/.test(identity.agentId.slice(identity.signerId.length + 1))) failInput();
+  if (!accountId(identity.signerId) || !publicKey(identity.publicKey) || !identity.publicKey.startsWith("ed25519:") || !agentIdMatchesSigner(identity.agentId, identity.signerId)) failInput();
 }
 export function runtimePermission(permission: unknown, contractId: string, method: RuntimeMethod): boolean {
   if (!isObject(permission) || !isObject(permission.FunctionCall)) return false;
