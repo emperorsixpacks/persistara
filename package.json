@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Owner-controlled agents with recoverable memory, durable missions, and bounded commerce on NEAR.",
   "license": "Apache-2.0",
-  "packageManager": "pnpm@12.18.0",
+  "packageManager": "pnpm@10.26.0",
   "engines": {
     "node": ">=24.22.1"
   },
