@@ -118,7 +118,7 @@ package_manager() {
 fetch_source() {
   command -v git >/dev/null 2>&1 || die "git is required"
   if [ -d "$INSTALL_DIR/.git" ] && [ -f "$INSTALL_DIR/.persistara-install" ]; then
-    if [ -n "$(git -C "$INSTALL_DIR" status --porcelain 2>/dev/null)" ] && [ "$FORCE" != 1 ]; then die "$INSTALL_DIR has local changes; re-run with --force to replace them"; fi
+    if [ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=no 2>/dev/null)" ] && [ "$FORCE" != 1 ]; then die "$INSTALL_DIR has local changes; re-run with --force to replace them"; fi
     say "Updating existing install at $INSTALL_DIR"
   elif [ -e "$INSTALL_DIR" ] && [ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
     die "$INSTALL_DIR exists and was not created by this installer; choose another PERSISTARA_INSTALL_DIR"
