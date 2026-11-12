@@ -27,14 +27,18 @@
   "elapsedMs": 23658,
   "sdkVersion": "0.2.1",
   "attempts": {
-    "total": 2,
+    "total": 3,
     "firstResult": "VERIFICATION_FAILED, no completion reference, no diagnostic code available at the time; cause unknown, possibly transient; the first request may have been billed",
     "secondResult": "verified_inference_and_tool_call"
   },
   "notRun": [
-    "step 3b streaming",
     "step 4 terminal chat with read-only tools against a configured workspace"
   ],
   "limits": "One real request proves this model/gateway path once. It does not prove streaming, the conversation loop, sustained reliability or cost control.",
-  "secretsIncluded": false
+  "secretsIncluded": false,
+  "streamingAttempt": {
+    "step": "3b NEARAI_STREAM=enabled",
+    "result": "PROTOCOL_ERROR before any completion reference; the violated parser rule was not captured (diagnostics were added afterwards)",
+    "status": "NOT ACCEPTED; left disabled by decision (2026-11-11); the request may have been billed (tiny)"
+  }
 }
