@@ -16,8 +16,10 @@ export interface WalletSetupDeps {
 }
 export const INSTALL_HELP = [
   "The official NEAR CLI ('near') is not installed.",
-  "Install it from https://github.com/near/near-cli-rs (see its README for the installer for your system),",
-  "or with Rust:  cargo install near-cli-rs --locked",
+  "Easiest: download the prebuilt release for your system from https://github.com/near/near-cli-rs/releases/latest",
+  "(each file has a .sha256 to check), or use the installer script published there.",
+  "Or build it with Rust: cargo install near-cli-rs --locked  (on Linux this needs OpenSSL development headers and pkg-config,",
+  "for example 'openssl-devel pkgconf-pkg-config' on Fedora or 'libssl-dev pkg-config' on Debian/Ubuntu).",
   "Then run this command again. Set NEAR_CLI_BIN in your .env if it lives somewhere unusual.",
 ].join("\n");
 
