@@ -51,6 +51,7 @@
     "contract:build": "cargo near build non-reproducible-wasm --manifest-path contracts/authority/Cargo.toml --locked --no-abi",
     "contract:test": "cargo test -p persistara-authority --locked",
     "contract:sandbox": "pnpm build && pnpm contract:build && cargo test -p persistara-contract-tests --features sandbox --locked -- --test-threads=1",
+    "contract:fetch": "pnpm build && node dist/scripts/fetch-authority-wasm.js",
     "contract:check": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets --features sandbox --locked -- -D warnings && pnpm contract:test && pnpm contract:sandbox",
     "cli": "./bin/persistara",
     "cli:dev": "pnpm build && ./bin/persistara"
