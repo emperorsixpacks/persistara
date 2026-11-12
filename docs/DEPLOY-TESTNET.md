@@ -2,9 +2,21 @@
 
 Persistara cannot do this for you: every step below is signed by **your** owner account through the official NEAR CLI, which keeps your key outside Persistara. Nothing here is mainnet (the client is testnet-only) and nothing here touches the existing deployment `authority.persistara-owner.testnet`; that contract and its funds stay as they are.
 
-The command lines below were checked against `near-cli-rs 0.31.1`: the grammar parses, and the call-function tail is the one used in the live acceptance runs. They have **not** been executed end to end against testnet by the author, so run step 1 first and stop at the first error.
+The command lines below were checked against `near-cli-rs 0.31.1`: the grammar parses, and the call-function tail is the one used in the live acceptance runs. They have **not** been executed end to end against testnet by the author, so stop at the first error.
 
-## Prerequisites
+## Fastest: one command with `near-api-js` (no NEAR CLI, no Rust, no cargo)
+
+`near-api-js` is NEAR's equivalent of viem or ethers: with a secret key it signs transactions. `pnpm near:deploy` uses it to do steps 2-5 below in one go. It is **resumable** (it reads chain state first, so after any failure you just run it again) and defaults to a **dry run** that only reads the chain.
+
+1. Put your owner **secret** key (`ed25519:...`) in a private file outside the repository, using your editor, never chat: `mkdir -p ~/.persistara-signer && chmod 700 ~/.persistara-signer`, then create `~/.persistara-signer/owner.key` with mode `600` (`chmod 600`). The tool refuses a file that is readable by others or a symlink. The key must be a **full-access** key of the owner account. Delete the file when you are done.
+2. Dry run (reads only, signs nothing): `pnpm near:deploy --owner persistara-owner.testnet --owner-key-file ~/.persistara-signer/owner.key --contract authority-v2.persistara-owner.testnet`
+3. If the plan looks right, run the same command with `--execute`.
+
+What it does and checks: the contract file's hash must equal the expected hash (default: the committed artifact's) before anything is signed; the contract name must be a subaccount of the owner; the owner key must really be a full-access key on that account; it then creates the contract account, deploys and runs `new` in one transaction, registers the agent, sets the policy, funds it, creates the runtime key file, authorizes that key with the same limits as the live agent and records the delegate grant. It prints the `.env` lines to use. It needs at least 6.5 testnet NEAR on the owner.
+
+Notes: this signs inside a short-lived process that you start, not in the chat or agent process, and it never prints or stores the owner key. A network blip shows as `UNEXPECTED_ERROR`; just run it again. The contract and runtime keys it creates are written as private files under `.persistara/keys/`. The reads were checked against the live testnet; the signing path has not been run against testnet by the author, so run the dry run first and watch the first `--execute`. The manual steps below do the same thing with the NEAR CLI.
+
+## Manual alternative: Prerequisites
 
 - Your owner account on testnet (the examples use `persistara-owner.testnet`) imported into the NEAR CLI keychain (`persistara wallet`), with at least about 8 testnet NEAR. Testnet NEAR is free from a faucet.
 - The NEAR CLI as a **prebuilt binary** (no cargo, no Rust): download the file for your system from <https://github.com/near/near-cli-rs/releases/latest>, check it against the `.sha256` next to it, and put `near` on your PATH. (`cargo install near-cli-rs --locked` also works but is slow and needs OpenSSL headers and `pkg-config` on Linux.)
