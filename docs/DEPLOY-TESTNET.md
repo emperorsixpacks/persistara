@@ -7,8 +7,8 @@ The command lines below were checked against `near-cli-rs 0.31.1`: the grammar p
 ## Prerequisites
 
 - Your owner account on testnet (the examples use `persistara-owner.testnet`) imported into the NEAR CLI keychain (`persistara wallet`), with at least about 8 testnet NEAR. Testnet NEAR is free from a faucet.
-- The NEAR CLI. Prebuilt, checksum-published releases: <https://github.com/near/near-cli-rs/releases/latest>. (`cargo install near-cli-rs --locked` also works but needs OpenSSL headers and `pkg-config` on Linux.)
-- This repository built: `pnpm install --frozen-lockfile`. Rust 1.96 and cargo-near 0.22 for `pnpm contract:build`.
+- The NEAR CLI as a **prebuilt binary** (no cargo, no Rust): download the file for your system from <https://github.com/near/near-cli-rs/releases/latest>, check it against the `.sha256` next to it, and put `near` on your PATH. (`cargo install near-cli-rs --locked` also works but is slow and needs OpenSSL headers and `pkg-config` on Linux.)
+- This repository: `pnpm install --frozen-lockfile`. **No Rust is needed**: the contract is committed prebuilt in `contracts/artifacts/` (step 1).
 
 ## Variables (edit the contract name if you like)
 
@@ -21,14 +21,16 @@ WORKER=worker.$OWNER                      # an existing approved worker account
 SIGN="sign-as $OWNER network-config testnet sign-with-keychain --signer-public-key $OWNER_KEY send"
 ```
 
-## 1. Build the contract and record its hash
+## 1. Use the committed contract artifact (no Rust, no cargo)
 
 ```sh
-pnpm contract:build
-node --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; import {baseEncode} from "near-api-js"; console.log(baseEncode(createHash("sha256").update(readFileSync("target/near/persistara_authority/persistara_authority.wasm")).digest()))'
+mkdir -p target/near/persistara_authority
+cp contracts/artifacts/persistara_authority-name-owner.wasm target/near/persistara_authority/persistara_authority.wasm
 ```
 
-Write the printed hash down. Builds are not reproducible, so you must deploy **this exact file** and keep the hash as your deployment record (it is what the client and `pnpm contract:fetch` check against).
+Its code hash is `A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a` (289,170 bytes). That is your deployment record: the client and `pnpm contract:fetch` check against it, and `pnpm check` fails if the file and `contracts/artifacts/authority-manifest.json` ever disagree. It was built from the contract source at commit `c25373c` and passed `pnpm contract:check` (35 Rust tests, six sandbox scenarios) on 2026-11-11.
+
+Builds are not reproducible, so rebuilding it yourself with `pnpm contract:build` produces **different bytes and a different hash**. That is fine only if you then deploy and record your own file instead; do not mix the two. The committed artifact is the one the repository's documentation refers to.
 
 ## 2. Create the contract account
 
@@ -82,7 +84,7 @@ The WASM at `target/near/persistara_authority/persistara_authority.wasm` must be
 ## 7. Verify
 
 ```sh
-pnpm contract:fetch --contract authority-v2.persistara-owner.testnet --expected-hash <hash from step 1> --out /tmp/check.wasm   # chain code == your build
+pnpm contract:fetch --contract authority-v2.persistara-owner.testnet --expected-hash A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a --out /tmp/check.wasm   # chain code == your build
 pnpm near:doctor
 pnpm cli --plain status                     # expect research.persistara-owner.testnet, ACTIVE, 0.1 NEAR available
 ```

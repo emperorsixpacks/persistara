@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "file": "persistara_authority-name-owner.wasm",
+  "bytes": 289170,
+  "sha256Hex": "86129f3cb212a7a82e9920ee5773d85c295649a4930faa3892885783b2310473",
+  "codeHashBase58": "A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a",
+  "agentIdFormat": "name.owner (for example research.persistara-owner.testnet)",
+  "sourceCommit": "c25373c",
+  "sourcePath": "contracts/authority",
+  "builtWith": {
+    "rust": "1.96.0",
+    "cargoNear": "0.22.0",
+    "nearSdk": "5.30.1",
+    "command": "pnpm contract:build",
+    "platform": "Linux x86_64"
+  },
+  "tested": "pnpm contract:check passed on 2026-11-11 against this exact file: 35 Rust unit tests and six deployed-WASM sandbox scenarios",
+  "deployed": false,
+  "notes": "Builds are NOT reproducible: rebuilding the same source gives different bytes and a different code hash. Deploy this exact file and keep its hash as your deployment record. Not deployed anywhere as of this commit; the existing testnet deployment uses the older owner:name build (code hash GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ)."
+}
