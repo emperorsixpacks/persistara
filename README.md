@@ -22,6 +22,47 @@ Then open a new terminal and run `persistara --help`. It builds the CLI, adds `p
 - **Want to read it first?** `curl -fsSL <url> -o install.sh && less install.sh && bash install.sh`. Preview with `--dry-run`; pin a version with `--ref <tag-or-commit>`.
 - **What it does not do:** it does not deploy a contract or create accounts. You still need your own deployed authority, its exact WASM and your NEAR account. See [INSTALL.md](docs/INSTALL.md) for every change it makes and what you still need.
 
+## Verify it yourself (no accounts, keys, funds or network)
+
+For reviewers and automated checks. Everything below ran from a clean clone with no `.env`, no contract artifact and no secrets. Needs `git`, Node.js 20+ with `corepack` (or pnpm 10.26) and an internet connection for `pnpm install`; pnpm downloads the pinned Node 24 runtime itself.
+
+```sh
+git clone https://github.com/JemIIahh/persistara.git && cd persistara
+pnpm install --frozen-lockfile
+pnpm check                      # typecheck + build + 300 tests / 47 suites, about 25 s -> "ℹ pass 300 / ℹ fail 0"
+pnpm memory:recover:fixture     # fresh process recovers encrypted memory from a backup -> "originalStateAvailable": false, keys unused
+pnpm memory:writes:fixture      # processes killed mid-write, fresh ones reconcile -> recordUploads 1, manifestUploads 1, checkpointBroadcasts 1
+pnpm missions:recover:fixture   # crash mid-mission, resume -> "abruptCrashRecovered":true, "completedReadsRepeated":0
+pnpm conversation:demo          # synthetic AI-chat walkthrough (no model/key): read-only lookup, lost request is never resent, owner resolution, encrypted backup round trip
+./bin/persistara --help         # the terminal app; without configuration `./bin/persistara status` stops with NOT_CONFIGURED and creates no state
+```
+
+The fixture drills and `conversation:demo` are clearly labeled synthetic and never substitute for live operations. Optional heavier checks: `pnpm contract:check` (needs Rust 1.96 + cargo-near 0.22, about an hour: 35 Rust tests and six deployed-WASM sandbox scenarios) and `pnpm test:e2e` (11 browser tests; first run `pnpm exec playwright install chromium`).
+
+### Check the live testnet deployment with public data only
+
+The real deployment is `authority.persistara-owner.testnet` (NEAR testnet). No key is needed to confirm it:
+
+```sh
+# 1. The deployed code is the recorded build: prints status "written" and the matching hash (writes only if the hash matches)
+pnpm contract:fetch --contract authority.persistara-owner.testnet --expected-hash GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ --out /tmp/persistara-authority.wasm
+
+# 2. A recorded transaction: the deployment (expect actions DeployContract + FunctionCall "new", and a SuccessValue status)
+curl -s https://archival-rpc.testnet.near.org -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"EXPERIMENTAL_tx_status","params":{"tx_hash":"C1jhawrZRTvMVKPMUF7fyiuN1uufyuMYvCWZCW1M7GkD","sender_account_id":"persistara-owner.testnet","wait_until":"EXECUTED"}}'
+```
+
+Other recorded transactions in [`docs/evidence/near-0g-testnet-2026-11-07.json`](docs/evidence/near-0g-testnet-2026-11-07.json) check the same way (use the archival endpoint; older transactions leave the standard RPC): memory checkpoint `DGqkRsaHe2RQE69epRFT3muH98YtXUBbTyGgwmjQBcCe` (`checkpoint_memory`), job reservation `J9oG7Ln5zwbXc6GU3y4uMKmcQgtWA7xGiT5NH8XiYZD2` (`create_job`) and acceptance/payout `FBiS4u1P52zHRa5nyhU3zJVe1BmY82R3ZaM1VE16rpKA` (`accept_job`).
+
+### What a reviewer cannot reproduce, and where the evidence is
+
+| Claim | Why it needs the owner | Evidence |
+| --- | --- | --- |
+| Owner login, pause/resume | Requires the owner's wallet key | [owner-wallet-login](docs/evidence/owner-wallet-login-2026-11-07.json), [native-terminal](docs/evidence/native-terminal-2026-11-08.json) |
+| Real 0G storage round trip | Needs an uploader wallet and funds | [0g-testnet](docs/evidence/0g-testnet-2026-11-07.json) |
+| Real NEAR AI request with attestation, encryption, signature and tool call | Needs a paid NEAR AI key | [inference-spike](docs/evidence/inference-spike-2026-11-11.json) (one request; streaming failed its one attempt and is off) |
+
+You can run the real thing against your own deployment: see [INSTALL.md](docs/INSTALL.md). Contract builds are not reproducible, so a rebuilt WASM will not match an existing deployment's code hash; `pnpm contract:fetch` recovers the deployed bytes against a hash you supply.
+
 ## Start in the terminal
 
 The primary interface is now an interactive terminal application with a persistent composer, command picker, scrollable session and live working/status feedback. In the configured project:
@@ -76,7 +117,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **230 TypeScript tests in 34 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **300 TypeScript tests in 47 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
@@ -90,7 +131,7 @@ Run `pnpm memory:writes:fixture` for an explicitly local process-exit drill at u
 pnpm contract:check
 ```
 
-Contract checks pass **34 Rust unit tests and six sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. Application scenarios commit memory, settle once, reconcile interruptions, rotate runtime/memory keys, reject revoked keys, and recover in a fresh process after removing runtime keys/journals. The fifth scenario validates external owner pause/resume signing and exact finalized receipt reconciliation without supplying owner/runtime secrets to the application. The sixth scenario verifies externally signed specialist envelopes, restart after reservation/acceptance, one actual sandbox payout and recipient-key recovery after original buyer state is removed. Storage and source/backup readiness fixtures remain explicit. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md), the pre-public-deployment state-layout change, and [client recovery limits](docs/NEAR-CLIENTS.md) before public funding.
+Contract checks pass **35 Rust unit tests and six sandbox scenarios**, plus formatting, Clippy and optimized WASM compilation. Application scenarios commit memory, settle once, reconcile interruptions, rotate runtime/memory keys, reject revoked keys, and recover in a fresh process after removing runtime keys/journals. The fifth scenario validates external owner pause/resume signing and exact finalized receipt reconciliation without supplying owner/runtime secrets to the application. The sixth scenario verifies externally signed specialist envelopes, restart after reservation/acceptance, one actual sandbox payout and recipient-key recovery after original buyer state is removed. Storage and source/backup readiness fixtures remain explicit. These tests require no AI credentials or public funds. Review [contract rules](docs/CONTRACTS.md), the pre-public-deployment state-layout change, and [client recovery limits](docs/NEAR-CLIENTS.md) before public funding.
 
 Run `pnpm owner:console` to build and serve the existing agent's mission desk and owner controls at **http://127.0.0.1:3377**. It requires the configured public deployment and owner-local recovery files; it has no fake fallback. `pnpm web:build` builds the browser assets with a server-module boundary guard. `pnpm test:e2e` runs 11 explicitly labeled Chromium fixture tests after installing the pinned test browser (`pnpm exec playwright install chromium`).
 
