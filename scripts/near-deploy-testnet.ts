@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, PublicKey, actions } from "near-api-js";
 import { readPrivateFile, writePrivateFile } from "../packages/memory/src/files.js";
 import { deployTestnet, type AgentSnapshot, type DeployChain } from "../packages/near/src/deploy.js";
+import { parseOwnerKeyFile } from "../packages/near/src/keyfile.js";
 import { ProviderError } from "../packages/protocol/src/providers.js";
 import { isObject } from "../packages/protocol/src/memory.js";
 import { loadEnvironment, printFailure } from "./common.js";
@@ -46,7 +47,7 @@ async function main() {
   const manifest = JSON.parse(await readFile(resolve(project, "contracts/artifacts/authority-manifest.json"), "utf8")) as { codeHashBase58?: string };
   const expectedHash = values.get("--expected-hash") ?? manifest.codeHashBase58 ?? "";
   const wasm = new Uint8Array(await readFile(resolve(values.get("--wasm") ?? resolve(project, "contracts/artifacts/persistara_authority-name-owner.wasm"))));
-  const ownerKey = await loadKey(resolve(need("--owner-key-file")), "Owner key");
+  const ownerKey = KeyPair.fromString(parseOwnerKeyFile(Buffer.from(await readPrivateFile(resolve(need("--owner-key-file")), 4096)).toString("utf8"), owner) as Parameters<typeof KeyPair.fromString>[0]);
   const contractKeyFile = resolve(values.get("--contract-key-file") ?? `.persistara/keys/${contract}.key`), runtimeKeyFile = resolve(values.get("--runtime-key-file") ?? ".persistara/keys/near-runtime-v2.key");
 
   const provider = new JsonRpcProvider({ url: rpc.toString() }), ownerAccount = new Account(owner, provider, new KeyPairSigner(ownerKey));

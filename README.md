@@ -16,7 +16,7 @@ You do **not** need to clone the repository. Run one command:
 curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
 ```
 
-Then open a new terminal and run `persistara --help`. It builds the CLI, adds `persistara` to your PATH and creates a private workspace in `~/.persistara-workspace`. It needs `git` and either `pnpm` or Node.js, and no `sudo`. To remove it: `curl -fsSL <same url> | bash -s -- --uninstall` (your workspace is kept).
+Then open a new terminal and run `persistara --help`. **First time? Follow the [getting-started guide](docs/GETTING-STARTED.md)** for the whole path: accounts, testnet funds, deploying your own agent, signing in and optional AI chat. It builds the CLI, adds `persistara` to your PATH and creates a private workspace in `~/.persistara-workspace`. It needs `git` and either `pnpm` or Node.js, and no `sudo`. To remove it: `curl -fsSL <same url> | bash -s -- --uninstall` (your workspace is kept).
 
 - **Repository still private?** The URL above only works for everyone once the repository is public. Collaborators with GitHub access can run the same script without cloning: `gh api repos/JemIIahh/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash`.
 - **Want to read it first?** `curl -fsSL <url> -o install.sh && less install.sh && bash install.sh`. Preview with `--dry-run`; pin a version with `--ref <tag-or-commit>`.
@@ -139,6 +139,9 @@ Run `pnpm missions:recover:fixture` for a clearly labeled three-process source-d
 
 ## Build specification
 
+- [Getting started: from nothing to chatting with your own agent](docs/GETTING-STARTED.md)
+- [Install, what it changes and uninstall](docs/INSTALL.md)
+- [Deploy your own authority on testnet](docs/DEPLOY-TESTNET.md)
 - [Native terminal setup and workflows](docs/TERMINAL.md)
 - [Product and first release](docs/PRODUCT.md)
 - [Architecture and trust boundaries](docs/ARCHITECTURE.md)

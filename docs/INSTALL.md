@@ -1,5 +1,7 @@
 # Installing Persistara
 
+New to Persistara? [GETTING-STARTED.md](GETTING-STARTED.md) covers the whole first-time path (accounts, funds, deploying your agent, sign-in, AI chat); this page is only about the installer.
+
 ## One-line install (macOS, Linux, WSL)
 
 ```sh
