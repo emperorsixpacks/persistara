@@ -19,7 +19,7 @@ Notes: this signs inside a short-lived process that you start, not in the chat o
 
 ## Manual alternative: Prerequisites
 
-- Your owner account on testnet (the examples use `persistara-owner.testnet`) imported into the NEAR CLI keychain (`persistara wallet`), with at least about 8 testnet NEAR. Testnet NEAR is free from a faucet.
+- Your owner account on testnet (the examples use `persistara-owner.testnet`) imported with `persistara wallet add` (or into the NEAR CLI keychain), with at least about 8 testnet NEAR. Testnet NEAR is free from a faucet.
 - The NEAR CLI as a **prebuilt binary** (no cargo, no Rust): download the file for your system from <https://github.com/near/near-cli-rs/releases/latest>, check it against the `.sha256` next to it, and put `near` on your PATH. (`cargo install near-cli-rs --locked` also works but is slow and needs OpenSSL headers and `pkg-config` on Linux.)
 - This repository: `pnpm install --frozen-lockfile`. **No Rust is needed**: the contract is committed prebuilt in `contracts/artifacts/` (step 1).
 
