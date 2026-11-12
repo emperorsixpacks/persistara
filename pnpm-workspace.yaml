@@ -1,4 +1,8 @@
 packages:
   - .
 # pnpm scripts already use this installed devEngines.runtime, not the host Node.
+allowBuilds:
+  bufferutil: set this to true or false
+  es5-ext: set this to true or false
+  utf-8-validate: set this to true or false
 nodeVersion: 24.22.2
