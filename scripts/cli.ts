@@ -33,7 +33,7 @@ function options(argv: string[]): Options {
   }
   result.args = argv.slice(i); return result;
 }
-const forwarded: Record<string, string> = { specialist: "specialist.js", recovery: "recovery-kit.js", doctor: "provider-doctor.js" };
+const forwarded: Record<string, string> = { specialist: "specialist.js", recovery: "recovery-kit.js", doctor: "provider-doctor.js", wallet: "wallet-setup.js" };
 async function forward(args: string[], project: string, acknowledgeCosts: boolean) {
   const [command, action, ...rest] = args;
   let script = forwarded[command!], values = args.slice(1);
