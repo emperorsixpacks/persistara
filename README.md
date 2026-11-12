@@ -29,7 +29,7 @@ For reviewers and automated checks. Everything below ran from a clean clone with
 ```sh
 git clone https://github.com/JemIIahh/persistara.git && cd persistara
 pnpm install --frozen-lockfile
-pnpm check                      # typecheck + build + 300 tests / 47 suites, about 25 s -> "ℹ pass 300 / ℹ fail 0"
+pnpm check                      # typecheck + build + 326 tests / 56 suites, about 25 s -> "ℹ pass 326 / ℹ fail 0"
 pnpm memory:recover:fixture     # fresh process recovers encrypted memory from a backup -> "originalStateAvailable": false, keys unused
 pnpm memory:writes:fixture      # processes killed mid-write, fresh ones reconcile -> recordUploads 1, manifestUploads 1, checkpointBroadcasts 1
 pnpm missions:recover:fixture   # crash mid-mission, resume -> "abruptCrashRecovered":true, "completedReadsRepeated":0
@@ -104,7 +104,7 @@ The redesigned mission desk now persists zero-spend source-collection briefs, ca
 
 Signed specialist commissioning now links one curated worker to a mission through domain-bound NEP-413 quotes and delivery receipts. Separate JWE recipient keys protect briefs/dossiers on 0G; exact owner review precedes bounded NEAR acceptance, and finalized payout callbacks determine payment completion. The separate worker CLI keeps wallet signing in the official external keychain. Fixed upload/job intents and canonical signer journals survive interruption without replacement effects. Public testnet acceptance completed a real two-source encrypted delivery and paid 0.01 NEAR once, retained across a host restart; a fresh process decrypted the result using a copied recipient key without runtime/uploader credentials. See [sanitized live commissioning evidence](docs/evidence/specialist-commission-2026-11-07.json) and [setup, signed-file exchange and recovery limits](docs/COMMISSIONS.md).
 
-**Not implemented yet:** AI conversation/reasoning and conversational session resumption, daemon/Telegram integration, embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
+**Not implemented yet:** verified streaming, signing owner pause/resume with the encrypted key store (it still needs the NEAR CLI), mainnet support, daemon/Telegram integration, embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
 
 ## Development
 
@@ -117,7 +117,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **300 TypeScript tests in 47 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **326 TypeScript tests in 56 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 

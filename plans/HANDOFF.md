@@ -2,6 +2,32 @@
 
 Prepared 2026-11-09 against code commit `4d2bbfd2aadb9e8c25db3f5fd0ea32b70dd2e972`. This is a repository handoff, not a fresh audit or a statement that the whole product is complete. No source code or live state was changed while preparing it.
 
+## Update 2026-11-12 (read this first; the sections below describe the 2026-11-09 baseline)
+
+34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**326 tests / 56 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
+
+**Hackathon facts (from `HACKATHON.md`, recheck the live copy before submitting):** development and submission end **2026-11-14T23:59:00Z**. The repo must be public by then; the owner posts the demo on X; submission is one POST after the owner confirms the exact payload. Never push, make public, post, sign, deploy to mainnet or submit without the owner's explicit yes. Judging agents reproduce from a clean clone, so every claim must be reproducible without secrets: see the README's "Verify it yourself".
+
+**Done since the baseline**
+- Plan 011 offline core: durable conversation journal, bounded runner, three read-only tools, terminal routing; owner resolution of lost outcomes (`/session resolve`); encrypted session backup/restore (`pnpm conversations:*`); `pnpm conversation:demo` (synthetic, pinned by a test). Chat is **off by default** (`PERSISTARA_AI_CHAT=enabled` plus key and model).
+- Live inference: one real non-streaming request passed full verification ([evidence](../docs/evidence/inference-spike-2026-11-11.json)); streaming failed its one attempt and stays off (`NEARAI_STREAM`). Chat in the real terminal against a live workspace has **not** been run.
+- Contract: agents register as `name.owner` (35 Rust tests, sandbox passed); committed prebuilt artifact `contracts/artifacts/persistara_authority-name-owner.wasm` (hash `A2N6rTX3…`, manifest + test). **Not deployed.** The live testnet contract `authority.persistara-owner.testnet` is untouched and still uses `owner:name` IDs (code hash `GCPU1ej…`).
+- Setup: `install.sh` (one-line install, workspace in `~/.persistara-workspace`), [GETTING-STARTED](../docs/GETTING-STARTED.md), [DEPLOY-TESTNET](../docs/DEPLOY-TESTNET.md) with `pnpm near:deploy` (resumable, dry run default, near-api-js; read paths checked against live testnet, **signing path never run on testnet**), `pnpm contract:fetch` (recover deployed WASM against a supplied hash), `pnpm near:runtime-key`.
+- Owner custody: `persistara wallet add|list|remove|check` imports an existing key into an encrypted store (`~/.persistara-signer`, AES-256-GCM + scrypt); sign-in runs in a separate short-lived signer process, verified against the project's own NEP-413 verifier. `persistara wallet near-cli` keeps the NEAR CLI path. **Owner pause/resume still needs the NEAR CLI.** Not run with a real account in a real terminal; no independent review.
+- TUI: footer shows why the NEAR check failed; `/copy` copies the last output (system tool, else OSC 52). Mouse highlight-to-copy is not implemented (terminal setting).
+
+**Open, in priority order**
+1. Owner decisions pending: push `main` and make the repo public; demo video + X post; the submission payload (name, lead, email, team size, tracks, a mainnet NEAR address, repo and post links). 25 commits carry a personal author email; rewriting history was not done.
+2. Owner-run checks that need their key: `wallet add`, startup passphrase, `/connect`, then the paid acceptance steps in INFERENCE-ACCEPTANCE (step 4: chat in the real terminal), then optionally the testnet deployment.
+3. Unbuilt: signing pause/resume with the key store, verified streaming, fresh-agent enrollment tooling beyond `near:deploy`, mainnet support, in-app mouse selection.
+
+**Traps learned the hard way**
+- **The client requires the local contract WASM's SHA-256 to equal the on-chain code hash, and builds are not reproducible.** Never run `pnpm contract:build`/`contract:check` in a workspace tied to a deployment (they overwrite the file); recover it with `pnpm contract:fetch --expected-hash <recorded hash>`. A run with the wrong file creates empty journals bound to the wrong hash ("Owner operation journal is invalid or changed"); remove them only if they hold no operations.
+- An unintended pnpm 12 run once rewrote `packageManager`, the lockfile and `pnpm-workspace.yaml`, breaking clean installs. Check `git diff package.json pnpm-lock.yaml pnpm-workspace.yaml` after pnpm commands; the pinned version is 10.26.0.
+- `HOME` is not passed to isolated workers (empty environment); give them absolute paths.
+- Background-task "exit code 0" notices can be a wrapper's `echo`; read the log's real exit line.
+- Pause/resume, uploads and payments are owner actions: never broadcast them without current authorization.
+
 ## Start here
 
 Persistara is a new successor to Sofer: **NEAR authority/budgets/settlement + application-encrypted 0G storage + planned NEAR AI conversation/reasoning**. The CLI is the primary product. It now has a real Ink/React terminal application, but it is still a command-driven mission workspace. Typing `hello` currently produces the chat-unavailable message. Adding an API key or credits alone will not implement the missing conversation loop.
