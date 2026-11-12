@@ -9,7 +9,7 @@ Persistara is a terminal tool for an AI agent that **you** control through your 
 | The program (`persistara`) | Free | everything |
 | A NEAR **testnet** owner account | Free (faucet) | owning the agent |
 | About 7 testnet NEAR on that account | Free (faucet) | deploying your own contract and funding the agent |
-| The official NEAR CLI (prebuilt binary) | Free | owner sign-in with `/connect` |
+| The official NEAR CLI (prebuilt binary) | Free | **optional**: only to create a new account with it, or for owner pause/resume |
 | A NEAR AI API key with credits | **Real money** (or the hackathon's $10 claim) | AI chat only |
 | A 0G storage wallet | Free testnet funds | memory uploads only (optional) |
 
@@ -23,15 +23,25 @@ curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh
 
 Open a new terminal and run `persistara --help`. Details, what it changes and how to uninstall: [INSTALL.md](INSTALL.md). Your private workspace is `~/.persistara-workspace` (`.env`, keys, journals).
 
-## 2. Get the NEAR CLI and a testnet owner account
+## 2. Use your existing NEAR testnet account (or make one)
 
-Download the prebuilt **NEAR CLI** for your system from <https://github.com/near/near-cli-rs/releases/latest>, check it against the `.sha256` beside it, and put `near` on your PATH. No cargo or Rust is needed. Then:
+Persistara works like the Solana or Stellar CLIs: you **bring the key of an account you already have**. Import it once; it is checked on chain and stored encrypted under a passphrase you choose, in `~/.persistara-signer`:
+
+```sh
+persistara wallet add --account YOURNAME.testnet --from-near-credentials   # reuse your existing NEAR CLI credentials file
+persistara wallet add --account YOURNAME.testnet --key-file /path/to/key   # a file holding ed25519:... or a NEAR credentials JSON
+persistara wallet add --account YOURNAME.testnet                           # paste the key at a hidden prompt
+```
+
+Use whichever matches how your key is stored; type the secret only at the hidden prompt or in a file, never in chat. It must be a **full-access** key of that account. `persistara wallet list` shows what is stored and `persistara wallet check` proves your passphrase works. A forgotten passphrase cannot be recovered: keep your own backup of the key. Details and the security design: [SECURITY.md](SECURITY.md).
+
+**No account yet?** Create a testnet account in any NEAR wallet that supports testnet, or with the NEAR CLI (prebuilt binary from <https://github.com/near/near-cli-rs/releases/latest>, checked against its `.sha256`; no cargo or Rust needed):
 
 ```sh
 near account create-account sponsor-by-faucet-service YOURNAME.testnet autogenerate-new-keypair save-to-legacy-keychain network-config testnet create
 ```
 
-This asks the testnet faucet service to create the account, and stores its key in the CLI's legacy keychain: `~/.near-credentials/testnet/YOURNAME.testnet.json` (mode it `600`, see step 4). Already have an owner account? Skip this and run `persistara wallet` to import it into the NEAR CLI; it never sees what you type ([SECURITY.md](SECURITY.md)). The first command's grammar was checked against the CLI's `--help`, but not run end to end by the author, so stop at the first error.
+That asks the testnet faucet service to create the account and saves its key to `~/.near-credentials/testnet/YOURNAME.testnet.json`, which `--from-near-credentials` above reads. The command's grammar was checked against the CLI's `--help`, not run end to end by the author. Prefer to keep your key in the NEAR CLI keychain instead of Persistara's store? `persistara wallet near-cli` is the guided path for that.
 
 ## 3. Fund it with testnet NEAR
 
@@ -39,16 +49,15 @@ You need roughly 7 testnet NEAR to deploy and fund an agent. Use a testnet fauce
 
 ## 4. Deploy your own authority contract and agent
 
-One resumable command signs everything with `near-api-js`; it defaults to a dry run. Point it at the key file from step 2 (a NEAR credentials JSON or a bare `ed25519:` key; it must be readable only by you: `chmod 600`):
+One resumable command signs everything with `near-api-js`. It defaults to a dry run and reads your key from the encrypted store (it asks for the passphrase, hidden):
 
 ```sh
 cd ~/.local/share/persistara/app            # where the installer put the program
-pnpm near:deploy --owner YOURNAME.testnet --owner-key-file ~/.near-credentials/testnet/YOURNAME.testnet.json \
-  --contract authority.YOURNAME.testnet \
+pnpm near:deploy --owner YOURNAME.testnet --owner-from-keystore --contract authority.YOURNAME.testnet \
   --contract-key-file ~/.persistara-workspace/.persistara/keys/authority.key --runtime-key-file ~/.persistara-workspace/.persistara/keys/near-runtime.key
 ```
 
-Review the plan, then add `--execute`. It prints the `.env` lines for the next step. Full explanation, checks and the manual NEAR CLI alternative: [DEPLOY-TESTNET.md](DEPLOY-TESTNET.md). Your agent's ID will be `research.YOURNAME.testnet`.
+Review the plan, then add `--execute`. It prints the `.env` lines for the next step. (You can instead pass `--owner-key-file` pointing at a key file.) Full explanation, checks and the manual NEAR CLI alternative: [DEPLOY-TESTNET.md](DEPLOY-TESTNET.md). Your agent's ID will be `research.YOURNAME.testnet`.
 
 Then copy the exact contract file you deployed into the workspace, because the client requires its hash to match the chain:
 
@@ -69,7 +78,9 @@ Settings reference: [NEAR-CLIENTS.md](NEAR-CLIENTS.md), [INTEGRATIONS.md](INTEGR
 
 ## 6. Sign in as the owner
 
-Run `persistara`, then `/connect`. It shows exactly what you are signing; the NEAR CLI signs and Persistara checks the key is the registered owner key. (The key stays in the NEAR CLI keychain; Persistara does not hold it.) After this you can create source missions with `/new` and `/run` and review them ([TERMINAL.md](TERMINAL.md)).
+Run `persistara`. If you stored a key in step 2 it asks for your key-store passphrase first (press Enter to skip), before the full-screen app opens. Then `/connect`: it shows exactly what you are signing, a separate short-lived process signs it, and Persistara checks the key is the registered owner key. The key is never in the chat or agent process. After this you can create source missions with `/new` and `/run` and review them ([TERMINAL.md](TERMINAL.md)).
+
+Owner **pause/resume** transactions are not signed by the key store yet: for those, use the NEAR CLI keychain (`persistara wallet near-cli`).
 
 ## 7. Optional: turn on AI chat (this costs money)
 

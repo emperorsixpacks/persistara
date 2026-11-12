@@ -20,6 +20,15 @@ export function printFailure(error: unknown): void {
   process.exitCode = error instanceof ProviderError && error.code === "NOT_CONFIGURED" ? 2 : 1;
 }
 
+/**
+ * For owner tools whose ProviderError messages are written by this project and never contain key material: shows the message
+ * as well as the code, so the user can act on it. Anything else still prints only a generic code.
+ */
+export function printUserFailure(error: unknown): void {
+  if (error instanceof ProviderError) { console.error(`${error.code}: ${error.message}`); process.exitCode = error.code === "NOT_CONFIGURED" ? 2 : 1; }
+  else printFailure(error);
+}
+
 export async function boundedJson(url: string, init: RequestInit = {}): Promise<unknown> {
   const response = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000), redirect: "error" });
   if (!response.ok) throw new ProviderError("UPSTREAM_ERROR", "Read-only provider request failed", true);

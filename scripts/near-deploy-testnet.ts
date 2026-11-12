@@ -11,24 +11,27 @@ import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, PublicKey, actions } 
 import { readPrivateFile, writePrivateFile } from "../packages/memory/src/files.js";
 import { deployTestnet, type AgentSnapshot, type DeployChain } from "../packages/near/src/deploy.js";
 import { parseOwnerKeyFile } from "../packages/near/src/keyfile.js";
+import { decryptKeystoreEntry, keystoreDirectory, readKeystoreEntry } from "../packages/owner/src/keystore.js";
+import { readSecret } from "../packages/terminal/src/secret.js";
 import { ProviderError } from "../packages/protocol/src/providers.js";
 import { isObject } from "../packages/protocol/src/memory.js";
-import { loadEnvironment, printFailure } from "./common.js";
+import { loadEnvironment, printUserFailure } from "./common.js";
 
 const KEY = /^ed25519:[1-9A-HJ-NP-Za-km-z]{64,100}$/;
 const FLAGS = new Set(["--owner", "--owner-key-file", "--contract", "--agent-name", "--worker", "--wasm", "--expected-hash", "--contract-key-file", "--runtime-key-file", "--rpc"]);
 const GAS = 100n * 10n ** 12n;
 
 function parse(argv: string[]) {
-  const values = new Map<string, string>(); let execute = false;
+  const values = new Map<string, string>(); let execute = false, fromKeystore = false;
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i]!;
     if (name === "--execute") { execute = true; continue; }
+    if (name === "--owner-from-keystore") { fromKeystore = true; continue; }
     const value = argv[++i];
     if (!FLAGS.has(name) || !value || value.startsWith("--") || values.has(name)) throw new ProviderError("INVALID_INPUT", `Invalid or duplicate argument ${name}. See docs/DEPLOY-TESTNET.md`);
     values.set(name, value);
   }
-  return { values, execute };
+  return { values, execute, fromKeystore };
 }
 async function loadKey(path: string, what: string) {
   const text = Buffer.from(await readPrivateFile(path, 512)).toString("utf8").trim();
@@ -39,7 +42,7 @@ const missing = (error: unknown) => isObject(error) && error.code === "ENOENT";
 
 async function main() {
   loadEnvironment();
-  const { values, execute } = parse(process.argv.slice(2));
+  const { values, execute, fromKeystore } = parse(process.argv.slice(2));
   const need = (name: string) => { const v = values.get(name); if (!v) throw new ProviderError("INVALID_INPUT", `Missing ${name}`); return v; };
   const owner = need("--owner"), contract = need("--contract"), rpc = new URL(values.get("--rpc") ?? process.env.NEAR_RPC_URL ?? "https://rpc.testnet.near.org");
   if (rpc.protocol !== "https:" || rpc.username || rpc.password) throw new ProviderError("INVALID_INPUT", "RPC URL must be https without credentials");
@@ -47,7 +50,17 @@ async function main() {
   const manifest = JSON.parse(await readFile(resolve(project, "contracts/artifacts/authority-manifest.json"), "utf8")) as { codeHashBase58?: string };
   const expectedHash = values.get("--expected-hash") ?? manifest.codeHashBase58 ?? "";
   const wasm = new Uint8Array(await readFile(resolve(values.get("--wasm") ?? resolve(project, "contracts/artifacts/persistara_authority-name-owner.wasm"))));
-  const ownerKey = KeyPair.fromString(parseOwnerKeyFile(Buffer.from(await readPrivateFile(resolve(need("--owner-key-file")), 4096)).toString("utf8"), owner) as Parameters<typeof KeyPair.fromString>[0]);
+  let ownerSecret: string;
+  if (fromKeystore) { // decrypt the stored owner key inside this short-lived owner tool; the passphrase is typed hidden, never an argument
+    if (values.has("--owner-key-file")) throw new ProviderError("INVALID_INPUT", "Choose --owner-from-keystore or --owner-key-file, not both");
+    if (!process.stdin.isTTY) throw new ProviderError("INVALID_INPUT", "--owner-from-keystore needs an interactive terminal to type the passphrase");
+    const bytes = await readKeystoreEntry(owner, keystoreDirectory());
+    if (!bytes) throw new ProviderError("NOT_CONFIGURED", `No stored key for ${owner}. Add it with: persistara wallet add`);
+    const passphrase = await readSecret(`Key store passphrase for ${owner}: `);
+    if (!passphrase) throw new ProviderError("INVALID_INPUT", "Cancelled; nothing was signed");
+    ownerSecret = (await decryptKeystoreEntry(bytes, passphrase)).secret;
+  } else ownerSecret = parseOwnerKeyFile(Buffer.from(await readPrivateFile(resolve(need("--owner-key-file")), 4096)).toString("utf8"), owner);
+  const ownerKey = KeyPair.fromString(ownerSecret as Parameters<typeof KeyPair.fromString>[0]);
   const contractKeyFile = resolve(values.get("--contract-key-file") ?? `.persistara/keys/${contract}.key`), runtimeKeyFile = resolve(values.get("--runtime-key-file") ?? ".persistara/keys/near-runtime-v2.key");
 
   const provider = new JsonRpcProvider({ url: rpc.toString() }), ownerAccount = new Account(owner, provider, new KeyPairSigner(ownerKey));
@@ -84,4 +97,4 @@ async function main() {
   for (const [name, value] of Object.entries(result.env)) console.log(`${name}=${value}`);
   console.log(`NEAR_RUNTIME_KEY_FILE=${runtimeKeyFile}`);
 }
-main().catch(printFailure);
+main().catch(printUserFailure);

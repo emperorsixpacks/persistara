@@ -1,8 +1,17 @@
+import { randomBytes } from "node:crypto";
 import { isObject } from "../../protocol/src/memory.js";
 import { ProviderError, type WorkerExecutor } from "../../protocol/src/providers.js";
 import { executeWorker } from "../../protocol/src/worker.js";
 import type { OwnerChallenge, PauseRequest } from "../../owner/src/types.js";
 import type { OwnerProof, TerminalWallet } from "./wallet.js";
+
+/** Proves a passphrase unlocks the stored key by signing a throwaway message in the isolated signer. Returns the public key. */
+export async function unlockKeystore(account: string, directory: string, passphrase: string, execute: WorkerExecutor = executeWorker): Promise<string> {
+  const url = new URL("../../owner/src/keystore-worker.js", import.meta.url);
+  const result = await execute(url, { account, directory, passphrase, payload: { message: "persistara key store unlock check (not a transaction)", recipient: "persistara-unlock-check", nonce: randomBytes(32).toString("base64url") } }, { effect: "read", timeoutMs: 30_000 });
+  if (!isObject(result) || typeof result.publicKey !== "string") throw new ProviderError("AUTHORIZATION_FAILED", "The key store did not unlock");
+  return result.publicKey;
+}
 
 /**
  * Owner wallet backed by the encrypted key store. Sign-in runs in a separate short-lived signer process, so the owner key is

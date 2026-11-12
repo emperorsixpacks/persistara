@@ -8,6 +8,7 @@ The command lines below were checked against `near-cli-rs 0.31.1`: the grammar p
 
 `near-api-js` is NEAR's equivalent of viem or ethers: with a secret key it signs transactions. `pnpm near:deploy` uses it to do steps 2-5 below in one go. It is **resumable** (it reads chain state first, so after any failure you just run it again) and defaults to a **dry run** that only reads the chain.
 
+0. **Easiest:** if you imported your key with `persistara wallet add`, skip the key file and add `--owner-from-keystore` to the commands below; it asks for your passphrase (hidden) instead.
 1. Put your owner **secret** key in a private file (either a bare `ed25519:...` line or the NEAR CLI credentials JSON, such as `~/.near-credentials/testnet/YOU.testnet.json`; the tool checks the file belongs to the owner account) outside the repository, using your editor, never chat: `mkdir -p ~/.persistara-signer && chmod 700 ~/.persistara-signer`, then create `~/.persistara-signer/owner.key` with mode `600` (`chmod 600`). The tool refuses a file that is readable by others or a symlink. The key must be a **full-access** key of the owner account. Delete the file when you are done.
 2. Dry run (reads only, signs nothing): `pnpm near:deploy --owner persistara-owner.testnet --owner-key-file ~/.persistara-signer/owner.key --contract authority-v2.persistara-owner.testnet`
 3. If the plan looks right, run the same command with `--execute`.

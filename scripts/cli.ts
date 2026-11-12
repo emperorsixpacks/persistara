@@ -7,6 +7,9 @@ import { terminalMemory } from "../packages/operator/src/memory.js";
 import { terminalConversation } from "../packages/operator/src/conversation.js";
 import { TerminalClient } from "../packages/terminal/src/client.js";
 import { NearCliWallet } from "../packages/terminal/src/wallet.js";
+import { KeystoreWallet, unlockKeystore } from "../packages/terminal/src/keystore-wallet.js";
+import { keystoreDirectory, readKeystoreEntry } from "../packages/owner/src/keystore.js";
+import { readSecret } from "../packages/terminal/src/secret.js";
 import { TerminalShell, errorText, inputJson, reviewApproval, type TerminalIO } from "../packages/terminal/src/shell.js";
 import { terminalHelp, terminalHelpFor, terminalJson, terminalText, parseNear, statusText, missionText, missionListText, commissionText, commandExitCode } from "../packages/terminal/src/render.js";
 import { createPlainTerminal } from "../packages/terminal/src/plain.js";
@@ -33,10 +36,11 @@ function options(argv: string[]): Options {
   }
   result.args = argv.slice(i); return result;
 }
-const forwarded: Record<string, string> = { specialist: "specialist.js", recovery: "recovery-kit.js", doctor: "provider-doctor.js", wallet: "wallet-setup.js" };
+const forwarded: Record<string, string> = { specialist: "specialist.js", recovery: "recovery-kit.js", doctor: "provider-doctor.js", wallet: "wallet.js" };
 async function forward(args: string[], project: string, acknowledgeCosts: boolean) {
   const [command, action, ...rest] = args;
   let script = forwarded[command!], values = args.slice(1);
+  if (command === "wallet" && action === "near-cli") { script = "wallet-setup.js"; values = []; }
   if (command === "memory") {
     if (["write", "resume", "reconcile", "cancel"].includes(action ?? "")) { script = "memory-write.js"; values = [action === "reconcile" ? "reconcile" : action!, ...rest]; }
     else { script = "memory.js"; values = args.slice(1); }
@@ -97,6 +101,17 @@ async function main() {
   if (interactive && !process.stdin.isTTY && !opts.interactive) { console.log(terminalHelp); process.exitCode = 2; return; }
   loadEnvironment();
   const workspace = await createLocalWorkspace(), controller = new AbortController();
+  // Owner key custody: a stored encrypted key (persistara wallet add) is unlocked once here, before the full-screen app owns the terminal.
+  // It is only decrypted inside the isolated signer process. Without a stored key, or when not interactive, the external NEAR CLI keychain is used.
+  const owner = workspace.config.signerId, nearCli = new NearCliWallet(process.env.NEAR_CLI_BIN || "near", undefined, controller.signal);
+  const stored = await readKeystoreEntry(owner, keystoreDirectory()).catch(() => null);
+  let passphrase: string | null = null;
+  const canPrompt = Boolean(interactive && !opts.json && process.stdin.isTTY && process.stdout.isTTY);
+  if (stored && canPrompt) {
+    const typed = await readSecret(`Key store passphrase for ${owner} (Enter to skip): `);
+    if (typed) { try { await unlockKeystore(owner, keystoreDirectory(), typed); passphrase = typed; } catch { process.stderr.write("That passphrase did not unlock the key store; continuing locked (owner sign-in will be unavailable).\n"); } }
+  }
+  const wallet = stored && canPrompt ? new KeystoreWallet(owner, keystoreDirectory(), () => passphrase, nearCli) : nearCli;
   let application: ReturnType<(typeof import("../packages/terminal/src/application.js"))["createTerminalApplication"]> | null = null;
   let plain: ReturnType<typeof createPlainTerminal> | null = null;
   let conversations: { close(): void } | null = null;
@@ -107,7 +122,7 @@ async function main() {
   const io = application?.io ?? plain!.io;
   // Machine-readable stdout contains one result; reviews/errors go to stderr.
   const reviewIO: TerminalIO = { ...io, print: (text, tone) => { if (opts.json) process.stderr.write(terminalText(text) + "\n"); else io.print(text, tone); } };
-  const client = new TerminalClient(workspace, new NearCliWallet(process.env.NEAR_CLI_BIN || "near", undefined, controller.signal), reviewApproval(reviewIO, { interactive: interactive || Boolean(process.stdin.isTTY && !opts.json), approveLogin: opts.approveLogin, acknowledgeCosts: opts.acknowledgeCosts, ...(opts.approveDigest ? { approveDigest: opts.approveDigest } : {}) }));
+  const client = new TerminalClient(workspace, wallet, reviewApproval(reviewIO, { interactive: interactive || Boolean(process.stdin.isTTY && !opts.json), approveLogin: opts.approveLogin, acknowledgeCosts: opts.acknowledgeCosts, ...(opts.approveDigest ? { approveDigest: opts.approveDigest } : {}) }));
   process.once("SIGINT", stop); process.once("SIGTERM", stop); plain?.rl.once("SIGINT", stop);
   try {
     if (interactive) { const memory = terminalMemory(workspace), conversation = terminalConversation(workspace, client, memory); conversations = conversation; const shell = new TerminalShell(client, io, memory, false, conversation); shell.selected = opts.resume ?? null; if (application) await application.run(client, shell, controller.signal); else await shell.loop(controller.signal); }
