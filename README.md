@@ -51,6 +51,14 @@ Signed specialist commissioning now links one curated worker to a mission throug
 
 **Not implemented yet:** AI conversation/reasoning and conversational session resumption, daemon/Telegram integration, embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
+```
+
+Builds the CLI, adds `persistara` to your PATH and creates a private workspace. Works once the repository is public (until then run `bash install.sh` from a clone). It does not deploy a contract or create accounts. See [INSTALL.md](docs/INSTALL.md) for exactly what it changes, how to uninstall and what you still need.
+
 ## Development
 
 - Node.js >=24.22.1. pnpm downloads the pinned project-local Node 24.22.2 runtime; the global installation is unchanged.
