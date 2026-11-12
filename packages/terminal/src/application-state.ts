@@ -16,7 +16,7 @@ export const commandCatalog = [
   ["cancel", "Cancel local source collection", false], ["pause", "Review an owner pause", false],
   ["resume-agent", "Review an owner resume", false], ["owner-reconcile", "Observe a wallet handoff", true],
   ["owner-cancel", "Cancel before wallet handoff", true], ["disconnect", "End the owner session", false],
-  ["sessions", "List saved conversations", false], ["session", "Start or open a conversation", true],
+  ["copy", "Copy the last output (or /copy all)", false], ["sessions", "List saved conversations", false], ["session", "Start or open a conversation", true],
   ["exit", "Close this workspace", false],
 ] as const;
 export type PaletteItem = typeof commandCatalog[number];
@@ -26,6 +26,8 @@ export interface ApplicationState {
   prompt: string; draft: string; cursor: number; menuIndex: number; menuHidden: boolean;
   scroll: number; entries: SessionEntry[]; activeCommand: string; startedAt: number;
   status: Awaited<ReturnType<TerminalClient["status"]>> | null; selected: string | null; session: string | null;
+  /** Short machine code when the last readiness check failed (never message text). */
+  statusProblem: string | null;
 }
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 export const graphemes = (value: string) => [...segmenter.segment(value)].map(s => s.segment);
@@ -37,12 +39,18 @@ export function suggestions(state: ApplicationState): PaletteItem[] {
 }
 
 export class ApplicationStore {
-  private state: ApplicationState = { phase: "loading", prompt: "", draft: "", cursor: 0, menuIndex: 0, menuHidden: false, scroll: 0, entries: [], activeCommand: "Checking workspace", startedAt: Date.now(), status: null, selected: null, session: null };
+  private state: ApplicationState = { phase: "loading", prompt: "", draft: "", cursor: 0, menuIndex: 0, menuHidden: false, scroll: 0, entries: [], activeCommand: "Checking workspace", startedAt: Date.now(), status: null, selected: null, session: null, statusProblem: null };
   private listeners = new Set<() => void>();
   private pending: { resolve: (value: string | null) => void; kind: "command" | "question" } | null = null;
   private history: string[] = []; private historyIndex = -1; private savedDraft = ""; private sequence = 0;
   readonly io: TerminalIO = { print: (text, tone) => this.print(text, tone), ask: prompt => this.ask(prompt, "question"), busy: label => { if (this.state.phase === "working") this.busy(label); } };
   snapshot = () => this.state;
+  /** Highest entry id so far, so a caller can later ask for exactly what one command printed. */
+  lastEntryId = () => this.sequence;
+  /** Plain text of what was printed after `id`; `you` lines are shown as `> text`. Bounded by the retained entries. */
+  textSince(id: number, includeInput = false) {
+    return this.state.entries.filter((entry) => entry.id > id && (includeInput || entry.role === "result")).map((entry) => entry.role === "you" ? `> ${entry.text}` : entry.text).join("\n\n");
+  }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   update(value: Partial<ApplicationState>) { this.state = { ...this.state, ...value }; for (const listener of this.listeners) listener(); }
   print(text: string, tone?: TerminalTone) {

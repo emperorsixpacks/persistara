@@ -3,6 +3,7 @@ import { Box, Text as InkText, Spacer, render, useInput, usePaste, useWindowSize
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 import { ApplicationStore, graphemes, suggestions, type ApplicationState, type SessionEntry } from "./application-state.js";
+import { copyText } from "./clipboard.js";
 import { agentDisplayName, nearAmount, terminalColor, terminalText, type TerminalTone } from "./render.js";
 import { errorText, words, type TerminalShell } from "./shell.js";
 import type { TerminalClient } from "./client.js";
@@ -115,20 +116,25 @@ export function TerminalApplicationView({ store, agentId, project, interrupt, co
       <Text color={c(muted)} wrap="truncate-end">{state.phase === "question" ? clip(state.prompt, width - 6) : [state.session ? `Session ${state.session.slice(-8)}` : "", state.selected ? `Mission ${state.selected.slice(-8)}` : ""].filter(Boolean).concat("Command").join("  /  ")}</Text>
       <Text wrap="truncate-end"><Text color={c(copper)}>{state.phase === "question" ? "? " : "› "}</Text>{parts.before}<Text inverse={state.phase === "command" || state.phase === "question"}>{parts.current}</Text>{parts.after}{!state.draft && state.phase === "command" && <Text color={c(muted)}> Type / for commands</Text>}{working && <Text color={c(muted)}>Working — Ctrl+C stops and exits safely</Text>}</Text>
     </Box>
-    <Box height={1} flexShrink={0}><Text color={c(muted)} wrap="truncate-end">{clip(status ? `Last check: ${status.view.paused ? "paused" : "active"} · ${nearAmount(status.view.balances.available)} · Memory ${status.view.checkpointVersion} · Owner ${status.authenticated ? "connected" : "disconnected"}` : "○ NEAR readiness not verified", width)}</Text></Box>
+    <Box height={1} flexShrink={0}><Text color={c(muted)} wrap="truncate-end">{clip(status ? `Last check: ${status.view.paused ? "paused" : "active"} · ${nearAmount(status.view.balances.available)} · Memory ${status.view.checkpointVersion} · Owner ${status.authenticated ? "connected" : "disconnected"}` : `○ NEAR readiness not verified${state.statusProblem ? ` (${state.statusProblem})` : ""} · /status for details`, width)}</Text></Box>
     <Box height={1} flexShrink={0}><Text color={c(muted)} wrap="truncate-end">{clip(rows < 20 ? "Esc cancel · Ctrl+C exit · --plain fallback" : "Enter submit · Esc cancel draft/prompt · PgUp/PgDn scroll · Ctrl+C exit", width)}</Text></Box>
   </Box>;
 }
 
-export async function runApplicationSession(store: ApplicationStore, client: TerminalClient, shell: TerminalShell, signal: AbortSignal) {
+export async function runApplicationSession(store: ApplicationStore, client: TerminalClient, shell: TerminalShell, signal: AbortSignal, copy: typeof copyText = copyText) {
       store.update({ selected: shell.selected, session: shell.session });
-      const refresh = async () => { try { store.update({ status: await client.status() }); } catch (error) { store.update({ status: null }); store.print(errorText(error), "warning"); } };
+      const refresh = async () => { try { store.update({ status: await client.status(), statusProblem: null }); } catch (error) { const text = errorText(error); store.update({ status: null, statusProblem: /^([A-Z][A-Z_]{2,40}):/.exec(text)?.[1] ?? "CHECK_FAILED" }); store.print(text, "warning"); } };
+      let lastOutput = "";
       await refresh();
       while (!signal.aborted && store.snapshot().phase !== "closing") {
         const line = await store.ask("Command", "command"); if (line === null) break;
+        const copyCommand = /^\/copy(?:\s+(all))?\s*$/.exec(line.trim());
+        if (copyCommand) { const outcome = await copy(copyCommand[1] ? store.textSince(0, true) : lastOutput); store.print(outcome.message, outcome.confirmed ? "success" : outcome.copied ? "muted" : "warning"); continue; }
+        const mark = store.lastEntryId();
         let args: string[] = [];
         try { const route = shell.route(line); if (route.kind === "command") args = route.args; if (route.kind === "command" && !args.length) continue; if (!await shell.handle(line, signal)) break; }
         catch (error) { store.print(errorText(error), "warning"); }
+        const printed = store.textSince(mark); if (printed) lastOutput = printed;
         const status = store.snapshot().status;
         store.update({ selected: shell.selected, session: shell.session, ...(status ? { status: { ...status, authenticated: client.authenticated() } } : {}) });
         if (["connect", "disconnect", "pause", "resume-agent", "status", "memory-recover"].includes((args[0] ?? "").replace(/^\//, "")) && !signal.aborted && store.snapshot().phase !== "closing") { store.busy("Refreshing workspace"); await refresh(); }

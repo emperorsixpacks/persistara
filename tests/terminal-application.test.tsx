@@ -100,6 +100,24 @@ describe("interactive terminal application", () => {
       await command("/exit"); await run;
     } finally { abort.abort(); store.close(); await run; await client.close(); await f.close(); }
   });
+  it("explains in the footer why the NEAR check failed, and /copy copies exactly the last output or the whole transcript through an injected copier", async () => {
+    const store = new ApplicationStore(), abort = new AbortController(), copied: string[] = [];
+    const client = { status: async () => { throw new ProviderError("INTEGRITY_FAILED", "Authority code differs"); }, authenticated: () => false } as unknown as TerminalClient;
+    const shell = { selected: null, session: null, route: () => ({ kind: "chat" }), handle: async (line: string) => { store.print(`reply to ${line}`); return true; } } as unknown as TerminalShell;
+    const run = runApplicationSession(store, client, shell, abort.signal, async (text) => { copied.push(text); return { copied: true, confirmed: true, message: `copied ${text.length}` }; });
+    const command = async (text: string) => { await until(() => store.snapshot().phase === "command"); store.setDraft(text); applicationKey(store, "\r", { return: true }, () => {}); };
+    try {
+      await until(() => store.snapshot().phase === "command");
+      assert.equal(store.snapshot().statusProblem, "INTEGRITY_FAILED");
+      const frame = view(store); assert.ok(frame.includes("NEAR readiness not verified (INTEGRITY_FAILED)")); assert.ok(frame.includes("/status"));
+      await command("first"); await command("second"); await command("/copy");
+      await until(() => copied.length === 1); assert.equal(copied[0], "reply to second", "only the last command's output, not the earlier one or the error");
+      await command("/copy all"); await until(() => copied.length === 2);
+      assert.ok(copied[1]!.includes("> first") && copied[1]!.includes("reply to first") && copied[1]!.includes("reply to second") && copied[1]!.includes("Authority code differs"));
+      await command("/copy"); await until(() => copied.length === 3); assert.equal(copied[2], "reply to second", "copying does not replace what was last copied");
+      assert.ok(store.snapshot().entries.some((entry) => entry.text.startsWith("copied ")));
+    } finally { abort.abort(); store.close(); await run; }
+  });
   it("(synthetic) sends natural text through the real application loop, escapes the reply, labels the session and never turns a canceled prompt into chat", async () => {
     const f = await commerceFixture(), cf = await journalFixture(), store = new ApplicationStore(), abort = new AbortController();
     const missions = new MissionService(f.missions(), { read: async url => captureSource(url, Buffer.from("fixture"), "text/plain", Date.now()) }, f.read);

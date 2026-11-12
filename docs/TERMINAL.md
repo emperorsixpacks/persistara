@@ -178,3 +178,10 @@ pnpm conversations:restore --bundle ... --secret-file ...
 - `restore` only works on a journal with **no sessions** (it never merges or overwrites). It re-runs the journal's integrity checks and the original message/request digests, and rolls everything back if any session fails. `verify` changes nothing.
 - Backup is refused while a turn is running. Resolved unknown attempts keep their owner finding; an unknown attempt still never gets a recorded cost.
 - Limits: about 900 KB per session and 32 MB per bundle. This is tested offline with synthetic sessions only; it has not been run against a live workspace, and it protects against loss, not against someone who holds both files.
+
+### Copying text
+
+- `/copy` copies the output of the last command (or the model's last reply) to your clipboard; `/copy all` copies the whole retained session, with your own inputs shown as `> text`.
+- It tries a system tool first (`wl-copy`, `xclip`, `xsel`, `pbcopy`, `clip`), whose exit status confirms the copy. If none is found it asks the terminal to set the clipboard with OSC 52, which cannot be confirmed and is blocked by some terminals; the message says which route was used and when it is unconfirmed. Over SSH only OSC 52 is used (a system tool would fill the remote machine's clipboard). Install `wl-clipboard` or `xclip` on Linux if `/copy` reports it could not confirm.
+- Selecting text with the mouse is handled by your terminal, not by Persistara (the app does not capture the mouse). Whether a selection is copied automatically is a terminal setting (for example "copy on select" in Kitty, WezTerm, iTerm2 and Windows Terminal); otherwise use the terminal's copy shortcut, often Ctrl+Shift+C. In-app highlight-to-copy is not implemented.
+- When the NEAR readiness check fails, the footer now shows the error code, for example `○ NEAR readiness not verified (INTEGRITY_FAILED) · /status for details`; the full message is printed in the session.
