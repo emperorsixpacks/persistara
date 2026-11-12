@@ -8,6 +8,20 @@ The selected stack is **NEAR ownership and settlement + 0G encrypted storage + N
 
 Repository: https://github.com/JemIIahh/persistara. Development visibility: private; the hackathon release must be public by its submission deadline.
 
+## Install
+
+You do **not** need to clone the repository. Run one command:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
+```
+
+Then open a new terminal and run `persistara --help`. It builds the CLI, adds `persistara` to your PATH and creates a private workspace in `~/.persistara-workspace`. It needs `git` and either `pnpm` or Node.js, and no `sudo`. To remove it: `curl -fsSL <same url> | bash -s -- --uninstall` (your workspace is kept).
+
+- **Repository still private?** The URL above only works for everyone once the repository is public. Collaborators with GitHub access can run the same script without cloning: `gh api repos/JemIIahh/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash`.
+- **Want to read it first?** `curl -fsSL <url> -o install.sh && less install.sh && bash install.sh`. Preview with `--dry-run`; pin a version with `--ref <tag-or-commit>`.
+- **What it does not do:** it does not deploy a contract or create accounts. You still need your own deployed authority, its exact WASM and your NEAR account. See [INSTALL.md](docs/INSTALL.md) for every change it makes and what you still need.
+
 ## Start in the terminal
 
 The primary interface is now an interactive terminal application with a persistent composer, command picker, scrollable session and live working/status feedback. In the configured project:
@@ -21,7 +35,7 @@ After building, run `pnpm cli` for normal use, or `pnpm cli:dev` to rebuild sour
 
 Real native acceptance verified owner login, memory-cache recovery and a source mission interrupted after its first capture, resumed/reviewed/reopened in fresh CLI processes with the same artifact. No upload, transaction or inference was used. See [terminal acceptance evidence](docs/evidence/native-terminal-2026-11-08.json).
 
-**AI chat is built offline but disabled by default and not live-accepted.** A durable conversation/session core with three read-only tools exists and is tested only with clearly labeled synthetic providers; no real model request, attestation or tool call has been verified. Enabling it needs deliberate operator opt-in (see [terminal docs](docs/TERMINAL.md#conversation-sessions-offline-core)). This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
+**AI chat is disabled by default and only partly live-verified.** A durable conversation/session core with three read-only tools is tested offline with clearly labeled synthetic providers. One real non-streaming NEAR AI request (fictional data) has passed full attestation, encryption, signature and tool-call verification ([evidence](docs/evidence/inference-spike-2026-11-11.json)); streaming failed its one live attempt and stays off, and chat in the real terminal against a live workspace has not yet been run. Enabling it needs deliberate operator opt-in and your own key (see [terminal docs](docs/TERMINAL.md#conversation-sessions-offline-core) and [acceptance runbook](docs/INFERENCE-ACCEPTANCE.md)). This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
 
 ## Current implementation
 
@@ -50,14 +64,6 @@ The redesigned mission desk now persists zero-spend source-collection briefs, ca
 Signed specialist commissioning now links one curated worker to a mission through domain-bound NEP-413 quotes and delivery receipts. Separate JWE recipient keys protect briefs/dossiers on 0G; exact owner review precedes bounded NEAR acceptance, and finalized payout callbacks determine payment completion. The separate worker CLI keeps wallet signing in the official external keychain. Fixed upload/job intents and canonical signer journals survive interruption without replacement effects. Public testnet acceptance completed a real two-source encrypted delivery and paid 0.01 NEAR once, retained across a host restart; a fresh process decrypted the result using a copied recipient key without runtime/uploader credentials. See [sanitized live commissioning evidence](docs/evidence/specialist-commission-2026-11-07.json) and [setup, signed-file exchange and recovery limits](docs/COMMISSIONS.md).
 
 **Not implemented yet:** AI conversation/reasoning and conversational session resumption, daemon/Telegram integration, embeddings, model-driven research/synthesis, multi-tenant/SSE mission API, browser new-agent enrollment or rotation execution. Two-fact/source/revision recovery, live key rotation, physical cross-machine/off-device backup drills and the five-trial benchmark remain release gates. NEAR AI credentials/credits and paid inference are deferred. The live specimen tests mechanical storage/settlement, not research output or model quality. Local fixtures and disposable NEAR sandbox results remain separate from public-chain evidence.
-
-## Install
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
-```
-
-Builds the CLI, adds `persistara` to your PATH and creates a private workspace. Works once the repository is public (until then run `bash install.sh` from a clone). It does not deploy a contract or create accounts. See [INSTALL.md](docs/INSTALL.md) for exactly what it changes, how to uninstall and what you still need.
 
 ## Development
 

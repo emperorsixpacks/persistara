@@ -6,7 +6,13 @@
 curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
 ```
 
-This URL only works **after the repository is public**. While it is private, clone it with your own git access and run the script from the checkout (the script fetches through git, so your existing credentials are used):
+No clone is needed. This URL only works for everyone **after the repository is public**. While it is private, collaborators with GitHub access can still skip cloning:
+
+```sh
+gh api repos/JemIIahh/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+```
+
+or clone with their own git access and run the script from the checkout (the script fetches through git, so existing credentials are used):
 
 ```sh
 git clone https://github.com/JemIIahh/persistara.git && bash persistara/install.sh
