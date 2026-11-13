@@ -29,7 +29,7 @@ For reviewers and automated checks. Everything below ran from a clean clone with
 ```sh
 git clone https://github.com/JemIIahh/persistara.git && cd persistara
 pnpm install --frozen-lockfile
-pnpm check                      # typecheck + build + 327 tests / 56 suites, about 25 s -> "ℹ pass 327 / ℹ fail 0"
+pnpm check                      # typecheck + build + 332 tests / 57 suites, about 25 s -> "ℹ pass 332 / ℹ fail 0"
 pnpm memory:recover:fixture     # fresh process recovers encrypted memory from a backup -> "originalStateAvailable": false, keys unused
 pnpm memory:writes:fixture      # processes killed mid-write, fresh ones reconcile -> recordUploads 1, manifestUploads 1, checkpointBroadcasts 1
 pnpm missions:recover:fixture   # crash mid-mission, resume -> "abruptCrashRecovered":true, "completedReadsRepeated":0
@@ -117,7 +117,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **327 TypeScript tests in 56 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **332 TypeScript tests in 57 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 

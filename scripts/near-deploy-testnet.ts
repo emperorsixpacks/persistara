@@ -50,7 +50,7 @@ async function main() {
   const project = fileURLToPath(new URL("../../", import.meta.url)); // defaults never depend on the current directory
   const manifest = JSON.parse(await readFile(resolve(project, "contracts/artifacts/authority-manifest.json"), "utf8")) as { codeHashBase58?: string };
   const expectedHash = values.get("--expected-hash") ?? manifest.codeHashBase58 ?? "";
-  const wasm = new Uint8Array(await readFile(resolve(values.get("--wasm") ?? resolve(project, "contracts/artifacts/persistara_authority-name-owner.wasm"))));
+  const wasm = new Uint8Array(await readFile(resolve(values.get("--wasm") ?? resolve(project, "contracts/artifacts/persistara_authority-agent-account.wasm"))));
   let ownerSecret: string;
   if (fromKeystore) { // decrypt the stored owner key inside this short-lived owner tool; the passphrase is typed hidden, never an argument
     if (values.has("--owner-key-file")) throw new ProviderError("INVALID_INPUT", "Choose --owner-from-keystore or --owner-key-file, not both");

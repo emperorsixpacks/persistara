@@ -13,11 +13,15 @@ The command lines below were checked against `near-cli-rs 0.31.1`: the grammar p
 2. Dry run (reads only, signs nothing): `pnpm near:deploy --owner persistara-owner.testnet --owner-key-file ~/.persistara-signer/owner.key --contract authority-v2.persistara-owner.testnet`
 3. If the plan looks right, run the same command with `--execute`.
 
-What it does and checks: the contract file's hash must equal the expected hash (default: the committed artifact's) before anything is signed; the contract name must be a subaccount of the owner; the owner key must really be a full-access key on that account; it then creates the contract account, deploys and runs `new` in one transaction, registers the agent, sets the policy, funds it, creates the runtime key file, authorizes that key with the same limits as the live agent and records the delegate grant. It prints the `.env` lines to use. It needs at least 6.5 testnet NEAR on the owner.
+**The agent is a real NEAR account.** By default the tool creates `research.<owner>` as an actual account (0.5 NEAR for storage and gas), gives it your owner key as a full-access key (so nothing is ever trapped) and gives it the agent's runtime key as a restricted function-call key (only this contract, three methods, 0.25 NEAR gas allowance). The agent signs as `research.<owner>`, so your owner account carries no runtime key at all, and the printed `.env` lines include `NEAR_RUNTIME_ACCOUNT`. Its budget still lives inside the authority contract under your spending policy; the account is the agent's identity, signer and payout address. Pass `--runtime-on-owner` for the older layout (runtime key on the owner account). **Limit:** runtime key rotation is not supported in the agent-account mode yet and refuses with a clear message; you can still pause the agent or revoke its delegate.
+
+What it does and checks: the contract file's hash must equal the expected hash (default: the committed artifact's) before anything is signed; the contract name must be a subaccount of the owner; the owner key must really be a full-access key on that account; it then creates the contract account, deploys and runs `new` in one transaction, registers the agent, sets the policy, funds it, creates the runtime key file, creates the agent account with that key (same limits as the live agent) and records the delegate grant. It prints the `.env` lines to use. It needs at least 6.5 testnet NEAR on the owner (about 5.9 is spent).
 
 Notes: this signs inside a short-lived process that you start, not in the chat or agent process, and it never prints or stores the owner key. A network blip shows as `UNEXPECTED_ERROR`; just run it again. The contract and runtime keys it creates are written as private files under `.persistara/keys/`. The whole flow was run on testnet against a throwaway faucet account (see the evidence file); still run the dry run first and watch the first `--execute`. If the public RPC is slow or drops connections (`NETWORK_ERROR`), just run the same command again, or pass another endpoint such as `--rpc https://test.rpc.fastnear.com`. The manual steps below do the same thing with the NEAR CLI.
 
 ## Manual alternative: Prerequisites
+
+The manual steps below are the **older layout**: they put the runtime key on the owner account and do not create the agent account. Use `pnpm near:deploy` for the agent-account layout.
 
 - Your owner account on testnet (the examples use `persistara-owner.testnet`) imported with `persistara wallet add` (or into the NEAR CLI keychain), with at least about 8 testnet NEAR. Testnet NEAR is free from a faucet.
 - The NEAR CLI as a **prebuilt binary** (no cargo, no Rust): download the file for your system from <https://github.com/near/near-cli-rs/releases/latest>, check it against the `.sha256` next to it, and put `near` on your PATH. (`cargo install near-cli-rs --locked` also works but is slow and needs OpenSSL headers and `pkg-config` on Linux.)
@@ -38,10 +42,10 @@ SIGN="sign-as $OWNER network-config testnet sign-with-keychain --signer-public-k
 
 ```sh
 mkdir -p target/near/persistara_authority
-cp contracts/artifacts/persistara_authority-name-owner.wasm target/near/persistara_authority/persistara_authority.wasm
+cp contracts/artifacts/persistara_authority-agent-account.wasm target/near/persistara_authority/persistara_authority.wasm
 ```
 
-Its code hash is `A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a` (289,170 bytes). That is your deployment record: the client and `pnpm contract:fetch` check against it, and `pnpm check` fails if the file and `contracts/artifacts/authority-manifest.json` ever disagree. It was built from the contract source at commit `c25373c` and passed `pnpm contract:check` (35 Rust tests, six sandbox scenarios) on 2026-11-11.
+Its code hash is `4Toz9TFJg38qTg3dnGoBd8uDySRHyfhDyr6n6McXz6vq` (289,212 bytes). That is your deployment record: the client and `pnpm contract:fetch` check against it, and `pnpm check` fails if the file and `contracts/artifacts/authority-manifest.json` ever disagree. It was built from the contract source at commit `c25373c` and passed `pnpm contract:check` (35 Rust tests, six sandbox scenarios) on 2026-11-11.
 
 Builds are not reproducible, so rebuilding it yourself with `pnpm contract:build` produces **different bytes and a different hash**. That is fine only if you then deploy and record your own file instead; do not mix the two. The committed artifact is the one the repository's documentation refers to.
 
@@ -97,7 +101,7 @@ The WASM at `target/near/persistara_authority/persistara_authority.wasm` must be
 ## 7. Verify
 
 ```sh
-pnpm contract:fetch --contract authority-v2.persistara-owner.testnet --expected-hash A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a --out /tmp/check.wasm   # chain code == your build
+pnpm contract:fetch --contract authority-v2.persistara-owner.testnet --expected-hash 4Toz9TFJg38qTg3dnGoBd8uDySRHyfhDyr6n6McXz6vq --out /tmp/check.wasm   # chain code == your build
 pnpm near:doctor
 pnpm cli --plain status                     # expect research.persistara-owner.testnet, ACTIVE, 0.1 NEAR available
 ```

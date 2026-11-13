@@ -24,10 +24,12 @@ export class OwnerReader {
     if (!isObject(block) || !isObject(block.header) || !transactionHash(block.header.hash) || !decimal(block.header.timestamp_nanosec)) throw new ProviderError("PROTOCOL_ERROR", "Invalid finalized owner block");
     const blockHash = block.header.hash;
     // One network check and three parallel queries at the same block; no duplicate views.
-    const [call, account, keys] = await Promise.all([
+    const runtimeAccount = this.identity.runtimeAccountId;
+    const [call, account, keys, runtimeKeyList] = await Promise.all([
       rpc.request("query", { request_type: "call_function", block_id: blockHash, account_id: rpc.config.contractId, method_name: "get_agent", args_base64: Buffer.from(JSON.stringify({ agent_id: this.identity.agentId })).toString("base64") }),
       rpc.request("query", { request_type: "view_account", block_id: blockHash, account_id: rpc.config.contractId }),
       rpc.request("query", { request_type: "view_access_key_list", block_id: blockHash, account_id: this.identity.signerId, limit: 129 }),
+      runtimeAccount ? rpc.request("query", { request_type: "view_access_key_list", block_id: blockHash, account_id: runtimeAccount, limit: 129 }) : Promise.resolve(null),
     ]);
     if (!isObject(call) || call.block_hash !== blockHash || !Array.isArray(call.result) || call.result.length > 150_000 || call.result.some((b: unknown) => !Number.isInteger(b) || Number(b) < 0 || Number(b) > 255) ||
         !isObject(account) || account.block_hash !== blockHash || account.code_hash !== this.expectedCodeHash || !isObject(keys) || keys.block_hash !== blockHash ||
@@ -37,11 +39,18 @@ export class OwnerReader {
     catch { throw new ProviderError("PROTOCOL_ERROR", "Invalid owner authority JSON"); }
     if (!isObject(raw) || raw.id !== this.identity.agentId || raw.owner !== this.identity.signerId || !publicKey(raw.ownerKey) || typeof raw.paused !== "boolean" ||
         !decimal(raw.generation, 64, true) || !decimal(raw.keyEpoch, 64, true) || BigInt(raw.keyEpoch) > BigInt(Number.MAX_SAFE_INTEGER) || !Array.isArray(raw.delegates) || raw.delegates.length > 8) throw new ProviderError("PROTOCOL_ERROR", "Invalid owner authority state");
-    const accessKeys = keys.keys.map((entry: unknown) => {
+    const parseKeys = (list: unknown[]) => list.map((entry: unknown) => {
       if (!isObject(entry) || !publicKey(entry.public_key) || !isObject(entry.access_key) || !Number.isSafeInteger(entry.access_key.nonce) || Number(entry.access_key.nonce) < 0 ||
           !(entry.access_key.permission === "FullAccess" || (isObject(entry.access_key.permission) && isObject(entry.access_key.permission.FunctionCall)))) throw new ProviderError("PROTOCOL_ERROR", "Invalid owner account access key");
       return { publicKey: entry.public_key, nonce: Number(entry.access_key.nonce), permission: entry.access_key.permission };
     });
+    const accessKeys = parseKeys(keys.keys);
+    // When the runtime key lives on the agent's own account, its permission is read from that account at the same block.
+    let runtimeAccessKeys = accessKeys;
+    if (runtimeAccount) {
+      if (!isObject(runtimeKeyList) || runtimeKeyList.block_hash !== blockHash || (runtimeKeyList.last_key !== undefined && runtimeKeyList.last_key !== null) || !Array.isArray(runtimeKeyList.keys) || runtimeKeyList.keys.length > 128) throw new ProviderError("INTEGRITY_FAILED", "Agent account keys are incomplete or differ from the finalized state");
+      runtimeAccessKeys = parseKeys(runtimeKeyList.keys);
+    }
     const delegates = raw.delegates.map(delegate);
     if (new Set(accessKeys.map((key) => key.publicKey)).size !== accessKeys.length || new Set(delegates.map((grant) => grant.publicKey)).size !== delegates.length) throw new ProviderError("PROTOCOL_ERROR", "Duplicate owner keys or delegates");
     const snapshot = { owner: raw.owner as string, ownerKey: raw.ownerKey, paused: raw.paused, generation: raw.generation, keyEpoch: Number(raw.keyEpoch), head: decodeHead(raw.head), accessKeys, delegates,
@@ -50,7 +59,7 @@ export class OwnerReader {
     if (balanceNames.some((key) => !decimal(raw[key], 128)) || BigInt(String(raw.deposited)) !== ["available", "reserved", "pending", "paid", "withdrawn"].reduce((sum, key) => sum + BigInt(String(raw[key])), 0n)) throw new ProviderError("INTEGRITY_FAILED", "Treasury balances do not conserve funds");
     const owner = snapshot.accessKeys.find((key) => key.publicKey === snapshot.ownerKey);
     const runtimeKeys = snapshot.delegates.map((grant) => {
-      const key = snapshot.accessKeys.find((entry) => entry.publicKey === grant.publicKey);
+      const key = runtimeAccessKeys.find((entry) => entry.publicKey === grant.publicKey);
       const p = isObject(key?.permission) && isObject(key.permission.FunctionCall) ? key.permission.FunctionCall : null;
       const methods = p && Array.isArray(p.method_names) && p.method_names.every((m: unknown) => typeof m === "string") ? p.method_names as string[] : [];
       const allowance = p && decimal(p.allowance, 128, true) ? p.allowance : null;

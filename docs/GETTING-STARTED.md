@@ -63,7 +63,7 @@ Then copy the exact contract file you deployed into the workspace, because the c
 
 ```sh
 mkdir -p ~/.persistara-workspace/target/near/persistara_authority
-cp contracts/artifacts/persistara_authority-name-owner.wasm ~/.persistara-workspace/target/near/persistara_authority/persistara_authority.wasm
+cp contracts/artifacts/persistara_authority-agent-account.wasm ~/.persistara-workspace/target/near/persistara_authority/persistara_authority.wasm
 ```
 
 ## 5. Configure `~/.persistara-workspace/.env`
