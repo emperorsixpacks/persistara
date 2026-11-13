@@ -4,6 +4,7 @@ import { assertRuntime, type InferenceConfig } from "../../protocol/src/config.j
 import { ProviderError } from "../../protocol/src/providers.js";
 import { fail, progress, reply } from "../../protocol/src/worker.js";
 import { validateInferenceRequest } from "./near-ai.js";
+import { retryCollateral } from "./retry.js";
 import { accumulateChatStream } from "./stream.js";
 import type { InferenceRequest } from "./provider.js";
 
@@ -22,7 +23,7 @@ process.once("message", async (input: unknown) => {
     validateInferenceRequest(request);
     const strict = { policy: { acceptedTcbStatuses: ["UpToDate" as const] } };
     client = new InferenceClient({ baseUrl: config.baseUrl, apiKey: config.apiKey, e2ee: true, gatewayVerification: strict, modelVerification: strict });
-    const preflight = await client.verify(config.model);
+    const preflight = await retryCollateral(() => client!.verify(config.model));
     if (preflight.models.length === 0) { fail("UNSUPPORTED"); return; }
     const messages = request.messages.map(message => {
       if (message.role === "tool") return { role: "tool" as const, tool_call_id: message.toolCallId, content: message.content };
@@ -52,7 +53,8 @@ process.once("message", async (input: unknown) => {
     }
     if (!isObject(completion) || typeof completion.id !== "string") { fail("PROTOCOL_ERROR"); return; }
     progress("completion", completion.id);
-    const verified = await client.verifyResponse(completion.id);
+    const completionId = completion.id;
+    const verified = await retryCollateral(() => client!.verifyResponse(completionId)); // read-only: the paid request is never repeated
     if (verified.id !== completion.id || verified.signatureKind !== "provider_tee") { fail("UNSUPPORTED"); return; }
     if (!Array.isArray(completion.choices) || completion.choices.length !== 1 || !isObject(completion.choices[0]) ||
         !isObject(completion.choices[0].message) || !isObject(completion.usage)) { fail("PROTOCOL_ERROR"); return; }

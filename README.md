@@ -29,7 +29,7 @@ For reviewers and automated checks. Everything below ran from a clean clone with
 ```sh
 git clone https://github.com/JemIIahh/persistara.git && cd persistara
 pnpm install --frozen-lockfile
-pnpm check                      # typecheck + build + 332 tests / 57 suites, about 25 s -> "ℹ pass 332 / ℹ fail 0"
+pnpm check                      # typecheck + build + 335 tests / 58 suites, about 25 s -> "ℹ pass 335 / ℹ fail 0"
 pnpm memory:recover:fixture     # fresh process recovers encrypted memory from a backup -> "originalStateAvailable": false, keys unused
 pnpm memory:writes:fixture      # processes killed mid-write, fresh ones reconcile -> recordUploads 1, manifestUploads 1, checkpointBroadcasts 1
 pnpm missions:recover:fixture   # crash mid-mission, resume -> "abruptCrashRecovered":true, "completedReadsRepeated":0
@@ -76,7 +76,7 @@ After building, run `pnpm cli` for normal use, or `pnpm cli:dev` to rebuild sour
 
 Real native acceptance verified owner login, memory-cache recovery and a source mission interrupted after its first capture, resumed/reviewed/reopened in fresh CLI processes with the same artifact. No upload, transaction or inference was used. See [terminal acceptance evidence](docs/evidence/native-terminal-2026-11-08.json).
 
-**AI chat is disabled by default and only partly live-verified.** A durable conversation/session core with three read-only tools is tested offline with clearly labeled synthetic providers. One real non-streaming NEAR AI request (fictional data) has passed full attestation, encryption, signature and tool-call verification ([evidence](docs/evidence/inference-spike-2026-11-11.json)); streaming failed its one live attempt and stays off, and chat in the real terminal against a live workspace has not yet been run. Enabling it needs deliberate operator opt-in and your own key (see [terminal docs](docs/TERMINAL.md#conversation-sessions-offline-core) and [acceptance runbook](docs/INFERENCE-ACCEPTANCE.md)). This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
+**AI chat is disabled by default and only partly live-verified.** A durable conversation/session core with three read-only tools is tested offline with clearly labeled synthetic providers. One real non-streaming NEAR AI request (fictional data) has passed full attestation, encryption, signature and tool-call verification ([evidence](docs/evidence/inference-spike-2026-11-11.json)); streaming failed its one live attempt and stays off, and one real chat message in the terminal (on a throwaway testnet deployment, 2026-11-13) returned a verified reply that used a read-only tool, after a bounded retry of the free attestation-collateral fetch. Enabling it needs deliberate operator opt-in and your own key (see [terminal docs](docs/TERMINAL.md#conversation-sessions-offline-core) and [acceptance runbook](docs/INFERENCE-ACCEPTANCE.md)). This release is an interactive mission workspace; it does not claim complete Sofer conversational/daemon/Telegram parity. The web console remains available, and further visual redesign is deferred.
 
 ## Current implementation
 
@@ -117,7 +117,7 @@ pnpm install
 pnpm check
 ```
 
-`pnpm check` typechecks, builds, and runs **332 TypeScript tests in 57 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
+`pnpm check` typechecks, builds, and runs **335 TypeScript tests in 58 suites**, including local HTTP security checks. No credentials, faucet, or public network is needed to execute those tests after installation; the HTTP tests bind temporary loopback ports.
 
 Verification covers authenticated encryption, owner backup binding, historical key recovery, concurrent revisions, cache corruption, failed/contended rebuilds, provider contracts, signer restart/reconciliation and finalized client semantics. Offline tests remain separate from deployed-WASM sandbox tests and public NEAR/0G acceptance evidence.
 
