@@ -3,7 +3,7 @@ import { ProviderError } from "../packages/protocol/src/providers.js";
 import { NearAuthorityReader } from "../packages/near/src/client.js";
 import { nearConfig } from "../packages/near/src/config.js";
 import { NearRpc } from "../packages/near/src/rpc.js";
-import { decimal, RUNTIME_METHODS } from "../packages/near/src/protocol.js";
+import { decimal, RUNTIME_METHODS, runtimeAccountOf } from "../packages/near/src/protocol.js";
 import { loadEnvironment, printFailure } from "./common.js";
 
 async function main(): Promise<void> {
@@ -12,7 +12,7 @@ async function main(): Promise<void> {
   const rpc = new NearRpc(config);
   const reader = new NearAuthorityReader(rpc);
   const agent = await reader.agent(config.agentId);
-  const key = await rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: config.signerId, public_key: config.publicKey });
+  const key = await rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: runtimeAccountOf(config), public_key: config.publicKey });
   if (agent.owner !== config.signerId || agent.ownerKey === config.publicKey || !isObject(key) || !isObject(key.permission) || !isObject(key.permission.FunctionCall)) {
     throw new ProviderError("AUTHORIZATION_FAILED", "Expected a distinct runtime function-call key for this owner");
   }

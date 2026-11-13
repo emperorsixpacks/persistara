@@ -5,7 +5,13 @@ import { ProviderError } from "../../protocol/src/providers.js";
 export const RUNTIME_METHODS = ["checkpoint_memory", "create_job", "accept_job"] as const;
 export type RuntimeMethod = typeof RUNTIME_METHODS[number];
 export interface NearNetwork { kind: "testnet" | "sandbox"; chainId: string; rpcUrl: string; contractId: string }
-export interface RuntimeIdentity { signerId: string; publicKey: string; agentId: string }
+/**
+ * `signerId` is the owner account. The runtime key normally lives on the owner account; when `runtimeAccountId` is set it must be the
+ * agent ID itself (the agent's own `name.owner` account), and the runtime key is a restricted function-call key on that account.
+ */
+export interface RuntimeIdentity { signerId: string; publicKey: string; agentId: string; runtimeAccountId?: string }
+/** The account that holds the restricted runtime key and signs runtime transactions. */
+export const runtimeAccountOf = (identity: { signerId: string; runtimeAccountId?: string }): string => identity.runtimeAccountId ?? identity.signerId;
 export interface NearSignerConfig extends NearNetwork, RuntimeIdentity { journalFile: string; runtimeKeyFile: string }
 export interface ContractCall { method: RuntimeMethod; args: Record<string, unknown> }
 export type NearOutcome =
@@ -70,7 +76,8 @@ export function agentIdMatchesSigner(agentId: unknown, signerId: string): boolea
   return agentId.endsWith(`.${signerId}`) && agentId.length <= 64 && subaccountAgentName(agentId.slice(0, agentId.length - signerId.length - 1));
 }
 export function validateIdentity(identity: RuntimeIdentity): void {
-  if (!accountId(identity.signerId) || !publicKey(identity.publicKey) || !identity.publicKey.startsWith("ed25519:") || !agentIdMatchesSigner(identity.agentId, identity.signerId)) failInput();
+  if (!accountId(identity.signerId) || !publicKey(identity.publicKey) || !identity.publicKey.startsWith("ed25519:") || !agentIdMatchesSigner(identity.agentId, identity.signerId) ||
+      (identity.runtimeAccountId !== undefined && (identity.runtimeAccountId !== identity.agentId || !accountId(identity.agentId) || identity.agentId.startsWith(`${identity.signerId}:`)))) failInput();
 }
 export function runtimePermission(permission: unknown, contractId: string, method: RuntimeMethod): boolean {
   if (!isObject(permission) || !isObject(permission.FunctionCall)) return false;

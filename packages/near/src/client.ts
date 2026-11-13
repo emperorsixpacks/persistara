@@ -2,7 +2,7 @@ import { isObject, type CheckpointAttempt, type DurableMemoryHeads, type MemoryH
 import { ProviderError } from "../../protocol/src/providers.js";
 import { NearRpc } from "./rpc.js";
 import { accountId, canonical, decimal, decodeHead, encodeHead, failInput, hash, operationId, publicKey, runtimePermission, validateBlob, validateCall, validateIdentity,
-  type ContractCall, type NearOutcome, type NearSigner, type RuntimeIdentity } from "./protocol.js";
+  runtimeAccountOf, type ContractCall, type NearOutcome, type NearSigner, type RuntimeIdentity } from "./protocol.js";
 
 export interface AgentState {
   id: string; owner: string; ownerKey: string; paused: boolean; generation: string; keyEpoch: string; policyVersion: string;
@@ -87,7 +87,7 @@ export class NearMemoryHeadStore implements DurableMemoryHeads {
     }
     const raw = await this.reader.rpc.view("get_agent", { agent_id: this.identity.agentId });
     const block = await this.reader.rpc.request("block", { finality: "final" });
-    const access = await this.reader.rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: this.identity.signerId, public_key: this.identity.publicKey });
+    const access = await this.reader.rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: runtimeAccountOf(this.identity), public_key: this.identity.publicKey });
     const grant = isObject(raw) && Array.isArray(raw.delegates) ? raw.delegates.find((d: unknown) => isObject(d) && d.publicKey === this.identity.publicKey) : undefined;
     if (!isObject(access) || !runtimePermission(access.permission, this.reader.rpc.config.contractId, "checkpoint_memory") ||
         !isObject(raw) || raw.generation !== state.generation || raw.paused !== false || !isObject(grant) || grant.canCheckpoint !== true || !decimal(grant.expiresAtNs, 64, true) ||
@@ -101,7 +101,7 @@ export class NearMemoryHeadStore implements DurableMemoryHeads {
     if (!this.signer.journalIdentity) throw new ProviderError("NOT_CONFIGURED", "Durable memory requires an identifiable signer journal");
     const journalIdentity = await this.signer.journalIdentity(create);
     const { kind, chainId, contractId } = this.reader.rpc.config;
-    return { journalIdentity, digest: hash(canonical({ kind, chainId, contractId, signerId: this.identity.signerId,
+    return { journalIdentity, digest: hash(canonical({ kind, chainId, contractId, signerId: this.identity.signerId, ...(this.identity.runtimeAccountId ? { runtimeAccountId: this.identity.runtimeAccountId } : {}),
       publicKey: this.identity.publicKey, agentId: this.identity.agentId, journalIdentity })) };
   }
   private checkpointCall(attempt: CheckpointAttempt): ContractCall {

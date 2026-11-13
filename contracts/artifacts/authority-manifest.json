@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "file": "persistara_authority-name-owner.wasm",
-  "bytes": 289170,
-  "sha256Hex": "86129f3cb212a7a82e9920ee5773d85c295649a4930faa3892885783b2310473",
-  "codeHashBase58": "A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a",
-  "agentIdFormat": "name.owner (for example research.persistara-owner.testnet)",
-  "sourceCommit": "c25373c",
+  "file": "persistara_authority-agent-account.wasm",
+  "bytes": 289212,
+  "sha256Hex": "337149c97af29e48d52612360530143c9f36b2332526d42d808c20c81df8020e",
+  "codeHashBase58": "4Toz9TFJg38qTg3dnGoBd8uDySRHyfhDyr6n6McXz6vq",
+  "agentIdFormat": "name.owner; the agent may also be a real account name.owner that holds the runtime key (for example research.persistara-owner.testnet)",
+  "sourceCommit": "f198da3",
   "sourcePath": "contracts/authority",
   "builtWith": {
     "rust": "1.96.0",
@@ -14,7 +14,7 @@
     "command": "pnpm contract:build",
     "platform": "Linux x86_64"
   },
-  "tested": "pnpm contract:check passed on 2026-11-11 against this exact file: 35 Rust unit tests and six deployed-WASM sandbox scenarios",
+  "tested": "pnpm contract:check against this exact file on 2026-11-13: 36 Rust unit tests and six deployed-WASM sandbox scenarios (the application scenario runs with the runtime key only on the agent account)",
   "deployed": false,
-  "notes": "Builds are NOT reproducible: rebuilding the same source gives different bytes and a different code hash. Deploy this exact file and keep its hash as your deployment record. Not deployed anywhere as of this commit; the existing testnet deployment uses the older owner:name build (code hash GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ)."
+  "notes": "Builds are NOT reproducible: rebuilding the same source gives different bytes and a different code hash. Deploy this exact file and keep its hash as your deployment record. Previous artifact persistara_authority-name-owner.wasm (A2N6rTX3eAsSmJQgo4pBy7AuiPaw8pLGmf8p7Jyw6Q4a) was deployed only to a throwaway testnet account on 2026-11-13; the original live testnet deployment uses the older owner:name build (code hash GCPU1ejMZ6CPDLyT4k9GorYuXtAv5sn49jXWVzDMsKYQ)."
 }

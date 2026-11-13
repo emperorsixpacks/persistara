@@ -51,4 +51,33 @@ describe("owner readiness from pinned finalized chain observations", () => {
       codeHash = "wrong-code"; await assert.rejects(reader.read(), { code: "INTEGRITY_FAILED" });
     } finally { await f.close(); }
   });
+  it("reads the runtime key from the agent's own account when it lives there, and never trusts a key left on the owner account", async () => {
+    const f = await ownerFixture();
+    try {
+      const agentId = "research.owner.testnet", config = { ...f.config, agentId, runtimeAccountId: agentId };
+      const raw = { id: agentId, owner: f.view.owner, ownerKey: f.view.ownerKey, paused: false, generation: "3", keyEpoch: "1", head: null,
+        delegates: [{ publicKey: config.publicKey, expiresAtNs: "1794750000000000000", canCheckpoint: true, canSpend: true }],
+        deposited: "100", available: "90", reserved: "0", pending: "0", paid: "10", withdrawn: "0", policyVersion: "1", policy: { maxJobAmount: "20", dailyLimit: "50", approvedWorkers: ["worker.testnet"] } };
+      const permission = { FunctionCall: { receiver_id: config.contractId, method_names: ["checkpoint_memory", "create_job", "accept_job"], allowance: "250000000000000000000000" } };
+      let keyOn: "agent" | "owner" = "agent", queried: string[] = [];
+      const rpc = new NearRpc(config, async (method, params) => {
+        const p = params as Record<string, unknown>;
+        if (method === "status") return { chain_id: "testnet", sync_info: { syncing: false } };
+        if (method === "block") return { header: { hash: f.view.blockHash, timestamp_nanosec: f.view.timestampNs } };
+        if (p.request_type === "view_access_key_list") {
+          queried.push(String(p.account_id));
+          const entries = p.account_id === agentId
+            ? [{ public_key: f.view.ownerKey, access_key: { nonce: 1, permission: "FullAccess" } }, ...(keyOn === "agent" ? [{ public_key: config.publicKey, access_key: { nonce: 2, permission } }] : [])]
+            : [{ public_key: f.view.ownerKey, access_key: { nonce: 30, permission: "FullAccess" } }, ...(keyOn === "owner" ? [{ public_key: config.publicKey, access_key: { nonce: 31, permission } }] : [])];
+          return { block_hash: f.view.blockHash, last_key: null, keys: entries };
+        }
+        if (p.request_type === "view_account") return { block_hash: f.view.blockHash, code_hash: f.codeHash };
+        return { block_hash: f.view.blockHash, result: [...Buffer.from(JSON.stringify(p.method_name === "get_agent" ? raw : null))] };
+      });
+      const reader = new OwnerReader(rpc, config, f.codeHash, async () => ({ backup: { status: "verified", offDeviceVerified: false }, localRotationHold: false }));
+      assert.equal((await reader.read()).canResume, true);
+      assert.ok(queried.includes(agentId) && queried.includes(config.signerId), "both accounts' keys were read at the pinned block");
+      keyOn = "owner"; assert.equal((await reader.read()).canResume, false, "a runtime key on the owner account does not count in agent-account mode");
+    } finally { await f.close(); }
+  });
 });

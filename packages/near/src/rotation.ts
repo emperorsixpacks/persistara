@@ -39,7 +39,7 @@ export function rotationRecord(value: unknown): RotationRecord | null {
 /** All authority and access-key observations are pinned to the same finalized block. No signing capability. */
 export class NearRotationReader {
   readonly identity: RuntimeIdentity;
-  constructor(readonly rpc: NearRpc, identity: RuntimeIdentity) { validateIdentity(identity); this.identity = structuredClone(identity); }
+  constructor(readonly rpc: NearRpc, identity: RuntimeIdentity) { validateIdentity(identity); if (identity.runtimeAccountId) throw new ProviderError("NOT_CONFIGURED", "Runtime key rotation is not supported when the runtime key lives on the agent account yet; the owner can still pause the agent or revoke the delegate"); this.identity = structuredClone(identity); }
   async read(operationId: string): Promise<RotationSnapshot> {
     if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(operationId)) throw new ProviderError("INVALID_INPUT", "Invalid rotation ID");
     await this.rpc.assertNetwork();

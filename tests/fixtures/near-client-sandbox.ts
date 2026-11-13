@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   const status: unknown = await (await fetch(input.rpcUrl, { method: "POST", signal: AbortSignal.timeout(10_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "fixture", method: "status", params: {} }) })).json();
   assert.ok(isObject(status) && isObject(status.result) && typeof status.result.chain_id === "string");
   const config: NearSignerConfig = { kind: "sandbox", chainId: status.result.chain_id, rpcUrl: input.rpcUrl,
-    contractId: String(input.contractId), signerId: String(input.signerId), publicKey: String(input.publicKey), agentId: String(input.agentId),
+    contractId: String(input.contractId), signerId: String(input.signerId), publicKey: String(input.publicKey), agentId: String(input.agentId), ...(typeof input.runtimeAccountId === "string" ? { runtimeAccountId: input.runtimeAccountId } : {}),
     journalFile: join(input.directory, "journal", "near.sqlite"), runtimeKeyFile: join(input.directory, "runtime.key") };
   const reader = new NearAuthorityReader(new NearRpc(config));
   const signer = new IsolatedNearSigner(config);

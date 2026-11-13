@@ -21,7 +21,10 @@ Users expect an agent to look like a NEAR account (`research.alice.testnet`). Ma
 
 Out of scope until approved: deploying, creating accounts, moving funds, changing existing journals or keys.
 
-## Phase 2 design: the agent as a real NEAR account (2026-11-13, owner asked for it; not started)
+## Phase 2: the agent as a real NEAR account (2026-11-13; IMPLEMENTED on testnet, runtime rotation deferred)
+
+Status: built the same day on the `agent-account` branch. Contract accepts the agent account as runtime signer (36 Rust tests, six sandbox scenarios; the application scenario runs with the key only on the agent account). Client: optional `runtimeAccountId` / `NEAR_RUNTIME_ACCOUNT`; `near:deploy` creates the account by default. Verified live on a throwaway account (`docs/evidence/e2e-testnet-2026-11-13.md`). Not done: runtime key rotation in this mode, and no deployment of the owner's real account. The design notes below are kept as written.
+
 
 Today `research.<owner>` is only an ID inside the authority contract (see "Role" above). The owner wants it to be a real wallet address.
 

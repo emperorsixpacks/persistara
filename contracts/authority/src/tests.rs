@@ -862,3 +862,30 @@ fn funding_overflow_rejects_before_mutating_any_balance() {
     assert_eq!(c.get_agent(AGENT.into()).unwrap().deposited.0, 10 * NEAR);
     conserved(&c);
 }
+
+#[test]
+fn the_agent_account_can_act_as_runtime_only_with_a_delegate_key_and_never_as_owner() {
+    let mut c = setup();
+    delegate(&mut c, true, true);
+    // The runtime key lives on the agent's own account `research.owner.testnet`.
+    call(AGENT, 2, NOW, 0);
+    assert!(c.checkpoint_memory(AGENT.into(), generation(&c), U64(0), head(1)));
+    call(AGENT, 2, NOW, 0);
+    c.create_job(request(&c, "job:agent-account", NEAR));
+    // A key that is not a registered delegate is refused even on the agent account.
+    call(AGENT, 7, NOW, 0);
+    reject(|| {
+        c.checkpoint_memory(AGENT.into(), U64(1), U64(1), head(2));
+    });
+    // The agent account is never the owner: owner methods stay owner-only.
+    call(AGENT, 1, NOW, 0);
+    reject(|| {
+        c.set_paused(AGENT.into(), true);
+    });
+    // Another account holding the delegate key's bytes cannot impersonate it.
+    call("other.owner.testnet", 2, NOW, 0);
+    reject(|| {
+        c.checkpoint_memory(AGENT.into(), U64(1), U64(1), head(2));
+    });
+    conserved(&c);
+}
