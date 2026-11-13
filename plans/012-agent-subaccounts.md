@@ -20,3 +20,16 @@ Users expect an agent to look like a NEAR account (`research.alice.testnet`). Ma
 - Docs/evidence: migration note, fresh-deploy instructions, and no claim that the old deployment is upgraded.
 
 Out of scope until approved: deploying, creating accounts, moving funds, changing existing journals or keys.
+
+## Phase 2 design: the agent as a real NEAR account (2026-11-13, owner asked for it; not started)
+
+Today `research.<owner>` is only an ID inside the authority contract (see "Role" above). The owner wants it to be a real wallet address.
+
+Design:
+- The owner creates `name.owner` in one owner-signed transaction: `CreateAccount`, a small `Transfer` (storage and gas), `AddKey` for the owner's key (full access, so funds are never trapped) and `AddKey` for the runtime key as a function-call key limited to the authority contract and the three runtime methods.
+- The runtime key therefore leaves the owner account. The agent signs as `name.owner`, so the owner account carries no delegate key at all.
+- Contract: `assert_runtime` accepts `signer == agent.id` (the subaccount) in addition to the owner. The delegate key lookup, expiry and permission checks stay unchanged. This changes the code hash, so it needs a rebuilt artifact, a fresh deployment and a new manifest.
+- Client: `signerId` is the agent account while the owner account stays the owner. `agentIdMatchesSigner`, `nearConfig`, the isolated signer, runtime rotation (it adds keys on the owner account today), `near:runtime-key`, `near:deploy`, doctor and the owner journal binding all assume signer == owner (about 60 references) and must change together. The six sandbox scenarios need reworking.
+- Treasury funds stay inside the contract under the spending policy. The subaccount does not hold the budget; it is the agent's identity, signer and payout address.
+
+Risks: a contract hash change and fresh deployment invalidate the verified live records unless the old deployment is kept for the demo; a half-migrated signer path can break rotation and recovery. Do it after the hackathon submission, on its own branch, with `pnpm contract:check` and a throwaway-account run like `docs/evidence/e2e-testnet-2026-11-13.md` before merging.
