@@ -22,16 +22,17 @@ const FLAGS = new Set(["--owner", "--owner-key-file", "--contract", "--agent-nam
 const GAS = 100n * 10n ** 12n;
 
 function parse(argv: string[]) {
-  const values = new Map<string, string>(); let execute = false, fromKeystore = false;
+  const values = new Map<string, string>(); let execute = false, fromKeystore = false, runtimeOnOwner = false;
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i]!;
     if (name === "--execute") { execute = true; continue; }
     if (name === "--owner-from-keystore") { fromKeystore = true; continue; }
+    if (name === "--runtime-on-owner") { runtimeOnOwner = true; continue; }
     const value = argv[++i];
     if (!FLAGS.has(name) || !value || value.startsWith("--") || values.has(name)) throw new ProviderError("INVALID_INPUT", `Invalid or duplicate argument ${name}. See docs/DEPLOY-TESTNET.md`);
     values.set(name, value);
   }
-  return { values, execute, fromKeystore };
+  return { values, execute, fromKeystore, runtimeOnOwner };
 }
 async function loadKey(path: string, what: string) {
   const text = Buffer.from(await readPrivateFile(path, 512)).toString("utf8").trim();
@@ -42,7 +43,7 @@ const missing = (error: unknown) => isObject(error) && error.code === "ENOENT";
 
 async function main() {
   loadEnvironment();
-  const { values, execute, fromKeystore } = parse(process.argv.slice(2));
+  const { values, execute, fromKeystore, runtimeOnOwner } = parse(process.argv.slice(2));
   const need = (name: string) => { const v = values.get(name); if (!v) throw new ProviderError("INVALID_INPUT", `Missing ${name}`); return v; };
   const owner = need("--owner"), contract = need("--contract"), rpc = new URL(values.get("--rpc") ?? process.env.NEAR_RPC_URL ?? "https://rpc.testnet.near.org");
   if (rpc.protocol !== "https:" || rpc.username || rpc.password) throw new ProviderError("INVALID_INPUT", "RPC URL must be https without credentials");
@@ -82,10 +83,11 @@ async function main() {
     createContractAccount: async (c, pk, amount) => { await send(ownerAccount, c, [actions.createAccount(), actions.transfer(amount), actions.addFullAccessKey(PublicKey.from(pk))]); },
     deployAndInit: async (c, code) => { await send(contractAccount(), c, [actions.deployContract(code), actions.functionCall("new", {}, GAS, 0n)]); },
     ownerCall: async (c, method, args, deposit) => { await send(ownerAccount, c, [actions.functionCall(method, args, GAS, deposit)]); },
+    createAgentAccount: async (agent, ownerPk, runtimePk, amount, c, methods, allowance) => { await send(ownerAccount, agent, [actions.createAccount(), actions.transfer(amount), actions.addFullAccessKey(PublicKey.from(ownerPk)), actions.addFunctionCallAccessKey(PublicKey.from(runtimePk), c, methods, allowance)]); },
     addRuntimeKey: async (o, pk, c, methods, allowance) => { await send(ownerAccount, o, [actions.addFunctionCallAccessKey(PublicKey.from(pk), c, methods, allowance)]); },
   };
   const spec = (run: boolean) => ({ owner, ownerPublicKey: ownerKey.getPublicKey().toString(), contract, agentName: values.get("--agent-name") ?? "research", worker: values.get("--worker") ?? `worker.${owner}`,
-    wasm, expectedHash, runtimePublicKey: runtimeKey ? runtimeKey.getPublicKey().toString() : null, contractPublicKey: contractKey ? contractKey.getPublicKey().toString() : null, contractKeyAvailable: contractKey !== null, execute: run });
+    wasm, expectedHash, runtimePublicKey: runtimeKey ? runtimeKey.getPublicKey().toString() : null, contractPublicKey: contractKey ? contractKey.getPublicKey().toString() : null, contractKeyAvailable: contractKey !== null, execute: run, agentAccount: !runtimeOnOwner });
   if (execute) { // every guard runs silently first, so a typo never leaves stray key files behind
     await deployTestnet(spec(false), chain, () => {});
     if (!contractKey) { contractKey = KeyPair.fromRandom("ed25519"); await writePrivateFile(contractKeyFile, Buffer.from(`${contractKey.toString()}\n`)); }

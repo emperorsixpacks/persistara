@@ -5,12 +5,12 @@ import { COSTS, NEAR, POLICY, deployTestnet, wasmCodeHash, type AgentSnapshot, t
 /** Fake in-memory chain: no network, no keys. It records every mutating call so order, amounts and idempotency can be asserted. */
 const wasm = new Uint8Array(Array.from({ length: 2048 }, (_, i) => (i * 7) % 251)), HASH = wasmCodeHash(wasm);
 const OWNER = "owner.testnet", CONTRACT = "authority-v2.owner.testnet", OWNER_KEY = "ed25519:OwnerKeyPublicAAAA", RUNTIME_KEY = "ed25519:RuntimeKeyPublicBBBB";
-function chain(init: { accounts?: string[]; code?: Record<string, string>; agent?: AgentSnapshot | null; balance?: bigint; keys?: { publicKey: string; receiver: string; methods: string[] }[]; fullAccess?: string[] } = {}) {
+function chain(init: { accounts?: string[]; code?: Record<string, string>; agent?: AgentSnapshot | null; balance?: bigint; keys?: { publicKey: string; receiver: string; methods: string[] }[]; agentKeys?: [string, { publicKey: string; receiver: string; methods: string[] }[]][]; fullAccess?: string[] } = {}) {
   const calls: string[] = [], accounts = new Set(init.accounts ?? [OWNER]), code = { ...(init.code ?? {}) }; let agent = init.agent ?? null;
-  const fc = [...(init.keys ?? [])];
+  const fc = [...(init.keys ?? [])], agentKeys = new Map<string, { publicKey: string; receiver: string; methods: string[] }[]>(init.agentKeys ?? []);
   const port: DeployChain = {
     nowMs: () => 1_700_000_000_000, balance: async () => init.balance ?? 20n * NEAR, accountExists: async (a) => accounts.has(a), codeHash: async (a) => code[a] ?? null,
-    fullAccessKeys: async () => init.fullAccess ?? [OWNER_KEY], functionCallKeys: async () => fc, agent: async () => agent,
+    fullAccessKeys: async (a) => a === OWNER ? (init.fullAccess ?? [OWNER_KEY]) : agentKeys.has(a) ? [OWNER_KEY] : [], functionCallKeys: async (a) => a === OWNER ? fc : agentKeys.get(a) ?? [], agent: async () => agent,
     createContractAccount: async (c, pk, amount) => { calls.push(`create ${c} ${amount === COSTS.contractAccount ? "5NEAR" : amount} ${pk}`); accounts.add(c); },
     deployAndInit: async (c, w) => { calls.push(`deploy+new ${c} ${w.byteLength}`); code[c] = wasmCodeHash(w); },
     ownerCall: async (_c, method, args, deposit) => {
@@ -20,6 +20,7 @@ function chain(init: { accounts?: string[]; code?: Record<string, string>; agent
       if (method === "fund" && agent) agent.deposited = deposit.toString();
       if (method === "set_delegate" && agent) agent.delegates.push({ ...(args.delegate as AgentSnapshot["delegates"][0]) });
     },
+    createAgentAccount: async (agentAccount, ownerPk, pk, amount, c, methods, allowance) => { calls.push(`agent-account ${agentAccount} ${amount} ${ownerPk} ${pk} ${c} ${methods.join(",")} ${allowance}`); accounts.add(agentAccount); agentKeys.set(agentAccount, [{ publicKey: pk, receiver: c, methods: [...methods] }]); },
     addRuntimeKey: async (_o, pk, c, methods, allowance) => { calls.push(`addkey ${pk} ${c} ${methods.join(",")} ${allowance}`); fc.push({ publicKey: pk, receiver: c, methods }); },
   };
   return { port, calls };
@@ -57,6 +58,25 @@ describe("owner testnet deployment orchestration (fake chain)", () => {
     assert.deepEqual(resumed.calls.map((x) => x.split(" ")[0]), ["deploy+new", "register_agent", "configure_policy", "fund", "addkey", "set_delegate"]);
     const tooLow = chain({ accounts: [OWNER, CONTRACT], balance: NEAR / 2n });
     await assert.rejects(deployTestnet(base(), tooLow.port), { code: "INVALID_INPUT" }); assert.deepEqual(tooLow.calls, []);
+  });
+  it("agent account mode: creates research.owner with the owner key and a restricted runtime key, never adds a key to the owner, and resumes safely", async () => {
+    const c = chain(); const result = await deployTestnet(base({ agentAccount: true }), c.port);
+    const names = c.calls.map((x) => x.split(" ")[0]);
+    assert.deepEqual(names, ["create", "deploy+new", "register_agent", "configure_policy", "fund", "agent-account", "set_delegate"]);
+    assert.ok(!names.includes("addkey"), "the owner account gets no runtime key");
+    const made = c.calls.find((x) => x.startsWith("agent-account"))!.split(" ");
+    assert.deepEqual(made.slice(1), ["research.owner.testnet", String(COSTS.agentAccount), OWNER_KEY, RUNTIME_KEY, CONTRACT, "checkpoint_memory,create_job,accept_job", String(COSTS.runtimeAllowance)]);
+    assert.equal(result.env.NEAR_RUNTIME_ACCOUNT, "research.owner.testnet");
+    // A second run does nothing; a legacy run does not set NEAR_RUNTIME_ACCOUNT.
+    const again = chain({ accounts: [OWNER, CONTRACT, "research.owner.testnet"], code: { [CONTRACT]: HASH }, agentKeys: [["research.owner.testnet", [{ publicKey: RUNTIME_KEY, receiver: CONTRACT, methods: ["checkpoint_memory", "create_job", "accept_job"] }]]],
+      agent: { id: "research.owner.testnet", policy: { maxJobAmount: POLICY.maxJobAmount, dailyLimit: POLICY.dailyLimit, approvedWorkers: ["worker.owner.testnet"] }, deposited: COSTS.fund.toString(),
+        delegates: [{ publicKey: RUNTIME_KEY, canCheckpoint: true, canSpend: true, expiresAtNs: ((1_700_000_000_000n + 86_400_000n) * 1_000_000n).toString() }] } });
+    const second = await deployTestnet(base({ agentAccount: true }), again.port); assert.deepEqual(again.calls, []); assert.ok(second.steps.every((s) => s.action === "done"));
+    assert.equal((await deployTestnet(base(), chain().port)).env.NEAR_RUNTIME_ACCOUNT, undefined);
+    // An account that already exists without the expected key is a conflict, not something to overwrite.
+    const squatted = chain({ accounts: [OWNER, CONTRACT, "research.owner.testnet"], code: { [CONTRACT]: HASH }, agent: { id: "research.owner.testnet", policy: null, deposited: "0", delegates: [] } });
+    await assert.rejects(deployTestnet(base({ agentAccount: true }), squatted.port), { code: "OPERATION_CONFLICT" });
+    assert.ok(!squatted.calls.some((x) => x.startsWith("agent-account")));
   });
   it("sets a delegate that expires 30 days out, in nanoseconds", async () => {
     let seen: Record<string, unknown> | null = null; const c = chain(); const original = c.port.ownerCall;

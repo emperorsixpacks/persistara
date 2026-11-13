@@ -4,7 +4,7 @@ import { ProviderError } from "../../protocol/src/providers.js";
 import { NearJournal, type Operation } from "./journal.js";
 import { NearRpc } from "./rpc.js";
 import { GAS, canonical, decimal, decodeJsonBase64, operationId, runtimePermission, validateCall, validateIdentity,
-  type ContractCall, type NearOutcome, type NearSignerConfig } from "./protocol.js";
+  runtimeAccountOf, type ContractCall, type NearOutcome, type NearSignerConfig } from "./protocol.js";
 
 /** Trusted signer process only. No Account.sendTransaction, SDK retries, or full-access keys. */
 export class DurableNearSigner {
@@ -18,7 +18,7 @@ export class DurableNearSigner {
   private async access(method: string): Promise<{ nonce: string; blockHash: string }> {
     await this.rpc.assertNetwork();
     if (!this.key || (await this.key.getPublicKey()).toString() !== this.config.publicKey) throw new ProviderError("AUTHORIZATION_FAILED", "Runtime key does not match the configured public key");
-    const value = await this.rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: this.config.signerId, public_key: this.config.publicKey });
+    const value = await this.rpc.request("query", { request_type: "view_access_key", finality: "final", account_id: runtimeAccountOf(this.config), public_key: this.config.publicKey });
     if (!isObject(value) || !Number.isSafeInteger(value.nonce) || Number(value.nonce) < 0 || typeof value.block_hash !== "string" || baseDecode(value.block_hash).length !== 32 ||
         !isObject(value.permission) || !isObject(value.permission.FunctionCall)) throw new ProviderError("AUTHORIZATION_FAILED", "A restricted NEAR function-call key is required");
     if (!runtimePermission(value.permission, this.config.contractId, method as ContractCall["method"])) throw new ProviderError("AUTHORIZATION_FAILED", "Runtime access key has excessive scope, no gas allowance, or the wrong receiver");
@@ -50,7 +50,7 @@ export class DurableNearSigner {
     const access = await this.access(snapshot.method);
     row ??= this.journal.allocate(id, snapshot, access.nonce, access.blockHash);
     if (row.state === "allocated") {
-      const tx = createTransaction(this.config.signerId, PublicKey.fromString(this.config.publicKey), this.config.contractId, BigInt(row.nonce),
+      const tx = createTransaction(runtimeAccountOf(this.config), PublicKey.fromString(this.config.publicKey), this.config.contractId, BigInt(row.nonce),
         [actions.functionCall(snapshot.method, Buffer.from(canonical(snapshot.args)), BigInt(GAS), 0n)], baseDecode(row.block_hash));
       const signed = await this.key!.signTransaction(tx);
       row = this.journal.prepared(id, Buffer.from(signed.signedTransaction.encode()).toString("base64"), baseEncode(signed.txHash));
@@ -74,7 +74,7 @@ export class DurableNearSigner {
     if (row.state === "prepared") return { status: "unknown", transactionHash: row.tx_hash };
     try {
       await this.rpc.assertNetwork();
-      const value = await this.rpc.request("tx", { tx_hash: row.tx_hash, sender_account_id: this.config.signerId, wait_until: "FINAL" });
+      const value = await this.rpc.request("tx", { tx_hash: row.tx_hash, sender_account_id: runtimeAccountOf(this.config), wait_until: "FINAL" });
       return this.journal.saveOutcome(id, this.decodeOutcome(row, value));
     } catch {
       return this.recordUnknown(row);
@@ -89,7 +89,7 @@ export class DurableNearSigner {
     if (!isObject(response) || response.final_execution_status !== "FINAL" || !isObject(response.transaction) || !isObject(response.status)) return unknown;
     const tx = response.transaction;
     const call = JSON.parse(row.call_json) as ContractCall;
-    if (tx.hash !== row.tx_hash || tx.signer_id !== this.config.signerId || tx.public_key !== this.config.publicKey || tx.receiver_id !== this.config.contractId ||
+    if (tx.hash !== row.tx_hash || tx.signer_id !== runtimeAccountOf(this.config) || tx.public_key !== this.config.publicKey || tx.receiver_id !== this.config.contractId ||
         !Number.isSafeInteger(tx.nonce) || String(tx.nonce) !== row.nonce || !Array.isArray(tx.actions) || tx.actions.length !== 1 ||
         !isObject(tx.actions[0]) || !isObject(tx.actions[0].FunctionCall)) return unknown;
     const action = tx.actions[0].FunctionCall;

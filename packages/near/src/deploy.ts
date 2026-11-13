@@ -10,7 +10,7 @@ import { subaccountAgentName } from "./protocol.js";
  * It deploys exactly one audited file: the code hash must equal the expected hash before anything is signed.
  */
 export const NEAR = 10n ** 24n;
-export const COSTS = { contractAccount: 5n * NEAR, registerAgent: 3n * NEAR / 10n, fund: NEAR / 10n, runtimeAllowance: NEAR / 4n, ownerMinimum: 13n * NEAR / 2n, gasMargin: NEAR / 2n };
+export const COSTS = { contractAccount: 5n * NEAR, registerAgent: 3n * NEAR / 10n, fund: NEAR / 10n, runtimeAllowance: NEAR / 4n, agentAccount: NEAR / 2n, ownerMinimum: 13n * NEAR / 2n, gasMargin: NEAR / 2n };
 export const POLICY = { maxJobAmount: (NEAR / 50n).toString(), dailyLimit: (NEAR / 20n).toString() };
 export const RUNTIME_METHODS = ["checkpoint_memory", "create_job", "accept_job"];
 const DELEGATE_DAYS = 30;
@@ -31,12 +31,19 @@ export interface DeployChain {
   /** Signed by the owner. */
   ownerCall(contract: string, method: string, args: Record<string, unknown>, deposit: bigint): Promise<void>;
   addRuntimeKey(owner: string, publicKey: string, contract: string, methods: string[], allowance: bigint): Promise<void>;
+  /**
+   * Signed by the owner, one transaction: create the agent's own account `name.owner`, fund it for gas and storage, give it the owner's
+   * full-access key (so nothing is ever trapped) and the runtime key as a restricted function-call key.
+   */
+  createAgentAccount(agentAccount: string, ownerPublicKey: string, runtimePublicKey: string, amount: bigint, contract: string, methods: string[], allowance: bigint): Promise<void>;
 }
 export interface DeployOptions {
   owner: string; ownerPublicKey: string; contract: string; agentName: string; worker: string;
   wasm: Uint8Array; expectedHash: string;
   /** Null when the runtime key does not exist yet (dry run only); the script creates it before executing. */
   runtimePublicKey: string | null; contractPublicKey: string | null; contractKeyAvailable: boolean; execute: boolean;
+  /** Put the runtime key on the agent's own account `name.owner` instead of the owner account. */
+  agentAccount?: boolean;
 }
 export interface DeployStep { id: string; action: "done" | "will-do" | "did"; detail: string }
 export interface DeployResult { steps: DeployStep[]; agentId: string; env: Record<string, string> }
@@ -64,7 +71,7 @@ export async function deployTestnet(options: DeployOptions, chain: DeployChain, 
   const needsDeploy = hash === null;
   if ((!exists || needsDeploy) && !options.contractKeyAvailable && exists) throw conflict(`${contract} exists without code but its key file is missing, so this tool cannot deploy to it`);
   const balance = await chain.balance(owner);
-  const need = (exists ? 0n : COSTS.contractAccount) + COSTS.registerAgent + COSTS.fund + COSTS.runtimeAllowance;
+  const need = (exists ? 0n : COSTS.contractAccount) + COSTS.registerAgent + COSTS.fund + COSTS.runtimeAllowance + (options.agentAccount ? COSTS.agentAccount : 0n);
   // A resumed run (contract account already created) only needs what is still to be spent, plus a margin for gas.
   const required = exists ? need + COSTS.gasMargin : COSTS.ownerMinimum;
   if (balance < required && execute) throw invalid(`${owner} has ${balance} yoctoNEAR; at least ${exists ? `${required} yocto (about ${need} yocto plus gas)` : "6.5 NEAR"} is needed. Get testnet NEAR from a faucet first.`);
@@ -90,15 +97,24 @@ export async function deployTestnet(options: DeployOptions, chain: DeployChain, 
   if (!agent || BigInt(agent.deposited) === 0n) await call("fund", "fund the agent treasury with 0.1 NEAR", "fund", { agent_id: agentId }, COSTS.fund); else record("fund", "done", `treasury already holds ${agent.deposited} yoctoNEAR`);
 
   // ---- 4. runtime key: access key on the owner, then delegate grant ----
-  const key = options.runtimePublicKey;
-  if (key === null) { record("runtime-key", "will-do", "create the runtime key file (run with --execute)"); record("runtime-access-key", "will-do", "authorize it on the owner account, limited to this contract and three methods with a 0.25 NEAR allowance"); record("delegate", "will-do", "record the delegate grant on the agent (30 days)"); }
+  const key = options.runtimePublicKey, onAgent = options.agentAccount === true;
+  const where = onAgent ? agentId : owner, accessText = onAgent ? `create the agent's own account ${agentId} with 0.5 NEAR, the owner key and the runtime key limited to this contract and three methods with a 0.25 NEAR allowance` : "authorize the runtime key on the owner account, limited to this contract and three methods with a 0.25 NEAR allowance";
+  if (key === null) { record("runtime-key", "will-do", "create the runtime key file (run with --execute)"); record("runtime-access-key", "will-do", accessText); record("delegate", "will-do", "record the delegate grant on the agent (30 days)"); }
   else {
-    const keys = await chain.functionCallKeys(owner);
+    const accountPresent = onAgent ? await chain.accountExists(agentId) : true;
+    const keys = accountPresent ? await chain.functionCallKeys(where) : [];
     const authorized = keys.some((k) => k.publicKey === key && k.receiver === contract && k.methods.length === RUNTIME_METHODS.length && RUNTIME_METHODS.every((m) => k.methods.includes(m)));
-    if (keys.some((k) => k.publicKey === key) && !authorized) throw conflict("That runtime key already exists on the owner account with different restrictions; remove or change it yourself first");
-    if (!authorized) { record("runtime-access-key", execute ? "did" : "will-do", "authorize the runtime key on the owner account, limited to this contract and three methods with a 0.25 NEAR allowance"); if (execute) await chain.addRuntimeKey(owner, key, contract, RUNTIME_METHODS, COSTS.runtimeAllowance); } else record("runtime-access-key", "done", "runtime key already authorized with the right limits");
+    if (keys.some((k) => k.publicKey === key) && !authorized) throw conflict(`That runtime key already exists on ${where} with different restrictions; remove or change it yourself first`);
+    if (onAgent && accountPresent && !authorized) throw conflict(`${agentId} already exists without the expected runtime key, so this tool cannot finish it; use another agent name or fix that account yourself`);
+    if (onAgent && accountPresent && !(await chain.fullAccessKeys(agentId)).includes(options.ownerPublicKey)) throw conflict(`${agentId} exists but the owner key is not a full-access key on it`);
+    if (!authorized) {
+      record("runtime-access-key", execute ? "did" : "will-do", accessText);
+      if (execute) { if (onAgent) await chain.createAgentAccount(agentId, options.ownerPublicKey, key, COSTS.agentAccount, contract, RUNTIME_METHODS, COSTS.runtimeAllowance); else await chain.addRuntimeKey(owner, key, contract, RUNTIME_METHODS, COSTS.runtimeAllowance); }
+    } else record("runtime-access-key", "done", `runtime key already authorized on ${where} with the right limits`);
     const delegated = agent?.delegates.some((d) => d.publicKey === key && d.canCheckpoint && d.canSpend && BigInt(d.expiresAtNs) > BigInt(chain.nowMs()) * 1_000_000n);
     if (!delegated) await call("delegate", "record the delegate grant on the agent (30 days)", "set_delegate", { agent_id: agentId, delegate: { publicKey: key, expiresAtNs: ((BigInt(chain.nowMs()) + BigInt(DELEGATE_DAYS) * 86_400_000n) * 1_000_000n).toString(), canCheckpoint: true, canSpend: true } }, 0n); else record("delegate", "done", "delegate grant is current");
   }
-  return { steps, agentId, env: { NEAR_AUTHORITY_CONTRACT: contract, NEAR_OWNER_ACCOUNT: owner, NEAR_AGENT_ID: agentId, ...(key ? { NEAR_RUNTIME_PUBLIC_KEY: key } : {}) } };
+  return { steps, agentId, env: { NEAR_AUTHORITY_CONTRACT: contract, NEAR_OWNER_ACCOUNT: owner, NEAR_AGENT_ID: agentId, ...(key ? { NEAR_RUNTIME_PUBLIC_KEY: key } : {}), ...(onAgentEnv(options) ? { NEAR_RUNTIME_ACCOUNT: agentId } : {}) } };
 }
+
+function onAgentEnv(options: DeployOptions) { return options.agentAccount === true; }

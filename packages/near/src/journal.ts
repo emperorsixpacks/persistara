@@ -35,7 +35,7 @@ export class NearJournal {
         ) STRICT;
         CREATE INDEX IF NOT EXISTS near_nonce_order ON near_operations(length(nonce), nonce);`);
       const binding = canonical({ schemaVersion: 1, kind: config.kind, chainId: config.chainId, contractId: config.contractId,
-        signerId: config.signerId, publicKey: config.publicKey, agentId: config.agentId });
+        signerId: config.signerId, publicKey: config.publicKey, agentId: config.agentId, ...(config.runtimeAccountId ? { runtimeAccountId: config.runtimeAccountId } : {}) });
       this.atomic(() => {
         this.db.prepare("INSERT OR IGNORE INTO near_instance VALUES(1,?)").run(randomUUID());
         this.db.exec("INSERT OR IGNORE INTO near_controls VALUES(1,NULL)");

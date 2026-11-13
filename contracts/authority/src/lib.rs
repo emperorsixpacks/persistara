@@ -69,9 +69,11 @@ impl Authority {
         if Self::is_owner(agent) {
             return;
         }
-        assert_eq!(
-            env::signer_account_id(),
-            agent.owner,
+        // The runtime key may live on the owner account (original layout) or on the agent's own account `name.owner`.
+        // Only the owner can create `name.owner`, so the agent account is under the owner's control either way.
+        let signer = env::signer_account_id();
+        assert!(
+            signer == agent.owner || signer.as_str() == agent.id,
             "ERR_UNAUTHORIZED_ACCOUNT"
         );
         let key = env::signer_account_pk();

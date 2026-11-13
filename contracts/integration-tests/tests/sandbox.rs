@@ -724,8 +724,14 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
     use std::os::unix::fs::DirBuilderExt;
     let (worker, contract, owner, specialist, id) = fixture(NearToken::from_near(1)).await?;
     let key = SecretKey::from_seed(KeyType::ED25519, "persistara-application-runtime-fixture");
+    // The runtime key lives on the agent's own account `research.<owner>`, created by the owner with its own full-access key
+    // too, so the owner account carries no runtime key at all.
+    let agent_account: near_workspaces::AccountId = id.parse()?;
     owner
-        .batch(owner.id())
+        .batch(&agent_account)
+        .create_account()
+        .transfer(NearToken::from_near(1))
+        .add_key(owner.secret_key().public_key(), AccessKey::full_access())
         .add_key(
             key.public_key(),
             AccessKey::function_call_access(
@@ -745,7 +751,7 @@ async fn application_client_settles_and_recovers_memory_in_a_fresh_process() -> 
         std::process::id()
     ));
     std::fs::DirBuilder::new().mode(0o700).create(&directory)?;
-    let mut input = json!({"phase":"write","directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"publicKey":key.public_key().to_string(),"runtimeSecretKey":key.to_string(),"workerId":specialist.id(),"nowNs":now.to_string()});
+    let mut input = json!({"phase":"write","directory":directory,"rpcUrl":worker.rpc_addr(),"contractId":contract.id(),"signerId":owner.id(),"agentId":id,"runtimeAccountId":id,"publicKey":key.public_key().to_string(),"runtimeSecretKey":key.to_string(),"workerId":specialist.id(),"nowNs":now.to_string()});
     let result: Result<()> = async {
         let written = run_application_fixture(&input)?;
         assert_eq!(written["version"], 1);
