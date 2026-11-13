@@ -26,6 +26,7 @@ export function printFailure(error: unknown): void {
  */
 export function printUserFailure(error: unknown): void {
   if (error instanceof ProviderError) { console.error(`${error.code}: ${error.message}`); process.exitCode = error.code === "NOT_CONFIGURED" ? 2 : 1; }
+  else if (error instanceof TypeError && error.message === "fetch failed") { console.error("NETWORK_ERROR: could not reach the NEAR RPC in time. Nothing is lost: these tools resume from chain state, so run the same command again."); process.exitCode = 1; }
   else printFailure(error);
 }
 

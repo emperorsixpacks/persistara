@@ -10,12 +10,12 @@ import { subaccountAgentName } from "./protocol.js";
  * It deploys exactly one audited file: the code hash must equal the expected hash before anything is signed.
  */
 export const NEAR = 10n ** 24n;
-export const COSTS = { contractAccount: 5n * NEAR, registerAgent: 3n * NEAR / 10n, fund: NEAR / 10n, runtimeAllowance: NEAR / 4n, ownerMinimum: 13n * NEAR / 2n };
+export const COSTS = { contractAccount: 5n * NEAR, registerAgent: 3n * NEAR / 10n, fund: NEAR / 10n, runtimeAllowance: NEAR / 4n, ownerMinimum: 13n * NEAR / 2n, gasMargin: NEAR / 2n };
 export const POLICY = { maxJobAmount: (NEAR / 50n).toString(), dailyLimit: (NEAR / 20n).toString() };
 export const RUNTIME_METHODS = ["checkpoint_memory", "create_job", "accept_job"];
 const DELEGATE_DAYS = 30;
 
-export interface AgentSnapshot { id: string; policy: { maxJobAmount: string; dailyLimit: string; approvedWorkers: string[] }; deposited: string; delegates: { publicKey: string; canCheckpoint: boolean; canSpend: boolean; expiresAtNs: string }[] }
+export interface AgentSnapshot { id: string; policy: { maxJobAmount: string; dailyLimit: string; approvedWorkers: string[] } | null; deposited: string; delegates: { publicKey: string; canCheckpoint: boolean; canSpend: boolean; expiresAtNs: string }[] }
 export interface DeployChain {
   nowMs(): number;
   balance(account: string): Promise<bigint>;
@@ -65,7 +65,9 @@ export async function deployTestnet(options: DeployOptions, chain: DeployChain, 
   if ((!exists || needsDeploy) && !options.contractKeyAvailable && exists) throw conflict(`${contract} exists without code but its key file is missing, so this tool cannot deploy to it`);
   const balance = await chain.balance(owner);
   const need = (exists ? 0n : COSTS.contractAccount) + COSTS.registerAgent + COSTS.fund + COSTS.runtimeAllowance;
-  if (balance < COSTS.ownerMinimum && execute && !(exists && !needsDeploy)) throw invalid(`${owner} has ${balance} yoctoNEAR; at least 6.5 NEAR is needed (about ${need} yocto plus gas). Get testnet NEAR from a faucet first.`);
+  // A resumed run (contract account already created) only needs what is still to be spent, plus a margin for gas.
+  const required = exists ? need + COSTS.gasMargin : COSTS.ownerMinimum;
+  if (balance < required && execute) throw invalid(`${owner} has ${balance} yoctoNEAR; at least ${exists ? `${required} yocto (about ${need} yocto plus gas)` : "6.5 NEAR"} is needed. Get testnet NEAR from a faucet first.`);
   if (!exists) {
     record("contract-account", execute ? "did" : "will-do", `create ${contract} with 5 NEAR`);
     if (execute) { if (!options.contractPublicKey) throw invalid("Missing contract account key"); await chain.createContractAccount(contract, options.contractPublicKey, COSTS.contractAccount); }
@@ -83,7 +85,7 @@ export async function deployTestnet(options: DeployOptions, chain: DeployChain, 
   let agent = needsDeploy && !execute ? null : await chain.agent(contract, agentId);
   if (!agent) { await call("register-agent", `register "${options.agentName}" (agent ID ${agentId}) with 0.3 NEAR storage credit`, "register_agent", { name: options.agentName }, COSTS.registerAgent); agent = execute ? await chain.agent(contract, agentId) : null; if (execute && !agent) throw conflict("The agent was not found after registering"); }
   else record("register-agent", "done", `${agentId} is registered`);
-  const policyOk = agent && agent.policy.maxJobAmount === POLICY.maxJobAmount && agent.policy.dailyLimit === POLICY.dailyLimit && agent.policy.approvedWorkers.length === 1 && agent.policy.approvedWorkers[0] === options.worker;
+  const policyOk = agent && agent.policy && agent.policy.maxJobAmount === POLICY.maxJobAmount && agent.policy.dailyLimit === POLICY.dailyLimit && agent.policy.approvedWorkers.length === 1 && agent.policy.approvedWorkers[0] === options.worker;
   if (!policyOk) { await call("policy", `limit jobs to 0.02 NEAR and 0.05 NEAR per day, approved worker ${options.worker}`, "configure_policy", { agent_id: agentId, policy: { maxJobAmount: POLICY.maxJobAmount, dailyLimit: POLICY.dailyLimit, approvedWorkers: [options.worker] } }, 0n); } else record("policy", "done", "policy already set");
   if (!agent || BigInt(agent.deposited) === 0n) await call("fund", "fund the agent treasury with 0.1 NEAR", "fund", { agent_id: agentId }, COSTS.fund); else record("fund", "done", `treasury already holds ${agent.deposited} yoctoNEAR`);
 

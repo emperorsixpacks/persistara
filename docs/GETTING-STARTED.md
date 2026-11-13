@@ -41,7 +41,7 @@ Use whichever matches how your key is stored; type the secret only at the hidden
 near account create-account sponsor-by-faucet-service YOURNAME.testnet autogenerate-new-keypair save-to-legacy-keychain network-config testnet create
 ```
 
-That asks the testnet faucet service to create the account and saves its key to `~/.near-credentials/testnet/YOURNAME.testnet.json`, which `--from-near-credentials` above reads. The command's grammar was checked against the CLI's `--help`, not run end to end by the author. Prefer to keep your key in the NEAR CLI keychain instead of Persistara's store? `persistara wallet near-cli` is the guided path for that.
+That asks the testnet faucet service to create the account and saves its key to `~/.near-credentials/testnet/YOURNAME.testnet.json`, which `--from-near-credentials` above reads. This command and `--from-near-credentials` were run end to end on testnet on 2026-11-13 (`docs/evidence/e2e-testnet-2026-11-13.md`). The name must end in `.testnet`. Prefer to keep your key in the NEAR CLI keychain instead of Persistara's store? `persistara wallet near-cli` is the guided path for that.
 
 ## 3. Fund it with testnet NEAR
 

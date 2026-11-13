@@ -2,7 +2,7 @@
 
 Persistara cannot do this for you: every step below is signed by **your** owner account through the official NEAR CLI, which keeps your key outside Persistara. Nothing here is mainnet (the client is testnet-only) and nothing here touches the existing deployment `authority.persistara-owner.testnet`; that contract and its funds stay as they are.
 
-The command lines below were checked against `near-cli-rs 0.31.1`: the grammar parses, and the call-function tail is the one used in the live acceptance runs. They have **not** been executed end to end against testnet by the author, so stop at the first error.
+The command lines below were checked against `near-cli-rs 0.31.1`: the grammar parses, and the call-function tail is the one used in the live acceptance runs. The one-command tool below was run end to end on testnet on 2026-11-13 (evidence: `docs/evidence/e2e-testnet-2026-11-13.md`). The manual NEAR CLI steps further down have **not** been executed end to end by the author, so stop at the first error.
 
 ## Fastest: one command with `near-api-js` (no NEAR CLI, no Rust, no cargo)
 
@@ -15,7 +15,7 @@ The command lines below were checked against `near-cli-rs 0.31.1`: the grammar p
 
 What it does and checks: the contract file's hash must equal the expected hash (default: the committed artifact's) before anything is signed; the contract name must be a subaccount of the owner; the owner key must really be a full-access key on that account; it then creates the contract account, deploys and runs `new` in one transaction, registers the agent, sets the policy, funds it, creates the runtime key file, authorizes that key with the same limits as the live agent and records the delegate grant. It prints the `.env` lines to use. It needs at least 6.5 testnet NEAR on the owner.
 
-Notes: this signs inside a short-lived process that you start, not in the chat or agent process, and it never prints or stores the owner key. A network blip shows as `UNEXPECTED_ERROR`; just run it again. The contract and runtime keys it creates are written as private files under `.persistara/keys/`. The reads were checked against the live testnet; the signing path has not been run against testnet by the author, so run the dry run first and watch the first `--execute`. The manual steps below do the same thing with the NEAR CLI.
+Notes: this signs inside a short-lived process that you start, not in the chat or agent process, and it never prints or stores the owner key. A network blip shows as `UNEXPECTED_ERROR`; just run it again. The contract and runtime keys it creates are written as private files under `.persistara/keys/`. The whole flow was run on testnet against a throwaway faucet account (see the evidence file); still run the dry run first and watch the first `--execute`. If the public RPC is slow or drops connections (`NETWORK_ERROR`), just run the same command again, or pass another endpoint such as `--rpc https://test.rpc.fastnear.com`. The manual steps below do the same thing with the NEAR CLI.
 
 ## Manual alternative: Prerequisites
 

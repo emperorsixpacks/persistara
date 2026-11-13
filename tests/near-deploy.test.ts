@@ -15,7 +15,7 @@ function chain(init: { accounts?: string[]; code?: Record<string, string>; agent
     deployAndInit: async (c, w) => { calls.push(`deploy+new ${c} ${w.byteLength}`); code[c] = wasmCodeHash(w); },
     ownerCall: async (_c, method, args, deposit) => {
       calls.push(`${method} deposit=${deposit}`);
-      if (method === "register_agent") agent = { id: `${String(args.name)}.${OWNER}`, policy: { maxJobAmount: "0", dailyLimit: "0", approvedWorkers: [] }, deposited: "0", delegates: [] };
+      if (method === "register_agent") agent = { id: `${String(args.name)}.${OWNER}`, policy: null, deposited: "0", delegates: [] }; // the live contract returns policy: null until one is configured
       if (method === "configure_policy" && agent) agent.policy = (args.policy as AgentSnapshot["policy"]);
       if (method === "fund" && agent) agent.deposited = deposit.toString();
       if (method === "set_delegate" && agent) agent.delegates.push({ ...(args.delegate as AgentSnapshot["delegates"][0]) });
@@ -47,8 +47,16 @@ describe("owner testnet deployment orchestration (fake chain)", () => {
       agent: { id: "research.owner.testnet", policy: { maxJobAmount: POLICY.maxJobAmount, dailyLimit: POLICY.dailyLimit, approvedWorkers: ["worker.owner.testnet"] }, deposited: COSTS.fund.toString(),
         delegates: [{ publicKey: RUNTIME_KEY, canCheckpoint: true, canSpend: true, expiresAtNs: ((1_700_000_000_000n + 86_400_000n) * 1_000_000n).toString() }] } });
     const again = await deployTestnet(base(), done.port); assert.deepEqual(done.calls, []); assert.ok(again.steps.every((s) => s.action === "done"));
-    const partial = chain({ accounts: [OWNER, CONTRACT], code: { [CONTRACT]: HASH }, agent: { id: "research.owner.testnet", policy: { maxJobAmount: "0", dailyLimit: "0", approvedWorkers: [] }, deposited: "0", delegates: [] } });
+    const partial = chain({ accounts: [OWNER, CONTRACT], code: { [CONTRACT]: HASH }, agent: { id: "research.owner.testnet", policy: null, deposited: "0", delegates: [] } });
     await deployTestnet(base(), partial.port); assert.deepEqual(partial.calls.map((x) => x.split(" ")[0]), ["configure_policy", "fund", "addkey", "set_delegate"], "no second account, deploy or registration");
+  });
+  it("resumes with only what is still to be spent: the 5 NEAR account cost is not demanded twice (found on live testnet)", async () => {
+    // A faucet account holds 10 NEAR; after creating the contract account about 5 NEAR remain, which is plenty for the rest.
+    const resumed = chain({ accounts: [OWNER, CONTRACT], balance: 5n * NEAR - 1n });
+    await deployTestnet(base(), resumed.port);
+    assert.deepEqual(resumed.calls.map((x) => x.split(" ")[0]), ["deploy+new", "register_agent", "configure_policy", "fund", "addkey", "set_delegate"]);
+    const tooLow = chain({ accounts: [OWNER, CONTRACT], balance: NEAR / 2n });
+    await assert.rejects(deployTestnet(base(), tooLow.port), { code: "INVALID_INPUT" }); assert.deepEqual(tooLow.calls, []);
   });
   it("sets a delegate that expires 30 days out, in nanoseconds", async () => {
     let seen: Record<string, unknown> | null = null; const c = chain(); const original = c.port.ownerCall;

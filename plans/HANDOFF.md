@@ -2,9 +2,15 @@
 
 Prepared 2026-11-09 against code commit `4d2bbfd2aadb9e8c25db3f5fd0ea32b70dd2e972`. This is a repository handoff, not a fresh audit or a statement that the whole product is complete. No source code or live state was changed while preparing it.
 
+## Update 2026-11-13 (newest; read before the 2026-11-12 section)
+
+The owner approved a throwaway faucet account, and the previously untested live paths were run end to end on NEAR testnet: `near:deploy` (dry run and `--execute`), the `name.owner` contract (its on-chain hash equals the committed artifact `A2N6rTX3…`), `status`, `wallet add --from-near-credentials`, `wallet list/check`, wrong-passphrase refusal, and `near:deploy --owner-from-keystore`. Evidence: `docs/evidence/e2e-testnet-2026-11-13.md`. Three bugs it found are fixed with tests (resume balance guard, `policy: null` shape, unhelpful network error). The throwaway account's key stayed outside the repo; the owner's real account and live deployment were not touched. Still not run: interactive `/connect` in the full-screen app, and a paid chat turn.
+
+Traps: pass `--project <dir>` to `persistara` to test against another deployment, because the default workspace's owner journal is bound to the live contract and rejects others (`INTEGRITY_FAILED: Owner operation journal is invalid or changed`). The public RPC `rpc.testnet.near.org` drops connections from some hosts; re-run resumable tools or pass `--rpc https://test.rpc.fastnear.com`. Testnet account names must end in `.testnet`.
+
 ## Update 2026-11-12 (read this first; the sections below describe the 2026-11-09 baseline)
 
-34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**326 tests / 56 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
+34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**327 tests / 56 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
 
 **Hackathon facts (from `HACKATHON.md`, recheck the live copy before submitting):** development and submission end **2026-11-14T23:59:00Z**. The repo must be public by then; the owner posts the demo on X; submission is one POST after the owner confirms the exact payload. Never push, make public, post, sign, deploy to mainnet or submit without the owner's explicit yes. Judging agents reproduce from a clean clone, so every claim must be reproducible without secrets: see the README's "Verify it yourself".
 
