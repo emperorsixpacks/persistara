@@ -111,7 +111,7 @@ async function main() {
     const typed = await readSecret(`Key store passphrase for ${owner} (Enter to skip): `);
     if (typed) { try { await unlockKeystore(owner, keystoreDirectory(), typed); passphrase = typed; } catch { process.stderr.write("That passphrase did not unlock the key store; continuing locked (owner sign-in will be unavailable).\n"); } }
   }
-  const wallet = stored && canPrompt ? new KeystoreWallet(owner, keystoreDirectory(), () => passphrase, nearCli, undefined, workspace.config.rpcUrl) : nearCli;
+  const wallet = stored && canPrompt ? new KeystoreWallet(owner, keystoreDirectory(), () => passphrase, nearCli, undefined, workspace.config.rpcUrl, { contractId: workspace.config.contractId, agentId: workspace.config.agentId }) : nearCli;
   let application: ReturnType<(typeof import("../packages/terminal/src/application.js"))["createTerminalApplication"]> | null = null;
   let plain: ReturnType<typeof createPlainTerminal> | null = null;
   let conversations: { close(): void } | null = null;

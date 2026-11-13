@@ -8,6 +8,7 @@ import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { KeyPair, SignedTransaction, baseEncode, encodeTransaction } from "near-api-js";
 import { verifyMessage } from "near-api-js/nep413";
+import { ProviderError } from "../packages/protocol/src/providers.js";
 import { saveKeystoreEntry } from "../packages/owner/src/keystore.js";
 import type { OwnerChallenge } from "../packages/owner/src/types.js";
 import { KeystoreWallet } from "../packages/terminal/src/keystore-wallet.js";
@@ -90,6 +91,21 @@ describe("key store wallet (real signer process)", () => {
       assert.equal(call.methodName, "set_paused"); assert.equal(call.deposit, 0n); assert.equal(call.gas, 100_000_000_000_000n);
       assert.deepEqual(JSON.parse(Buffer.from(call.args).toString()), { agent_id: "research.owner.testnet", paused: true });
       assert.equal(hash, baseEncode(createHash("sha256").update(encodeTransaction(decoded.transaction)).digest()));
+    } finally { await rpc.close(); await t.done(); }
+  });
+  it("pins the contract and agent to the workspace, treats worker-reported failures as definite and only silence as unknown", async () => {
+    const t = await setup(); const rpc = await fakeRpc(t.pub);
+    try {
+      const scoped = new KeystoreWallet("owner.testnet", t.dir, () => PASS, null, undefined, rpc.url, { contractId: "authority.testnet", agentId: "research.owner.testnet" });
+      await assert.rejects(new KeystoreWallet("owner.testnet", t.dir, () => PASS, null, undefined, rpc.url, { contractId: "other-authority.testnet", agentId: "research.owner.testnet" }).send(pauseRequest(t.pub)), { code: "INVALID_INPUT" });
+      await assert.rejects(new KeystoreWallet("owner.testnet", t.dir, () => PASS, null, undefined, rpc.url, { contractId: "authority.testnet", agentId: "other.owner.testnet" }).send(pauseRequest(t.pub)), { code: "INVALID_INPUT" });
+      const tampered = pauseRequest(t.pub); (tampered.actions[0] as { params: { args: { agent_id: string } } }).params.args.agent_id = "victim.owner.testnet";
+      await assert.rejects(scoped.send(tampered), { code: "INVALID_INPUT" });
+      assert.equal(rpc.broadcasts.length, 0);
+      assert.match(await scoped.send(pauseRequest(t.pub)), /^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
+      const failing = (code: string) => new KeystoreWallet("owner.testnet", t.dir, () => PASS, null, async () => { throw new ProviderError(code as never, "x"); }, rpc.url);
+      await assert.rejects(failing("UPSTREAM_ERROR").send(pauseRequest(t.pub)), { code: "UPSTREAM_ERROR" });
+      for (const code of ["OUTCOME_UNKNOWN", "TIMEOUT", "ABORTED"]) await assert.rejects(failing(code).send(pauseRequest(t.pub)), { code: "OUTCOME_UNKNOWN" });
     } finally { await rpc.close(); await t.done(); }
   });
   it("refuses before signing anything when the request, key or passphrase is wrong, and reports a lost broadcast reply as a hash to reconcile", async () => {

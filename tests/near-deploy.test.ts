@@ -78,6 +78,16 @@ describe("owner testnet deployment orchestration (fake chain)", () => {
     await assert.rejects(deployTestnet(base({ agentAccount: true }), squatted.port), { code: "OPERATION_CONFLICT" });
     assert.ok(!squatted.calls.some((x) => x.startsWith("agent-account")));
   });
+  it("re-checking a finished deployment never needs funds, and a nearly finished one needs only the remaining step", async () => {
+    const done = { accounts: [OWNER, CONTRACT], code: { [CONTRACT]: HASH }, keys: [{ publicKey: RUNTIME_KEY, receiver: CONTRACT, methods: ["checkpoint_memory", "create_job", "accept_job"] }],
+      agent: { id: "research.owner.testnet", policy: { maxJobAmount: POLICY.maxJobAmount, dailyLimit: POLICY.dailyLimit, approvedWorkers: ["worker.owner.testnet"] }, deposited: COSTS.fund.toString(),
+        delegates: [{ publicKey: RUNTIME_KEY, canCheckpoint: true, canSpend: true, expiresAtNs: ((1_700_000_000_000n + 86_400_000n) * 1_000_000n).toString() }] } } as NonNullable<Parameters<typeof chain>[0]>;
+    const broke = chain({ ...done, balance: 1n }); const result = await deployTestnet(base(), broke.port);
+    assert.deepEqual(broke.calls, []); assert.ok(result.steps.every((s) => s.action === "done"));
+    // Only set_delegate remains (no spend): still allowed with almost no funds.
+    const last = chain({ ...done, balance: 1n, agent: { ...done.agent!, delegates: [] } }); await deployTestnet(base(), last.port);
+    assert.deepEqual(last.calls.map((x) => x.split(" ")[0]), ["set_delegate"]);
+  });
   it("sets a delegate that expires 30 days out, in nanoseconds", async () => {
     let seen: Record<string, unknown> | null = null; const c = chain(); const original = c.port.ownerCall;
     c.port.ownerCall = async (cc, method, args, deposit) => { if (method === "set_delegate") seen = args; await original(cc, method, args, deposit); };

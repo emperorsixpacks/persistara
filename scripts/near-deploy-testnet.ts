@@ -99,4 +99,4 @@ async function main() {
   for (const [name, value] of Object.entries(result.env)) console.log(`${name}=${value}`);
   console.log(`NEAR_RUNTIME_KEY_FILE=${runtimeKeyFile}`);
 }
-main().catch(printUserFailure);
+main().catch((error) => printUserFailure(error, true));

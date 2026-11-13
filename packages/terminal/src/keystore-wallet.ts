@@ -21,10 +21,10 @@ export async function unlockKeystore(account: string, directory: string, passphr
  */
 export class KeystoreWallet implements TerminalWallet {
   get signerNote(): string | undefined {
-    return this.passphrase() === null && this.fallback ? this.fallback.signerNote : "Persistara's encrypted key store signs, in a separate short-lived process.";
+    return this.passphrase() === null ? "The owner key store is locked, so sign-in will be refused." : "Persistara's encrypted key store signs, in a separate short-lived process.";
   }
   constructor(private readonly account: string, private readonly directory: string, private readonly passphrase: () => string | null,
-    private readonly fallback: TerminalWallet | null = null, private readonly execute: WorkerExecutor = executeWorker, private readonly rpcUrl: string | null = null) {}
+    private readonly fallback: TerminalWallet | null = null, private readonly execute: WorkerExecutor = executeWorker, private readonly rpcUrl: string | null = null, private readonly scope: { contractId: string; agentId: string } | null = null) {}
   async signMessage(challenge: OwnerChallenge): Promise<OwnerProof> {
     if (challenge.signerId !== this.account) throw new ProviderError("AUTHORIZATION_FAILED", "The stored key belongs to a different account than this workspace's owner");
     const passphrase = this.passphrase();
@@ -46,7 +46,7 @@ export class KeystoreWallet implements TerminalWallet {
       throw new ProviderError("AUTHORIZATION_FAILED", "The owner key store is locked. Restart persistara in a terminal and enter your passphrase.");
     }
     const action = request.actions[0];
-    if (request.network.kind !== "testnet" || request.network.chainId !== "testnet" || request.signerId !== this.account || request.actions.length !== 1 || !action || action.params.methodName !== "set_paused" ||
+    if (request.network.kind !== "testnet" || request.network.chainId !== "testnet" || request.signerId !== this.account || (this.scope && (request.receiverId !== this.scope.contractId || request.agentId !== this.scope.agentId || action?.params.args.agent_id !== this.scope.agentId)) || request.actions.length !== 1 || !action || action.params.methodName !== "set_paused" ||
         action.params.deposit !== "0" || action.params.gas !== "100000000000000") throw new ProviderError("INVALID_INPUT", "Only the exact owner pause/resume request can be signed");
     const url = new URL("../../owner/src/keystore-tx-worker.js", import.meta.url);
     let result: unknown;
@@ -54,7 +54,9 @@ export class KeystoreWallet implements TerminalWallet {
       result = await this.execute(url, { account: this.account, directory: this.directory, passphrase, rpcUrl: this.rpcUrl, ownerPublicKey: request.ownerPublicKey,
         tx: { receiverId: request.receiverId, methodName: action.params.methodName, args: action.params.args, gas: action.params.gas, deposit: action.params.deposit } }, { effect: "may-charge", timeoutMs: 60_000 });
     } catch (error) {
-      if (error instanceof ProviderError && ["AUTHORIZATION_FAILED", "NOT_CONFIGURED", "INVALID_INPUT"].includes(error.code)) throw error;
+      // The worker always returns a hash once it has signed, so a failure the worker itself reports happened before signing and is
+      // definite. Only an interrupted or silent worker (timeout, abort, crash) leaves the outcome unknown.
+      if (error instanceof ProviderError && !["OUTCOME_UNKNOWN", "TIMEOUT", "ABORTED"].includes(error.code)) throw error;
       throw new ProviderError("OUTCOME_UNKNOWN", "The signer outcome is unknown; reconcile the existing owner request without resending");
     }
     if (!isObject(result) || typeof result.transactionHash !== "string" || !transactionHash(result.transactionHash)) throw new ProviderError("OUTCOME_UNKNOWN", "The signer returned no valid transaction hash; reconcile without resending");

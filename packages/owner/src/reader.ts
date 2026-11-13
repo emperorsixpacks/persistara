@@ -46,10 +46,13 @@ export class OwnerReader {
     });
     const accessKeys = parseKeys(keys.keys);
     // When the runtime key lives on the agent's own account, its permission is read from that account at the same block.
-    let runtimeAccessKeys = accessKeys;
+    let runtimeAccessKeys = accessKeys, unexpectedAgentKeys = false;
     if (runtimeAccount) {
       if (!isObject(runtimeKeyList) || runtimeKeyList.block_hash !== blockHash || (runtimeKeyList.last_key !== undefined && runtimeKeyList.last_key !== null) || !Array.isArray(runtimeKeyList.keys) || runtimeKeyList.keys.length > 128) throw new ProviderError("INTEGRITY_FAILED", "Agent account keys are incomplete or differ from the finalized state");
       runtimeAccessKeys = parseKeys(runtimeKeyList.keys);
+      // Any key on the agent account other than the owner key and a recorded delegate could also sign as the agent.
+      const known = new Set<string>([raw.ownerKey as string, ...(raw.delegates as { publicKey?: unknown }[]).map((d) => String(d.publicKey))]);
+      unexpectedAgentKeys = runtimeAccessKeys.some((entry) => !known.has(entry.publicKey));
     }
     const delegates = raw.delegates.map(delegate);
     if (new Set(accessKeys.map((key) => key.publicKey)).size !== accessKeys.length || new Set(delegates.map((grant) => grant.publicKey)).size !== delegates.length) throw new ProviderError("PROTOCOL_ERROR", "Duplicate owner keys or delegates");
@@ -63,7 +66,7 @@ export class OwnerReader {
       const p = isObject(key?.permission) && isObject(key.permission.FunctionCall) ? key.permission.FunctionCall : null;
       const methods = p && Array.isArray(p.method_names) && p.method_names.every((m: unknown) => typeof m === "string") ? p.method_names as string[] : [];
       const allowance = p && decimal(p.allowance, 128, true) ? p.allowance : null;
-      const ready = p?.receiver_id === snapshot.contractId && Boolean(allowance) && BigInt(allowance ?? "0") <= 1_000_000_000_000_000_000_000_000n &&
+      const ready = !unexpectedAgentKeys && p?.receiver_id === snapshot.contractId && Boolean(allowance) && BigInt(allowance ?? "0") <= 1_000_000_000_000_000_000_000_000n &&
         JSON.stringify([...methods].sort()) === JSON.stringify(replacementMethods(grant).sort()) && grant.canCheckpoint && BigInt(grant.expiresAtNs) > BigInt(snapshot.timestampNs);
       return { publicKey: grant.publicKey, methods, allowance, expiresAtNs: grant.expiresAtNs, ready };
     });

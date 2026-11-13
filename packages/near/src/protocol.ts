@@ -77,7 +77,7 @@ export function agentIdMatchesSigner(agentId: unknown, signerId: string): boolea
 }
 export function validateIdentity(identity: RuntimeIdentity): void {
   if (!accountId(identity.signerId) || !publicKey(identity.publicKey) || !identity.publicKey.startsWith("ed25519:") || !agentIdMatchesSigner(identity.agentId, identity.signerId) ||
-      (identity.runtimeAccountId !== undefined && (identity.runtimeAccountId !== identity.agentId || !accountId(identity.agentId) || identity.agentId.startsWith(`${identity.signerId}:`)))) failInput();
+      (identity.runtimeAccountId !== undefined && (identity.runtimeAccountId !== identity.agentId || !accountId(identity.agentId)))) failInput();
 }
 export function runtimePermission(permission: unknown, contractId: string, method: RuntimeMethod): boolean {
   if (!isObject(permission) || !isObject(permission.FunctionCall)) return false;

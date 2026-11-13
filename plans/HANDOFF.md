@@ -16,7 +16,7 @@ Traps: pass `--project <dir>` to `persistara` to test against another deployment
 
 ## Update 2026-11-12 (read this first; the sections below describe the 2026-11-09 baseline)
 
-34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**337 tests / 58 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
+34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**339 tests / 58 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
 
 **Hackathon facts (from `HACKATHON.md`, recheck the live copy before submitting):** development and submission end **2026-11-14T23:59:00Z**. The repo must be public by then; the owner posts the demo on X; submission is one POST after the owner confirms the exact payload. Never push, make public, post, sign, deploy to mainnet or submit without the owner's explicit yes. Judging agents reproduce from a clean clone, so every claim must be reproducible without secrets: see the README's "Verify it yourself".
 

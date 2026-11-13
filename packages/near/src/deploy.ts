@@ -71,10 +71,12 @@ export async function deployTestnet(options: DeployOptions, chain: DeployChain, 
   const needsDeploy = hash === null;
   if ((!exists || needsDeploy) && !options.contractKeyAvailable && exists) throw conflict(`${contract} exists without code but its key file is missing, so this tool cannot deploy to it`);
   const balance = await chain.balance(owner);
-  const need = (exists ? 0n : COSTS.contractAccount) + COSTS.registerAgent + COSTS.fund + COSTS.runtimeAllowance + (options.agentAccount ? COSTS.agentAccount : 0n);
-  // A resumed run (contract account already created) only needs what is still to be spent, plus a margin for gas.
-  const required = exists ? need + COSTS.gasMargin : COSTS.ownerMinimum;
-  if (balance < required && execute) throw invalid(`${owner} has ${balance} yoctoNEAR; at least ${exists ? `${required} yocto (about ${need} yocto plus gas)` : "6.5 NEAR"} is needed. Get testnet NEAR from a faucet first.`);
+  // Only what is still to be spent counts, so a finished or nearly finished deployment can always be re-checked.
+  const known = exists && !needsDeploy ? await chain.agent(contract, agentId) : null;
+  const agentAccountDone = options.agentAccount && options.runtimePublicKey !== null && await chain.accountExists(agentId);
+  const need = (exists ? 0n : COSTS.contractAccount) + (known ? 0n : COSTS.registerAgent) + (known && BigInt(known.deposited) > 0n ? 0n : COSTS.fund) + (options.agentAccount && !agentAccountDone ? COSTS.agentAccount : 0n);
+  const required = !exists ? COSTS.ownerMinimum : need === 0n ? 0n : need + COSTS.gasMargin;
+  if (balance < required && execute) throw invalid(`${owner} has ${balance} yoctoNEAR; at least ${!exists ? "6.5 NEAR" : `${required} yocto (about ${need} yocto plus gas)`} is needed. Get testnet NEAR from a faucet first.`);
   if (!exists) {
     record("contract-account", execute ? "did" : "will-do", `create ${contract} with 5 NEAR`);
     if (execute) { if (!options.contractPublicKey) throw invalid("Missing contract account key"); await chain.createContractAccount(contract, options.contractPublicKey, COSTS.contractAccount); }

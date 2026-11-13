@@ -28,6 +28,7 @@ process.once("message", async (input: unknown) => {
     const key = KeyPair.fromString(opened.secret as Parameters<typeof KeyPair.fromString>[0]);
     if (opened.account !== input.account || key.getPublicKey().toString() !== input.ownerPublicKey) { fail("AUTHORIZATION_FAILED"); return; }
     const provider = new JsonRpcProvider({ url: url.toString() });
+    // Anything that throws from here until the hash exists is a definite "nothing was sent" failure.
     const access = await provider.query({ request_type: "view_access_key", finality: "final", account_id: opened.account, public_key: input.ownerPublicKey }) as unknown as { nonce: number | string; block_hash: string; permission: unknown };
     if (access.permission !== "FullAccess") { fail("AUTHORIZATION_FAILED"); return; }
     const built = createTransaction(opened.account, PublicKey.fromString(input.ownerPublicKey), tx.receiverId, BigInt(access.nonce) + 1n,
