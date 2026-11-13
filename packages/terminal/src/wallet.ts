@@ -7,7 +7,7 @@ import type { OwnerChallenge, PauseRequest } from "../../owner/src/types.js";
 import { transactionHash } from "../../near/src/protocol.js";
 
 export interface OwnerProof { challengeId: string; accountId: string; publicKey: string; signature: string }
-export interface TerminalWallet { signMessage(challenge: OwnerChallenge): Promise<OwnerProof>; send(request: PauseRequest): Promise<string> }
+export interface TerminalWallet { signMessage(challenge: OwnerChallenge): Promise<OwnerProof>; send(request: PauseRequest): Promise<string>; /** One line shown in the sign-in review saying who signs. */ readonly signerNote?: string | undefined }
 export type WalletRunner = (binary: string, args: string[], signal?: AbortSignal) => Promise<{ stdout: string; stderr: string }>;
 const runner: WalletRunner = (binary, args, signal) => promisify(execFile)(binary, args, { timeout: 120_000, maxBuffer: 200_000, ...(signal ? { signal } : {}) });
 function clean(output: { stdout: string; stderr: string }) { return `${output.stdout}\n${output.stderr}`.replace(/\u001b\[[0-9;]*m/g, ""); }
@@ -21,6 +21,7 @@ function jsonObjects(raw: string) {
 }
 /** External official CLI keychain only. No wallet private-key file or arbitrary method input. */
 export class NearCliWallet implements TerminalWallet {
+  readonly signerNote = "The official NEAR CLI signs through its external keychain.";
   constructor(private readonly binary = "near", private readonly execute: WalletRunner = runner, private readonly signal?: AbortSignal) {}
   async signMessage(challenge: OwnerChallenge): Promise<OwnerProof> {
     let output;

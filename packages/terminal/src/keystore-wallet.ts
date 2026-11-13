@@ -19,6 +19,9 @@ export async function unlockKeystore(account: string, directory: string, passphr
  * (pause/resume) are NOT signed here yet: they are delegated to a fallback wallet (the NEAR CLI) or refused.
  */
 export class KeystoreWallet implements TerminalWallet {
+  get signerNote(): string | undefined {
+    return this.passphrase() === null && this.fallback ? this.fallback.signerNote : "Persistara's encrypted key store signs, in a separate short-lived process.";
+  }
   constructor(private readonly account: string, private readonly directory: string, private readonly passphrase: () => string | null,
     private readonly fallback: TerminalWallet | null = null, private readonly execute: WorkerExecutor = executeWorker) {}
   async signMessage(challenge: OwnerChallenge): Promise<OwnerProof> {

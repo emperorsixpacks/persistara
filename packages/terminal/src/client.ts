@@ -31,7 +31,7 @@ export class TerminalClient {
     this.disconnect();
     const challenge = await this.auth.challenge(this.#challenge); this.#challenge = challenge.id;
     const c = this.services.service.config;
-    if (!await this.confirm({ kind: "connect", title: "Connect owner wallet", digest: hash(challenge.message), costs: false, details: { account: challenge.signerId, agent: c.agentId, contract: c.contractId, network: "NEAR testnet", publicKey: challenge.publicKey, recipient: challenge.recipient, message: challenge.message, effect: "Sign a message for a 10-minute session. No transaction, payment or added key." } })) throw canceled();
+    if (!await this.confirm({ kind: "connect", title: "Connect owner wallet", digest: hash(challenge.message), costs: false, details: { account: challenge.signerId, agent: c.agentId, contract: c.contractId, network: "NEAR testnet", signer: this.wallet.signerNote ?? "", publicKey: challenge.publicKey, recipient: challenge.recipient, message: challenge.message, effect: "Sign a message for a 10-minute session. No transaction, payment or added key." } })) throw canceled();
     const result = await this.auth.login(challenge.id, await this.wallet.signMessage(challenge));
     this.#challenge = undefined; this.#token = result.token; this.#csrf = result.session.csrf;
     return { authenticated: true, owner: result.session.owner, expiresAt: result.session.expiresAt };

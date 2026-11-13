@@ -79,7 +79,7 @@ export function missionText(d: MissionDetail) {
     "\nCollection/signatures do not establish source truth. Inspect the dossier before review."].join("\n");
 }
 export function reviewText(review: TerminalReview, full = false) {
-  if (review.kind === "connect" && !full) return [review.title, `  Account    ${review.details.account}`, `  Network    ${review.details.network ?? "NEAR testnet"}`, ...(review.details.agent ? [`  Agent      ${review.details.agent}`] : []), ...(review.details.contract ? [`  Contract   ${review.details.contract}`] : []), `  Owner key  ${review.details.publicKey}`, `\n${review.details.effect}`, "The official NEAR CLI signs through its external keychain."].join("\n");
+  if (review.kind === "connect" && !full) return [review.title, `  Account    ${review.details.account}`, `  Network    ${review.details.network ?? "NEAR testnet"}`, ...(review.details.agent ? [`  Agent      ${review.details.agent}`] : []), ...(review.details.contract ? [`  Contract   ${review.details.contract}`] : []), `  Owner key  ${review.details.publicKey}`, `\n${review.details.effect}`, review.details.signer || "The official NEAR CLI signs through its external keychain."].join("\n");
   return [review.title, ...Object.entries(review.details).map(([key, value]) => `${key}: ${value}`), `Review digest: ${review.digest}`, ...(review.costs ? ["This action may spend testnet funds or gas."] : [])].join("\n");
 }
 export function commissionText(c: CommissionView) {
