@@ -33,3 +33,7 @@ Run each paid step once. Do not loop or script retries.
 ## After acceptance
 
 Passing this gate enables only the three read-only tools in the current milestone. Streaming (`NEARAI_STREAM=enabled`) is implemented and unit-tested against synthetic bytes, off by default, and is accepted only if step 3b passes; it shows no partial text (a reply appears only after full verification). Still open afterward: richer reviewed agent actions, per-request price validation, and a real-terminal capture. (Owner resolution of unknown attempts and encrypted chat-session backup exist offline; neither has been exercised against live inference.)
+
+## Chat acceptance attempt, 2026-11-13 (step 4): fail-closed, not passed
+
+One message ("what saved missions do I have?") through the real terminal against a throwaway testnet deployment, three attempts. Each ended `VERIFICATION_FAILED` with the SDK diagnostic `quote.collateral_unavailable`: the attestation quote's collateral could not be fetched from the upstream service, so the reply was refused and nothing was saved (about 450 tokens in, 40 out per attempt; well under the $1 cap). A standalone `pnpm spike:inference` request made minutes later verified successfully, so this is an intermittent upstream condition, not a wrong key or model. **Step 4 is therefore not passed**; chat stays off by default and unverified replies are never shown. Retry when the collateral service is reachable.
