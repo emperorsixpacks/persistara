@@ -151,7 +151,7 @@ Replace the uppercase placeholders with fingerprints you inspected independently
 
 ## Owner controls
 
-`/pause` and `/resume-agent` prepare exact zero-deposit `set_paused` requests and show the original owner/key, contract, digest and maximum 100 Tgas before external signing. Gas costs testnet NEAR. The canonical owner journal records wallet handoff first. A wallet failure/cancellation or missing hash remains unresolved and cannot be sent again.
+`/pause` and `/resume-agent` prepare exact zero-deposit `set_paused` requests and show the original owner/key, contract, digest and maximum 100 Tgas before signing (by the encrypted key store in a separate short-lived process, or by the NEAR CLI if you use that wallet). Gas costs testnet NEAR. The canonical owner journal records wallet handoff first. A wallet failure/cancellation or missing hash remains unresolved and cannot be sent again.
 
 For a structured review, `owner prepare pause` or `owner prepare resume` creates/reuses the unsubmitted request and exposes its digest. Then the exact digest/cost consent can authorize `owner pause`/`owner resume`. A declined interactive review cancels only an unsubmitted request. Use `/owner-reconcile wallet:UUID TRANSACTION_HASH` to verify the fixed finalized public receipt or `/owner-cancel wallet:UUID` before handoff. The external CLI's returned hash is only a candidate; the same service verifies actual signer/key/action/args/gas/zero deposit/nonce/final result as the console. A missing/unsupported wallet hash can remain unknown indefinitely.
 

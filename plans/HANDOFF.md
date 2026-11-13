@@ -2,6 +2,8 @@
 
 Prepared 2026-11-09 against code commit `4d2bbfd2aadb9e8c25db3f5fd0ea32b70dd2e972`. This is a repository handoff, not a fresh audit or a statement that the whole product is complete. No source code or live state was changed while preparing it.
 
+**Owner pause through the key store (2026-11-13):** `KeystoreWallet.send` now signs and broadcasts the exact `set_paused` transaction in `packages/owner/src/keystore-tx-worker.ts` (empty env, passphrase over IPC, one bounded broadcast, always returns the tx hash so the owner journal reconciles by hash and never resends). Run live: `/pause` on a throwaway deployment reached `confirmed`, status PAUSED, and a direct signed pause was FINAL on chain. `/resume-agent` is gated by design (needs a verified backup + ready runtime) so it was covered by fake-RPC tests only. The NEAR CLI is no longer needed for pause.
+
 **Chat acceptance step 4 passed (2026-11-13):** one verified chat reply with a read-only tool call, on a throwaway deployment. Earlier attempts failed closed on `quote.collateral_unavailable` (Intel collateral fetch); the worker now retries only that condition around the free verification steps (`packages/inference/src/retry.ts`). Streaming remains off. Not run live: runtime key rotation in agent-account mode, job reservation/acceptance with a worker on the new deployment, owner pause/resume through the key store (still needs the NEAR CLI).
 
 ## Update 2026-11-13 (newest; read before the 2026-11-12 section)
@@ -14,7 +16,7 @@ Traps: pass `--project <dir>` to `persistara` to test against another deployment
 
 ## Update 2026-11-12 (read this first; the sections below describe the 2026-11-09 baseline)
 
-34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**335 tests / 58 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
+34 commits since `4d2bbfd`, all on `main`, tested with `pnpm check` (**337 tests / 58 suites**) and `pnpm contract:check` (35 Rust tests + six sandbox scenarios, passed 2026-11-11). Nothing pushed as of this update except up to `575c953`; the push and making the repo public are the owner's decisions.
 
 **Hackathon facts (from `HACKATHON.md`, recheck the live copy before submitting):** development and submission end **2026-11-14T23:59:00Z**. The repo must be public by then; the owner posts the demo on X; submission is one POST after the owner confirms the exact payload. Never push, make public, post, sign, deploy to mainnet or submit without the owner's explicit yes. Judging agents reproduce from a clean clone, so every claim must be reproducible without secrets: see the README's "Verify it yourself".
 
@@ -29,7 +31,7 @@ Traps: pass `--project <dir>` to `persistara` to test against another deployment
 **Open, in priority order**
 1. Owner decisions pending: push `main` and make the repo public; demo video + X post; the submission payload (name, lead, email, team size, tracks, a mainnet NEAR address, repo and post links). 25 commits carry a personal author email; rewriting history was not done.
 2. Owner-run checks that need their key: `wallet add`, startup passphrase, `/connect`, then the paid acceptance steps in INFERENCE-ACCEPTANCE (step 4: chat in the real terminal), then optionally the testnet deployment.
-3. Unbuilt: signing pause/resume with the key store, verified streaming, fresh-agent enrollment tooling beyond `near:deploy`, mainnet support, in-app mouse selection.
+3. Unbuilt: verified streaming, fresh-agent enrollment tooling beyond `near:deploy`, mainnet support, in-app mouse selection.
 
 **Traps learned the hard way**
 - **The client requires the local contract WASM's SHA-256 to equal the on-chain code hash, and builds are not reproducible.** Never run `pnpm contract:build`/`contract:check` in a workspace tied to a deployment (they overwrite the file); recover it with `pnpm contract:fetch --expected-hash <recorded hash>`. A run with the wrong file creates empty journals bound to the wrong hash ("Owner operation journal is invalid or changed"); remove them only if they hold no operations.

@@ -9,7 +9,7 @@ Persistara is a terminal tool for an AI agent that **you** control through your 
 | The program (`persistara`) | Free | everything |
 | A NEAR **testnet** owner account | Free (faucet) | owning the agent |
 | About 7 testnet NEAR on that account | Free (faucet) | deploying your own contract and funding the agent |
-| The official NEAR CLI (prebuilt binary) | Free | **optional**: only to create a new account with it, or for owner pause/resume |
+| The official NEAR CLI (prebuilt binary) | Free | **optional**: only to create a new account with it |
 | A NEAR AI API key with credits | **Real money** (or the hackathon's $10 claim) | AI chat only |
 | A 0G storage wallet | Free testnet funds | memory uploads only (optional) |
 
@@ -80,7 +80,7 @@ Settings reference: [NEAR-CLIENTS.md](NEAR-CLIENTS.md), [INTEGRATIONS.md](INTEGR
 
 Run `persistara`. If you stored a key in step 2 it asks for your key-store passphrase first (press Enter to skip), before the full-screen app opens. Then `/connect`: it shows exactly what you are signing, a separate short-lived process signs it, and Persistara checks the key is the registered owner key. The key is never in the chat or agent process. After this you can create source missions with `/new` and `/run` and review them ([TERMINAL.md](TERMINAL.md)).
 
-Owner **pause/resume** transactions are not signed by the key store yet: for those, use the NEAR CLI keychain (`persistara wallet near-cli`).
+Owner **pause/resume** transactions are signed by the key store too, in a second short-lived signer process (same passphrase, same isolation): `/pause` was run live this way on testnet. `/resume-agent` additionally requires a verified current memory backup and a ready runtime, so a brand-new agent with no backup cannot be resumed yet. Prefer the NEAR CLI keychain for these? `persistara wallet near-cli` still works.
 
 ## 7. Optional: turn on AI chat (this costs money)
 

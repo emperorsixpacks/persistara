@@ -4,7 +4,9 @@ import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { KeyPair } from "near-api-js";
+import { createServer } from "node:http";
+import { createHash } from "node:crypto";
+import { KeyPair, SignedTransaction, baseEncode, encodeTransaction } from "near-api-js";
 import { verifyMessage } from "near-api-js/nep413";
 import { saveKeystoreEntry } from "../packages/owner/src/keystore.js";
 import type { OwnerChallenge } from "../packages/owner/src/types.js";
@@ -20,6 +22,28 @@ async function setup(account = "owner.testnet") {
   const challenge = (over: Partial<OwnerChallenge> = {}): OwnerChallenge => ({ id: "challenge-1", message: "Persistara CLI sign-in. This is not a transaction.", recipient: "persistara-cli:v1:testnet:authority.testnet:owner.testnet:research", nonce: randomBytes(32).toString("base64url"),
     expiresAt: Date.now() + 60_000, signerId: account, publicKey: pub, network: "testnet", ...over });
   return { dir, pub, secret: pair.toString(), challenge, done: () => rm(dir, { recursive: true, force: true }) };
+}
+function pauseRequest(ownerKey: string) {
+  return { schemaVersion: 1, id: "wallet:00000000-0000-4000-8000-000000000000", kind: "OWNER_PAUSE_REQUEST", network: { kind: "testnet", chainId: "testnet" }, agentId: "research.owner.testnet", signerId: "owner.testnet", ownerPublicKey: ownerKey,
+    receiverId: "authority.testnet", expectedGeneration: "1", minimumNonce: 0, paused: true,
+    actions: [{ type: "FunctionCall", params: { methodName: "set_paused", args: { agent_id: "research.owner.testnet", paused: true }, gas: "100000000000000", deposit: "0" } }] } as unknown as Parameters<KeystoreWallet["send"]>[0];
+}
+/** A local JSON-RPC stand-in: serves the owner's full-access key at nonce 40 and records every broadcast. */
+async function fakeRpc(ownerKey: string) {
+  const broadcasts: string[] = []; const state = { failBroadcast: false };
+  const server = createServer((req, res) => {
+    let body = ""; req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      const call = JSON.parse(body) as { id: unknown; method: string; params: unknown };
+      const ok = (result: unknown) => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ jsonrpc: "2.0", id: call.id, result })); };
+      if (call.method === "query") return ok({ nonce: 40, block_hash: baseEncode(randomBytes(32)), block_height: 1, permission: "FullAccess", public_key: ownerKey });
+      if (call.method === "send_tx") { broadcasts.push((call.params as { signed_tx_base64: string }).signed_tx_base64); if (state.failBroadcast) { res.statusCode = 500; res.end("{}"); return; } return ok("hash"); }
+      res.statusCode = 400; res.end("{}");
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  return { url: `http://127.0.0.1:${port}`, broadcasts, set failBroadcast(v: boolean) { state.failBroadcast = v; }, close: () => new Promise<void>((resolve) => { server.closeAllConnections(); server.close(() => resolve()); }) };
 }
 const provider = (account: string, key: string) => ({ viewAccessKey: async () => ({ nonce: 0n, permission: "FullAccess" }), account, key }) as unknown as Parameters<typeof verifyMessage>[0]["provider"];
 
@@ -44,12 +68,42 @@ describe("key store wallet (real signer process)", () => {
       await assert.rejects(new KeystoreWallet("nobody.testnet", t.dir, () => PASS).signMessage(t.challenge({ signerId: "nobody.testnet" })), { code: "NOT_CONFIGURED" });
     } finally { await t.done(); }
   });
-  it("delegates owner transactions to a fallback wallet, or refuses clearly; it never signs them itself", async () => {
+  it("without an RPC URL or a passphrase it delegates owner transactions to a fallback wallet, or refuses clearly", async () => {
     const t = await setup(); const request = { id: "r" } as never;
     try {
-      await assert.rejects(new KeystoreWallet("owner.testnet", t.dir, () => PASS).send(request), { code: "UNSUPPORTED" });
+      await assert.rejects(new KeystoreWallet("owner.testnet", t.dir, () => PASS).send(request), { code: "AUTHORIZATION_FAILED" });
       const fallback: TerminalWallet = { signMessage: async () => assert.fail("not used"), send: async () => "HASH123" };
       assert.equal(await new KeystoreWallet("owner.testnet", t.dir, () => PASS, fallback).send(request), "HASH123");
+      assert.equal(await new KeystoreWallet("owner.testnet", t.dir, () => null, fallback, undefined, "http://127.0.0.1:1").send(request), "HASH123");
     } finally { await t.done(); }
+  });
+  it("signs and broadcasts the owner pause transaction in the signer process: exact action, owner key, one broadcast, hash returned", async () => {
+    const t = await setup(); const rpc = await fakeRpc(t.pub);
+    try {
+      const request = pauseRequest(t.pub);
+      const hash = await new KeystoreWallet("owner.testnet", t.dir, () => PASS, null, undefined, rpc.url).send(request);
+      assert.equal(rpc.broadcasts.length, 1, "exactly one broadcast");
+      const decoded = SignedTransaction.decode(Buffer.from(rpc.broadcasts[0]!, "base64"));
+      assert.equal(decoded.transaction.signerId, "owner.testnet"); assert.equal(decoded.transaction.receiverId, "authority.testnet");
+      assert.equal(decoded.transaction.publicKey.toString(), t.pub); assert.equal(decoded.transaction.nonce, 41n);
+      const call = decoded.transaction.actions[0]!.functionCall!;
+      assert.equal(call.methodName, "set_paused"); assert.equal(call.deposit, 0n); assert.equal(call.gas, 100_000_000_000_000n);
+      assert.deepEqual(JSON.parse(Buffer.from(call.args).toString()), { agent_id: "research.owner.testnet", paused: true });
+      assert.equal(hash, baseEncode(createHash("sha256").update(encodeTransaction(decoded.transaction)).digest()));
+    } finally { await rpc.close(); await t.done(); }
+  });
+  it("refuses before signing anything when the request, key or passphrase is wrong, and reports a lost broadcast reply as a hash to reconcile", async () => {
+    const t = await setup(); const rpc = await fakeRpc(t.pub);
+    try {
+      const wallet = (pass = PASS, account = "owner.testnet") => new KeystoreWallet(account, t.dir, () => pass, null, undefined, rpc.url);
+      await assert.rejects(wallet().send({ ...pauseRequest(t.pub), actions: [{ type: "FunctionCall", params: { methodName: "withdraw_funds", args: {}, gas: "100000000000000", deposit: "0" } }] } as never), { code: "INVALID_INPUT" });
+      await assert.rejects(wallet().send({ ...pauseRequest(t.pub), signerId: "other.testnet" }), { code: "INVALID_INPUT" });
+      await assert.rejects(wallet().send({ ...pauseRequest(KeyPair.fromRandom("ed25519").getPublicKey().toString()) }), { code: "AUTHORIZATION_FAILED" });
+      await assert.rejects(wallet("wrong passphrase value").send(pauseRequest(t.pub)), { code: "AUTHORIZATION_FAILED" });
+      assert.equal(rpc.broadcasts.length, 0, "nothing was broadcast by any refusal");
+      rpc.failBroadcast = true; // the reply is lost but the transaction hash is already known
+      assert.match(await wallet().send(pauseRequest(t.pub)), /^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
+      assert.equal(rpc.broadcasts.length, 1, "one bounded attempt, never a second transaction");
+    } finally { await rpc.close(); await t.done(); }
   });
 });
