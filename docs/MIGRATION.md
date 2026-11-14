@@ -1,6 +1,6 @@
 # Selective migration from Sofer
 
-Source: `/Users/ram/Desktop/sofer`, origin `https://github.com/JemIIahh/sofer.git`, HEAD `542813f` at review. The working tree contains existing web relocation/new web work and a changed lockfile. Preserve those changes. This migration copies approved material; it never removes or resets source files.
+Source: `/Users/ram/Desktop/sofer`, HEAD `542813f` at review. The working tree contains existing web relocation/new web work and a changed lockfile. Preserve those changes. This migration copies approved material; it never removes or resets source files.
 
 ## Selection
 
