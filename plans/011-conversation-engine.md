@@ -82,7 +82,7 @@ Out of scope: contract source/deployment/state migration; existing funded accoun
 | Contract regressions | `pnpm contract:check` | Exit 0; formatting/Clippy, 34 Rust tests and six sandbox scenarios remain green |
 | Final scope | `git diff --check` and `git status --short` | No whitespace errors or unrelated/private files |
 
-New conversation test paths above are deliverables to create, not commands claimed to exist at handoff. Build once before filtered Node test commands; do not run multiple compilers into the same `dist/` concurrently. HTTP/browser/sandbox checks need loopback permission. Tests require no production `.env`, wallets, public funds or AI credits. The baseline CI at handoff is <https://github.com/JemIIahh/persistara/actions/runs/42582132526>.
+New conversation test paths above are deliverables to create, not commands claimed to exist at handoff. Build once before filtered Node test commands; do not run multiple compilers into the same `dist/` concurrently. HTTP/browser/sandbox checks need loopback permission. Tests require no production `.env`, wallets, public funds or AI credits. The baseline CI at handoff is <https://github.com/emperorsixpacks/persistara/actions/runs/42582132526>.
 
 ## Ordered implementation
 

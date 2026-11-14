@@ -18,7 +18,7 @@ Mission work and status need no AI key. Chat stays **off** until you turn it on 
 ## 1. Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/emperorsixpacks/persistara/main/install.sh | bash
 ```
 
 Open a new terminal and run `persistara --help`. Details, what it changes and how to uninstall: [INSTALL.md](INSTALL.md). Your private workspace is `~/.persistara-workspace` (`.env`, keys, journals).

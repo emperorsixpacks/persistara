@@ -2,6 +2,8 @@
 
 Prepared 2026-11-09 against code commit `4d2bbfd2aadb9e8c25db3f5fd0ea32b70dd2e972`. This is a repository handoff, not a fresh audit or a statement that the whole product is complete. No source code or live state was changed while preparing it.
 
+**Repository moved (2026-11-14):** the project now lives at `https://github.com/emperorsixpacks/persistara` (private until the owner makes it public). History was rewritten so all commits are authored as the owner's GitHub noreply identity; file contents are unchanged and a local branch `backup-before-author-rewrite` keeps the old hashes. Repo links in the README and install docs were updated. The `JemIIahh/sofer` links in `NOTICE`, `docs/MIGRATION.md` and `migration/provenance.json` are the recorded source of the imported Sofer code and were left as provenance. Commit hashes quoted in older notes (for example `c25373c`, `39f9e28`) refer to the pre-rewrite history.
+
 **Owner pause through the key store (2026-11-13):** `KeystoreWallet.send` now signs and broadcasts the exact `set_paused` transaction in `packages/owner/src/keystore-tx-worker.ts` (empty env, passphrase over IPC, one bounded broadcast, always returns the tx hash so the owner journal reconciles by hash and never resends). Run live: `/pause` on a throwaway deployment reached `confirmed`, status PAUSED, and a direct signed pause was FINAL on chain. `/resume-agent` is gated by design (needs a verified backup + ready runtime) so it was covered by fake-RPC tests only. The NEAR CLI is no longer needed for pause.
 
 **Chat acceptance step 4 passed (2026-11-13):** one verified chat reply with a read-only tool call, on a throwaway deployment. Earlier attempts failed closed on `quote.collateral_unavailable` (Intel collateral fetch); the worker now retries only that condition around the free verification steps (`packages/inference/src/retry.ts`). Streaming remains off. Not run live: runtime key rotation in agent-account mode, job reservation/acceptance with a worker on the new deployment, owner pause/resume through the key store (still needs the NEAR CLI).
@@ -52,13 +54,13 @@ Read in order: this guide → [AGENTS](../AGENTS.md) → [product](../docs/PRODU
 
 | Item | Snapshot / instruction |
 | --- | --- |
-| Repository | <https://github.com/JemIIahh/persistara> |
+| Repository | <https://github.com/emperorsixpacks/persistara> |
 | Branch / visibility | `main`; **private** at handoff |
 | Canonical configured checkout | `/Users/ram/Desktop/persistara` |
 | Earlier agent staging checkout | `/private/tmp/persistara`; temporary, not a runtime/recovery dependency |
 | Separate original project | `/Users/ram/Desktop/sofer`; do not develop Persistara there or overwrite its unrelated work |
 | Latest verified code | `4d2bbfd` (this documentation may be a later descendant) |
-| Fully green baseline CI | <https://github.com/JemIIahh/persistara/actions/runs/42582132526> |
+| Fully green baseline CI | <https://github.com/emperorsixpacks/persistara/actions/runs/42582132526> |
 
 The previous coding environment started in the Sofer directory and allowed source writes there and in temporary directories. That did **not** make Sofer the target project. Check your own filesystem permissions; if staging is needed, keep one authoritative branch and sync a clean checkout by fast-forward. Never overwrite someone else's new changes. Work single-agent unless the operator authorizes delegation.
 
@@ -94,7 +96,7 @@ Baseline checks passed: **230 TypeScript tests / 34 suites; 11 browser fixture t
 For a fresh source checkout, authenticate to the private repository through the operator's normal GitHub workflow:
 
 ```sh
-git clone https://github.com/JemIIahh/persistara.git
+git clone https://github.com/emperorsixpacks/persistara.git
 cd persistara
 pnpm install --frozen-lockfile
 pnpm check

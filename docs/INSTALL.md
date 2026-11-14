@@ -5,19 +5,19 @@ New to Persistara? [GETTING-STARTED.md](GETTING-STARTED.md) covers the whole fir
 ## One-line install (macOS, Linux, WSL)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/emperorsixpacks/persistara/main/install.sh | bash
 ```
 
 No clone is needed. This URL only works for everyone **after the repository is public**. While it is private, collaborators with GitHub access can still skip cloning:
 
 ```sh
-gh api repos/JemIIahh/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+gh api repos/emperorsixpacks/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 ```
 
 or clone with their own git access and run the script from the checkout (the script fetches through git, so existing credentials are used):
 
 ```sh
-git clone https://github.com/JemIIahh/persistara.git && bash persistara/install.sh
+git clone https://github.com/emperorsixpacks/persistara.git && bash persistara/install.sh
 ```
 
 Prefer to read it first: `curl -fsSL <url> -o install.sh && less install.sh && bash install.sh`. Pin a version with `--ref <tag-or-full-commit>` (default `main`), and preview with `--dry-run`.

@@ -6,19 +6,19 @@ Persistara is a new successor to Sofer: a terminal-first workspace for owner-con
 
 The selected stack is **NEAR ownership and settlement + 0G encrypted storage + NEAR AI inference**. This repository starts fresh. It selectively adapts reviewed Sofer primitives; it is not a renamed copy or a claim that old work was built during the hackathon.
 
-Repository: https://github.com/JemIIahh/persistara. Development visibility: private; the hackathon release must be public by its submission deadline.
+Repository: https://github.com/emperorsixpacks/persistara. Development visibility: private; the hackathon release must be public by its submission deadline.
 
 ## Install
 
 You do **not** need to clone the repository. Run one command:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JemIIahh/persistara/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/emperorsixpacks/persistara/main/install.sh | bash
 ```
 
 Then open a new terminal and run `persistara --help`. **First time? Follow the [getting-started guide](docs/GETTING-STARTED.md)** for the whole path: accounts, testnet funds, deploying your own agent, signing in and optional AI chat. It builds the CLI, adds `persistara` to your PATH and creates a private workspace in `~/.persistara-workspace`. It needs `git` and either `pnpm` or Node.js, and no `sudo`. To remove it: `curl -fsSL <same url> | bash -s -- --uninstall` (your workspace is kept).
 
-- **Repository still private?** The URL above only works for everyone once the repository is public. Collaborators with GitHub access can run the same script without cloning: `gh api repos/JemIIahh/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash`.
+- **Repository still private?** The URL above only works for everyone once the repository is public. Collaborators with GitHub access can run the same script without cloning: `gh api repos/emperorsixpacks/persistara/contents/install.sh -H "Accept: application/vnd.github.raw" | bash`.
 - **Want to read it first?** `curl -fsSL <url> -o install.sh && less install.sh && bash install.sh`. Preview with `--dry-run`; pin a version with `--ref <tag-or-commit>`.
 - **What it does not do:** it does not deploy a contract or create accounts. You still need your own deployed authority, its exact WASM and your NEAR account. See [INSTALL.md](docs/INSTALL.md) for every change it makes and what you still need.
 
@@ -27,7 +27,7 @@ Then open a new terminal and run `persistara --help`. **First time? Follow the [
 For reviewers and automated checks. Everything below ran from a clean clone with no `.env`, no contract artifact and no secrets. Needs `git`, Node.js 20+ with `corepack` (or pnpm 10.26) and an internet connection for `pnpm install`; pnpm downloads the pinned Node 24 runtime itself.
 
 ```sh
-git clone https://github.com/JemIIahh/persistara.git && cd persistara
+git clone https://github.com/emperorsixpacks/persistara.git && cd persistara
 pnpm install --frozen-lockfile
 pnpm check                      # typecheck + build + 339 tests / 58 suites, about 25 s -> "ℹ pass 339 / ℹ fail 0"
 pnpm memory:recover:fixture     # fresh process recovers encrypted memory from a backup -> "originalStateAvailable": false, keys unused

@@ -17,7 +17,7 @@
 # Persistara needs a deployed authority contract and your own NEAR/NEAR AI accounts; installing the program does not create them.
 set -euo pipefail
 
-REPO_URL="${PERSISTARA_REPO:-https://github.com/JemIIahh/persistara.git}"
+REPO_URL="${PERSISTARA_REPO:-https://github.com/emperorsixpacks/persistara.git}"
 REF="${PERSISTARA_REF:-main}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 INSTALL_DIR="${PERSISTARA_INSTALL_DIR:-$DATA_HOME/persistara/app}"
